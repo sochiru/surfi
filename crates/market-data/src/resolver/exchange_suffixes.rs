@@ -26,6 +26,7 @@ pub struct ExchangeSuffix {
 /// for each supported provider.
 pub struct ExchangeMap {
     mappings: HashMap<Mic, HashMap<ProviderId, ExchangeSuffix>>,
+    tradingview_prefixes: HashMap<Mic, Cow<'static, str>>,
 }
 
 impl Default for ExchangeMap {
@@ -39,6 +40,7 @@ impl ExchangeMap {
     pub fn new() -> Self {
         let mut map = Self {
             mappings: HashMap::new(),
+            tradingview_prefixes: HashMap::new(),
         };
         map.load_defaults();
         map
@@ -79,6 +81,22 @@ impl ExchangeMap {
                 );
             }
 
+            if let Some(ref tv) = entry.tradingview {
+                self.tradingview_prefixes
+                    .insert(Cow::Owned(entry.mic.clone()), Cow::Owned(tv.prefix.clone()));
+
+                // Currency mapping for this provider is used by ResolverChain.get_currency().
+                // TradingView equities are resolved as `PREFIX:TICKER`, so suffix is always empty.
+                let currency = entry.currency.as_deref().unwrap_or("USD");
+                provider_map.insert(
+                    Cow::Owned("TRADINGVIEW".to_string()),
+                    ExchangeSuffix {
+                        suffix: Cow::Borrowed(""),
+                        currency: Cow::Owned(currency.to_string()),
+                    },
+                );
+            }
+
             if !provider_map.is_empty() {
                 self.mappings
                     .insert(Cow::Owned(entry.mic.clone()), provider_map);
@@ -100,6 +118,11 @@ impl ExchangeMap {
             .get(mic)?
             .get(provider)
             .map(|s| s.currency.as_ref())
+    }
+
+    /// Get the TradingView exchange prefix for an MIC (e.g., `PSE` for `XPHS`).
+    pub fn get_tradingview_prefix(&self, mic: &Mic) -> Option<&str> {
+        self.tradingview_prefixes.get(mic).map(|p| p.as_ref())
     }
 
     /// Check if a MIC is supported.

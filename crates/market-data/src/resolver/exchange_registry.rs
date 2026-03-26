@@ -33,6 +33,8 @@ pub struct ExchangeEntry {
     pub yahoo: Option<YahooInfo>,
     #[serde(default)]
     pub alpha_vantage: Option<ProviderInfo>,
+    #[serde(default)]
+    pub tradingview: Option<TradingViewInfo>,
 }
 
 #[derive(Debug, Clone, Deserialize, serde::Serialize)]
@@ -49,6 +51,11 @@ pub struct ProviderInfo {
     pub suffix: String,
     #[serde(default)]
     pub currency: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, serde::Serialize)]
+pub struct TradingViewInfo {
+    pub prefix: String,
 }
 
 // ── Public API type for frontend consumption ─────────────────────────────────

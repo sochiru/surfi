@@ -69,6 +69,16 @@ impl RulesResolver {
             });
         }
 
+        if provider.as_ref() == "TRADINGVIEW" {
+            if let Some(mic_cow) = mic.as_ref() {
+                if let Some(prefix) = self.exchange_map.get_tradingview_prefix(mic_cow) {
+                    return Some(ProviderInstrument::EquitySymbol {
+                        symbol: Arc::from(format!("{}:{}", prefix, ticker)),
+                    });
+                }
+            }
+        }
+
         let provider_ticker = if provider.as_ref() == "YAHOO" {
             yahoo_equity_base_to_provider(ticker)
         } else {
@@ -441,6 +451,24 @@ mod tests {
         match resolved.instrument {
             ProviderInstrument::EquitySymbol { symbol } => {
                 assert_eq!(symbol.as_ref(), "SHOP.TRT");
+            }
+            _ => panic!("Expected EquitySymbol"),
+        }
+    }
+
+    #[test]
+    fn test_resolve_ph_equity_tradingview() {
+        let resolver = RulesResolver::new();
+        let context = make_equity_context("SM", Some("XPHS"));
+
+        let result = resolver.resolve(&"TRADINGVIEW".into(), &context);
+
+        assert!(result.is_some());
+        let resolved = result.unwrap().unwrap();
+
+        match resolved.instrument {
+            ProviderInstrument::EquitySymbol { symbol } => {
+                assert_eq!(symbol.as_ref(), "PSE:SM");
             }
             _ => panic!("Expected EquitySymbol"),
         }
