@@ -23,6 +23,7 @@ import {
   Skeleton,
 } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
+import { useAccounts } from "@/hooks/use-accounts";
 import { useTaxonomy } from "@/hooks/use-taxonomies";
 import type { TaxonomyCategory } from "@/lib/types";
 
@@ -35,9 +36,11 @@ import {
 import { PRESET_FLAGS } from "@/features/spending/components/rule-preset-constants";
 import { RulePresetPicker } from "@/features/spending/components/rule-preset-picker";
 import type {
+  RuleFormAccountOption,
   RuleFormCategoryOption,
   RuleFormValues,
 } from "@/features/spending/components/rule-form";
+import { isSpendingAccountType } from "@/features/spending/lib/constants";
 import {
   useCategorizationRuleMutations,
   useCategorizationRules,
@@ -55,7 +58,8 @@ const SAVINGS_TAXONOMY = "savings_categories";
 
 export default function SpendingRulesPage() {
   const { t } = useTranslation();
-  const { isEnabled, isLoading: settingsLoading } = useSpendingSettings();
+  const { isEnabled, isLoading: settingsLoading, accountIds } = useSpendingSettings();
+  const { accounts } = useAccounts({ filterActive: false });
   const {
     data: rules = [],
     isLoading: rulesLoading,
@@ -133,6 +137,23 @@ export default function SpendingRulesPage() {
     return meta;
   }, [presets]);
 
+  const { accountOptions, accountMeta } = useMemo(() => {
+    // Only tracked spending accounts are offered: a rerun walks just those
+    // accounts, so a rule scoped anywhere else could never fire.
+    const tracked = new Set(accountIds);
+    const opts: RuleFormAccountOption[] = accounts
+      .filter((a) => isSpendingAccountType(a.accountType) && tracked.has(a.id))
+      .map((a) => ({ id: a.id, name: a.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    // Names cover every account, not just the pickable ones, so a rule scoped to
+    // an account the user has since untracked still renders a real name.
+    const meta: Record<string, string> = {};
+    accounts.forEach((a) => {
+      meta[a.id] = a.name;
+    });
+    return { accountOptions: opts, accountMeta: meta };
+  }, [accounts, accountIds]);
+
   if (!settingsLoading && !isEnabled) {
     return <Navigate to="/settings/spending" replace />;
   }
@@ -164,7 +185,10 @@ export default function SpendingRulesPage() {
             categoryId: values.categoryId || null,
             activityType: values.activityType || null,
             priority: values.priority,
-            isGlobal: values.isGlobal,
+            // Always sent explicitly: null clears the column, an id sets it, and
+            // the backend rejects an isGlobal/accountId pair that disagrees.
+            isGlobal: values.accountId === null,
+            accountId: values.accountId,
           },
         },
         {
@@ -181,7 +205,8 @@ export default function SpendingRulesPage() {
           categoryId: values.categoryId || null,
           activityType: values.activityType || null,
           priority: values.priority,
-          isGlobal: values.isGlobal,
+          isGlobal: values.accountId === null,
+          accountId: values.accountId,
         },
         {
           onSuccess: () => setVisibleModal(false),
@@ -387,6 +412,7 @@ export default function SpendingRulesPage() {
                     rule={rule}
                     categoryMeta={categoryMeta}
                     presetMeta={presetMeta}
+                    accountMeta={accountMeta}
                     onEdit={handleEditRule}
                     onDelete={handleDeleteRule}
                   />
@@ -402,6 +428,7 @@ export default function SpendingRulesPage() {
         onClose={() => setVisibleModal(false)}
         rule={selectedRule}
         categoryOptions={categoryOptions}
+        accountOptions={accountOptions}
         onSave={handleSave}
         isLoading={create.isPending || update.isPending}
       />

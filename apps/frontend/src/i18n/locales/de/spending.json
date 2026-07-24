@@ -94,7 +94,11 @@
     "priorityLabel": "Priorität",
     "priorityHint": "Regeln mit höherer Priorität werden zuerst geprüft (0-100).",
     "updateRule": "Regel aktualisieren",
-    "createRule": "Regel erstellen"
+    "createRule": "Regel erstellen",
+    "scopeLabel": "Gilt für",
+    "scopeHint": "Beschränken Sie diese Regel auf ein einzelnes Konto oder wenden Sie sie auf alle erfassten Ausgabenkonten an.",
+    "scopedToAccount": "Gilt nur für {{name}}",
+    "unknownAccount": "Unbekanntes Konto"
   },
   "transactions": {
     "deleteTitle_one": "Transaktion löschen",

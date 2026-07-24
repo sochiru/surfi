@@ -94,7 +94,11 @@
     "priorityLabel": "优先级",
     "priorityHint": "优先级较高的规则会被优先检查（0-100）。",
     "updateRule": "更新规则",
-    "createRule": "创建规则"
+    "createRule": "创建规则",
+    "scopeLabel": "适用于",
+    "scopeHint": "将此规则限定为单个账户，或应用于所有已跟踪的支出账户。",
+    "scopedToAccount": "仅适用于 {{name}}",
+    "unknownAccount": "未知账户"
   },
   "transactions": {
     "deleteTitle_one": "删除交易",

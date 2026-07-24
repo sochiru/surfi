@@ -94,7 +94,11 @@
     "priorityLabel": "Prioridad",
     "priorityHint": "Las reglas de mayor prioridad se comprueban primero (0-100).",
     "updateRule": "Actualizar regla",
-    "createRule": "Crear regla"
+    "createRule": "Crear regla",
+    "scopeLabel": "Se aplica a",
+    "scopeHint": "Limita esta regla a una sola cuenta o aplícala a todas las cuentas de gastos rastreadas.",
+    "scopedToAccount": "Solo se aplica a {{name}}",
+    "unknownAccount": "Cuenta desconocida"
   },
   "transactions": {
     "deleteTitle_one": "Eliminar transacción",

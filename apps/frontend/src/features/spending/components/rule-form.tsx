@@ -33,7 +33,8 @@ export interface RuleFormValues {
   categoryId?: string;
   activityType?: string;
   priority: number;
-  isGlobal: boolean;
+  /** null applies the rule to every account; a value scopes it to that account. */
+  accountId: string | null;
 }
 
 export interface RuleFormCategoryOption {
@@ -46,23 +47,38 @@ export interface RuleFormCategoryOption {
   parentName?: string | null;
 }
 
+export interface RuleFormAccountOption {
+  id: string;
+  name: string;
+}
+
 interface RuleFormProps {
   rule?: CategorizationRule;
   /** Flat list of activity-scope categories from spending, income, and savings taxonomies. */
   categoryOptions: RuleFormCategoryOption[];
+  /** Tracked spending accounts the rule can be scoped to. */
+  accountOptions: RuleFormAccountOption[];
   onSubmit: (values: RuleFormValues) => void;
   onCancel: () => void;
   isLoading?: boolean;
 }
 
 const NONE = "__none__";
+const ALL_ACCOUNTS = "__all__";
 
 const composite = (rule?: CategorizationRule): string => {
   if (rule?.taxonomyId && rule?.categoryId) return `${rule.taxonomyId}:${rule.categoryId}`;
   return "";
 };
 
-export function RuleForm({ rule, categoryOptions, onSubmit, onCancel, isLoading }: RuleFormProps) {
+export function RuleForm({
+  rule,
+  categoryOptions,
+  accountOptions,
+  onSubmit,
+  onCancel,
+  isLoading,
+}: RuleFormProps) {
   const { t } = useTranslation();
 
   const ruleFormSchema = useMemo(
@@ -76,7 +92,7 @@ export function RuleForm({ rule, categoryOptions, onSubmit, onCancel, isLoading 
           categoryId: z.string().optional(),
           activityType: z.string().optional(),
           priority: z.coerce.number().int().min(0),
-          isGlobal: z.boolean(),
+          accountId: z.string().nullable(),
         })
         .refine((data) => data.categoryId || data.activityType, {
           message: t("spending:rules.categoryOrTypeRequired"),
@@ -120,9 +136,20 @@ export function RuleForm({ rule, categoryOptions, onSubmit, onCancel, isLoading 
       categoryId: composite(rule), // we encode taxonomyId:categoryId in this single field
       activityType: rule?.activityType ?? "",
       priority: rule?.priority ?? 0,
-      isGlobal: rule ? Boolean(rule.isGlobal) : true,
+      accountId: rule && !rule.isGlobal ? (rule.accountId ?? null) : null,
     },
   });
+
+  // A rule can reference an account that is no longer tracked (or is archived and
+  // so absent from accountOptions). Keep it in the list so the trigger isn't blank
+  // and the id survives a save untouched.
+  const scopeOptions = useMemo(() => {
+    const scopedId = rule && !rule.isGlobal ? rule.accountId : null;
+    if (!scopedId || accountOptions.some((account) => account.id === scopedId)) {
+      return accountOptions;
+    }
+    return [...accountOptions, { id: scopedId, name: t("spending:rules.unknownAccount") }];
+  }, [accountOptions, rule, t]);
 
   const handleSubmit = (values: RuleFormValues) => {
     // Decode composite categoryId back into taxonomyId + categoryId
@@ -301,6 +328,36 @@ export function RuleForm({ rule, categoryOptions, onSubmit, onCancel, isLoading 
             }}
           />
         </div>
+
+        <FormField
+          control={form.control as never}
+          name="accountId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t("spending:rules.scopeLabel")}</FormLabel>
+              <Select
+                onValueChange={(val) => field.onChange(val === ALL_ACCOUNTS ? null : val)}
+                value={(field.value as string | null) ?? ALL_ACCOUNTS}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value={ALL_ACCOUNTS}>{t("common:component.all_accounts")}</SelectItem>
+                  {scopeOptions.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>{t("spending:rules.scopeHint")}</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control as never}

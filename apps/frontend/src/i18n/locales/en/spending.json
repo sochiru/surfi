@@ -94,7 +94,11 @@
     "priorityLabel": "Priority",
     "priorityHint": "Higher priority rules are checked first (0-100).",
     "updateRule": "Update Rule",
-    "createRule": "Create Rule"
+    "createRule": "Create Rule",
+    "scopeLabel": "Applies To",
+    "scopeHint": "Limit this rule to a single account, or apply it to every tracked spending account.",
+    "scopedToAccount": "Only applies to {{name}}",
+    "unknownAccount": "Unknown account"
   },
   "transactions": {
     "deleteTitle_one": "Delete transaction",
