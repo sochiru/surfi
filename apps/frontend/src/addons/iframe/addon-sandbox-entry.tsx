@@ -1,3 +1,4 @@
+import "./addon-sandbox.css";
 import "@/globals.css";
 
 import * as React from "react";
@@ -16,6 +17,7 @@ import { applyHostTheme, type AddonThemeSnapshot } from "./addon-sandbox-theme";
 import { rewriteModuleSpecifiers } from "./addon-module-rewriter";
 
 const CHANNEL = "wealthfolio:addon-sandbox:v1";
+const RUNTIME_PROTOCOL_VERSION = 1;
 
 interface PendingCall {
   resolve: (value: unknown) => void;
@@ -63,9 +65,10 @@ interface SandboxMessage {
 
 type RouteRenderer = (context: RouteRenderContext) => Promise<void> | void;
 
-const init = new URLSearchParams(window.location.hash.slice(1));
+const init = new URLSearchParams(window.name);
 const ADDON_ID = init.get("addonId") ?? "";
 const NONCE = init.get("nonce") ?? "";
+const HOST_BASE_URL = init.get("hostBaseUrl") ?? "";
 const rootElement = document.getElementById("addon-root");
 const routes = new Map<string, RouteRenderer>();
 const pending = new Map<string, PendingCall>();
@@ -77,7 +80,7 @@ let addonQueryClient: QueryClient | undefined;
 let addonModuleUrls = new Map<string, string>();
 let reactRouteRoot: ReactDOMClient.Root | undefined;
 
-if (!ADDON_ID || !NONCE || !rootElement) {
+if (!ADDON_ID || !NONCE || !HOST_BASE_URL || !rootElement) {
   throw new Error("Invalid addon sandbox bootstrap parameters");
 }
 
@@ -94,6 +97,9 @@ function callHost(type: string, payload: Record<string, unknown> = {}) {
     post(type, { requestId, ...payload });
   });
 }
+
+globalThis.__wealthfolioRequestTickerLogo = (symbol: string) =>
+  callHost("hostAssetRequest", { kind: "tickerLogo", symbol }) as Promise<Blob | null>;
 
 function formatError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -295,9 +301,9 @@ function toInternalRoute(rawHref: string) {
     return null;
   }
 
-  const currentUrl = new URL(window.location.href);
-  const targetUrl = new URL(rawHref, currentUrl);
-  if (targetUrl.origin !== currentUrl.origin) {
+  const hostBaseUrl = new URL(HOST_BASE_URL);
+  const targetUrl = new URL(rawHref, hostBaseUrl);
+  if (targetUrl.origin !== hostBaseUrl.origin) {
     return null;
   }
 
@@ -655,7 +661,12 @@ window.addEventListener("unhandledrejection", (event) => {
 
 window.addEventListener("message", (event: MessageEvent<SandboxMessage>) => {
   const message = event.data;
-  if (message?.channel !== CHANNEL || message.addonId !== ADDON_ID || message.nonce !== NONCE) {
+  if (
+    event.source !== parent ||
+    message?.channel !== CHANNEL ||
+    message.addonId !== ADDON_ID ||
+    message.nonce !== NONCE
+  ) {
     return;
   }
 
@@ -721,4 +732,4 @@ window.addEventListener("message", (event: MessageEvent<SandboxMessage>) => {
   })();
 });
 
-post("ready");
+post("ready", { runtimeProtocolVersion: RUNTIME_PROTOCOL_VERSION });

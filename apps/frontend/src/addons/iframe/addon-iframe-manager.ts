@@ -12,6 +12,12 @@ import { logger } from "@/adapters";
 import { toast } from "sonner";
 import { collectAddonThemeSnapshot, type AddonThemeSnapshot } from "./addon-sandbox-theme";
 import { createPermissionGuard, type PermissionGuard } from "../type-bridge";
+import {
+  ADDON_SANDBOX_RUNTIME_PROTOCOL_VERSION,
+  loadAddonSandboxRuntimeAssets,
+} from "./addon-sandbox-assets";
+import { tickerLogoAssetBridge } from "./ticker-logo-asset-bridge";
+import addonSandboxDocument from "../../../addon-sandbox.html?raw";
 
 const CHANNEL = "wealthfolio:addon-sandbox:v1";
 const LOAD_TIMEOUT_MS = 10_000;
@@ -61,6 +67,7 @@ interface Runtime {
     routeId: string;
   };
   isLoaded: boolean;
+  isRuntimeBootstrapping: boolean;
   loadPhase: string;
   lastRenderedRouteKey?: string;
   permissionGuard: PermissionGuard;
@@ -95,6 +102,9 @@ interface SandboxMessage {
   subscriptionId?: string;
   error?: string;
   phase?: string;
+  runtimeProtocolVersion?: number;
+  kind?: string;
+  symbol?: string;
 }
 
 function createNonce() {
@@ -107,25 +117,21 @@ function createAddonLoadCancelledError(addonId: string, reason = "was unloaded b
   return error;
 }
 
-function createSandboxUrl(addonId: string, nonce: string, theme: AddonThemeSnapshot) {
+function createSandboxBootstrapParams(addonId: string, nonce: string, theme: AddonThemeSnapshot) {
   const basePath = import.meta.env.BASE_URL || "/";
-  const sandboxUrl = new URL(
-    `${basePath.replace(/\/?$/, "/")}addon-sandbox.html`,
-    window.location.href,
-  );
   const params = new URLSearchParams({
     addonId,
     backgroundColor: theme.backgroundColor,
     colorScheme: theme.colorScheme,
     foregroundColor: theme.foregroundColor,
+    hostBaseUrl: new URL(basePath.replace(/\/?$/, "/"), window.location.href).toString(),
     nonce,
     themeClass: theme.themeClass,
   });
   if (theme.fontClass) {
     params.set("fontClass", theme.fontClass);
   }
-  sandboxUrl.hash = params.toString();
-  return sandboxUrl.toString();
+  return params.toString();
 }
 
 function makeRequestId() {
@@ -424,11 +430,12 @@ export class AddonIframeManager {
 
     const nonce = createNonce();
     const initialTheme = collectAddonThemeSnapshot();
-    const sandboxUrl = createSandboxUrl(input.addonId, nonce, initialTheme);
+    const sandboxBootstrapParams = createSandboxBootstrapParams(input.addonId, nonce, initialTheme);
 
     const iframe = document.createElement("iframe");
     iframe.title = `${input.manifest.name || input.addonId} add-on sandbox`;
     iframe.setAttribute("sandbox", "allow-scripts");
+    iframe.name = sandboxBootstrapParams;
     iframe.referrerPolicy = "no-referrer";
     Object.assign(iframe.style, {
       border: "0",
@@ -458,6 +465,7 @@ export class AddonIframeManager {
         files: input.files ?? [],
         iframe,
         isLoaded: false,
+        isRuntimeBootstrapping: false,
         loadPhase: "creating sandbox iframe",
         loadTimer: window.setTimeout(() => {
           if (this.runtimes.get(input.addonId) !== runtime) {
@@ -492,7 +500,7 @@ export class AddonIframeManager {
       },
       { once: true },
     );
-    iframe.src = sandboxUrl;
+    iframe.srcdoc = addonSandboxDocument;
 
     try {
       const handle = await loadPromise;
@@ -791,13 +799,26 @@ export class AddonIframeManager {
   private async dispatchMessage(runtime: Runtime, message: SandboxMessage) {
     try {
       switch (message.type) {
+        case "bootstrapReady":
+          await this.handleBootstrapReady(runtime);
+          break;
         case "loadPhase":
           if (message.phase) {
             runtime.loadPhase = message.phase;
           }
           break;
-        case "ready":
-          runtime.loadPhase = "sandbox ready";
+        case "ready": {
+          runtime.isRuntimeBootstrapping = false;
+          if (message.runtimeProtocolVersion !== ADDON_SANDBOX_RUNTIME_PROTOCOL_VERSION) {
+            const received = message.runtimeProtocolVersion ?? "missing";
+            const error = new Error(
+              `Incompatible sandbox runtime protocol for addon '${runtime.addonId}': expected ${ADDON_SANDBOX_RUNTIME_PROTOCOL_VERSION}, received ${received}`,
+            );
+            runtime.rejectLoad(error);
+            await this.stopRuntimeIfCurrent(runtime);
+            break;
+          }
+          runtime.loadPhase = "runtime ready";
           await this.resetRuntimeForReload(runtime);
           runtime.loadPhase = "host sent addon code";
           this.post(runtime, "loadAddon", {
@@ -806,6 +827,7 @@ export class AddonIframeManager {
             theme: collectAddonThemeSnapshot(),
           });
           break;
+        }
         case "loaded":
           runtime.isLoaded = true;
           runtime.loadPhase = "loaded";
@@ -815,14 +837,17 @@ export class AddonIframeManager {
           this.renderActiveRoute(runtime);
           break;
         case "loadError": {
+          runtime.isRuntimeBootstrapping = false;
+          const reportedError = message.error || `Failed to load addon '${runtime.addonId}'`;
+          const detailedError = message.phase
+            ? `Sandbox failed during ${message.phase}: ${reportedError}`
+            : reportedError;
           // Log unconditionally: on a sandbox reload the load promise has
           // already settled, so rejectLoad is a no-op and this would
           // otherwise be silent.
-          logger.error(`Addon '${runtime.addonId}' failed to load: ${message.error || "unknown"}`);
-          notifyClassifiedAddonErrorOnce(runtime.addonId, message.error);
-          runtime.rejectLoad(
-            new Error(message.error || `Failed to load addon '${runtime.addonId}'`),
-          );
+          logger.error(`Addon '${runtime.addonId}' failed to load: ${detailedError}`);
+          notifyClassifiedAddonErrorOnce(runtime.addonId, detailedError);
+          runtime.rejectLoad(new Error(detailedError));
           await this.stopAddon(runtime.addonId);
           break;
         }
@@ -849,6 +874,9 @@ export class AddonIframeManager {
         case "eventUnsubscribe":
           await this.handleEventUnsubscribe(runtime, message);
           break;
+        case "hostAssetRequest":
+          await this.handleHostAssetRequest(runtime, message);
+          break;
         case "sidebar.addItem":
           this.handleSidebarAdd(runtime, message);
           break;
@@ -873,6 +901,48 @@ export class AddonIframeManager {
         this.respond(runtime, message.requestId, false, undefined, error);
       }
     }
+  }
+
+  private async handleBootstrapReady(runtime: Runtime) {
+    if (runtime.isRuntimeBootstrapping) {
+      return;
+    }
+
+    runtime.isRuntimeBootstrapping = true;
+    runtime.loadPhase = "fetching sandbox runtime assets";
+    try {
+      const assets = await loadAddonSandboxRuntimeAssets();
+      if (this.runtimes.get(runtime.addonId) !== runtime) {
+        return;
+      }
+      runtime.loadPhase = "sending sandbox runtime assets";
+      this.post(runtime, "loadRuntime", {
+        protocolVersion: ADDON_SANDBOX_RUNTIME_PROTOCOL_VERSION,
+        script: assets.script,
+        stylesheet: assets.stylesheet,
+      });
+    } catch (error) {
+      runtime.isRuntimeBootstrapping = false;
+      const detail = formatUnknownError(error) ?? "unknown error";
+      const unavailable = new Error(
+        `Sandbox runtime unavailable for addon '${runtime.addonId}': ${detail}`,
+      );
+      runtime.rejectLoad(unavailable);
+      await this.stopRuntimeIfCurrent(runtime);
+    }
+  }
+
+  private async handleHostAssetRequest(runtime: Runtime, message: SandboxMessage) {
+    if (!message.requestId) {
+      return;
+    }
+    if (message.kind !== "tickerLogo") {
+      this.respond(runtime, message.requestId, true, null);
+      return;
+    }
+
+    const logo = await tickerLogoAssetBridge.load(message.symbol);
+    this.respond(runtime, message.requestId, true, logo);
   }
 
   private async handleApiCall(runtime: Runtime, message: SandboxMessage) {
