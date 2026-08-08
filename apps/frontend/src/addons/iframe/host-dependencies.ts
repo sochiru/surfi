@@ -16,6 +16,7 @@ import * as ReactJSXRuntime from "react/jsx-runtime";
 import * as ReactDOM from "react-dom";
 import * as ReactDOMClient from "react-dom/client";
 import * as Recharts from "recharts";
+import { SandboxTickerAvatar } from "./sandbox-ticker-avatar";
 
 interface HostDependencyModule {
   defaultExport?: unknown;
@@ -29,6 +30,7 @@ declare global {
 }
 
 const emptyModule: Record<string, unknown> = {};
+const sandboxWealthfolioUI = { ...WealthfolioUI, TickerAvatar: SandboxTickerAvatar };
 
 const HOST_DEPENDENCIES: Record<string, HostDependencyModule> = {
   "@tanstack/react-query": { module: ReactQuery },
@@ -41,7 +43,7 @@ const HOST_DEPENDENCIES: Record<string, HostDependencyModule> = {
   "@wealthfolio/addon-sdk/query-keys": { module: AddonSDKQueryKeys },
   "@wealthfolio/addon-sdk/types": { module: emptyModule },
   "@wealthfolio/addon-sdk/utils": { module: AddonSDKUtils },
-  "@wealthfolio/ui": { module: WealthfolioUI },
+  "@wealthfolio/ui": { module: sandboxWealthfolioUI },
   "@wealthfolio/ui/chart": { module: WealthfolioUIChart },
   "date-fns": { module: DateFns },
   "lucide-react": { module: LucideReact },
