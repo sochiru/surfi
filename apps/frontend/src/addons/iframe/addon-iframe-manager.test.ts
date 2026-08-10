@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/adapters", () => ({
+  loadAddonAsset: vi.fn(),
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), trace: vi.fn(), warn: vi.fn() },
 }));
 
@@ -17,6 +18,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 import { AddonIframeManager } from "./addon-iframe-manager";
 import { resetAddonSandboxRuntimeAssetsForTest } from "./addon-sandbox-assets";
+import { loadAddonAsset } from "@/adapters";
 
 const input = {
   addonId: "test-addon",
@@ -77,6 +79,7 @@ describe("AddonIframeManager", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     document.getElementById("addon-sandbox-parking")?.remove();
     vi.unstubAllGlobals();
   });
@@ -91,6 +94,44 @@ describe("AddonIframeManager", () => {
     expect(isCurrent).toHaveBeenCalledTimes(1);
   });
 
+  it("allows a longer bootstrap window before applying the execution timeout", async () => {
+    vi.useFakeTimers();
+    const manager = new AddonIframeManager();
+    const starting = manager.startAddon(input);
+    const rejection = expect(starting).rejects.toThrow(
+      "Timed out loading addon 'test-addon' during loading sandbox document",
+    );
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(getSandboxFrame()).toBeDefined();
+    await vi.advanceTimersByTimeAsync(10_001);
+    expect(getSandboxFrame()).toBeDefined();
+
+    await vi.advanceTimersByTimeAsync(19_999);
+    await rejection;
+  });
+
+  it("starts the shorter execution timeout after the sandbox runtime is ready", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", successfulRuntimeFetch());
+    const manager = new AddonIframeManager();
+    const starting = manager.startAddon(input);
+    const rejection = expect(starting).rejects.toThrow(
+      "Timed out loading addon 'test-addon' during host sent addon code",
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    const iframe = getSandboxFrame();
+    vi.spyOn(iframe.contentWindow!, "postMessage").mockImplementation(() => {});
+
+    dispatchFromSandbox(iframe, "bootstrapReady");
+    await vi.advanceTimersByTimeAsync(0);
+    dispatchFromSandbox(iframe, "ready", { runtimeProtocolVersion: 1 });
+    await vi.advanceTimersByTimeAsync(0);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    await rejection;
+  });
+
   it("checks the generation again after awaiting runtime teardown", async () => {
     const manager = new AddonIframeManager();
     const isCurrent = vi.fn().mockReturnValueOnce(true).mockReturnValue(false);
@@ -99,6 +140,31 @@ describe("AddonIframeManager", () => {
       name: "AddonLoadCancelled",
     });
     expect(isCurrent).toHaveBeenCalledTimes(2);
+  });
+
+  it("tracks visual viewport changes while iframe layout updates are active", () => {
+    const visualViewport = new EventTarget();
+    const addEventListener = vi.spyOn(visualViewport, "addEventListener");
+    const removeEventListener = vi.spyOn(visualViewport, "removeEventListener");
+    const requestFrame = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(1);
+    vi.stubGlobal("visualViewport", visualViewport);
+
+    const manager = new AddonIframeManager();
+    const internals = manager as unknown as {
+      ensureLayoutListener: () => void;
+      stopLayoutListenerIfIdle: () => void;
+    };
+    internals.ensureLayoutListener();
+
+    expect(addEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
+    expect(addEventListener).toHaveBeenCalledWith("scroll", expect.any(Function));
+
+    visualViewport.dispatchEvent(new Event("resize"));
+    expect(requestFrame).toHaveBeenCalledTimes(1);
+
+    internals.stopLayoutListenerIfIdle();
+    expect(removeEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
+    expect(removeEventListener).toHaveBeenCalledWith("scroll", expect.any(Function));
   });
 
   it("hides stale warm content when the next route render fails", () => {
@@ -181,6 +247,138 @@ describe("AddonIframeManager", () => {
 
     const postedTypes = postMessage.mock.calls.map(([message]) => message.type);
     expect(postedTypes.indexOf("loadRuntime")).toBeLessThan(postedTypes.indexOf("loadAddon"));
+  });
+
+  it("loads and disables a legacy 3.6 addon without packaged assets", async () => {
+    vi.stubGlobal("fetch", successfulRuntimeFetch());
+    const manager = new AddonIframeManager();
+    const legacyInput = {
+      ...input,
+      manifest: {
+        ...input.manifest,
+        minWealthfolioVersion: "3.6.2",
+        sdkVersion: "3.6.2",
+      },
+    };
+    const starting = manager.startAddon(legacyInput);
+    await vi.waitFor(() => expect(document.querySelector("iframe")).not.toBeNull());
+    const iframe = getSandboxFrame();
+    const postMessage = vi.spyOn(iframe.contentWindow!, "postMessage").mockImplementation(() => {});
+
+    dispatchFromSandbox(iframe, "bootstrapReady");
+    await vi.waitFor(() =>
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "loadRuntime" }),
+        "*",
+      ),
+    );
+    dispatchFromSandbox(iframe, "ready", { runtimeProtocolVersion: 1 });
+    await vi.waitFor(() =>
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ assets: [], code: input.code, type: "loadAddon" }),
+        "*",
+      ),
+    );
+    dispatchFromSandbox(iframe, "loaded");
+    const handle = await starting;
+
+    const disabling = handle.disable();
+    await vi.waitFor(() =>
+      expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "disable" }), "*"),
+    );
+    dispatchFromSandbox(iframe, "disabled");
+    await disabling;
+    expect(document.querySelector("iframe")).toBeNull();
+  });
+
+  it("loads only registered packaged assets by opaque id", async () => {
+    vi.stubGlobal("fetch", successfulRuntimeFetch());
+    vi.mocked(loadAddonAsset).mockResolvedValue(
+      new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" }),
+    );
+    const manager = new AddonIframeManager();
+    const starting = manager.startAddon({
+      ...input,
+      assets: [
+        {
+          id: "opaque-asset-id",
+          mimeType: "image/png",
+          path: "assets/logo.png",
+          size: 3,
+        },
+      ],
+    });
+    await vi.waitFor(() => expect(document.querySelector("iframe")).not.toBeNull());
+    const iframe = getSandboxFrame();
+    const postMessage = vi.spyOn(iframe.contentWindow!, "postMessage").mockImplementation(() => {});
+
+    dispatchFromSandbox(iframe, "bootstrapReady");
+    await vi.waitFor(() =>
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "loadRuntime" }),
+        "*",
+      ),
+    );
+    dispatchFromSandbox(iframe, "ready", { runtimeProtocolVersion: 1 });
+    await vi.waitFor(() =>
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          assets: [expect.objectContaining({ id: "opaque-asset-id" })],
+          type: "loadAddon",
+        }),
+        "*",
+      ),
+    );
+    dispatchFromSandbox(iframe, "loaded");
+    await starting;
+
+    dispatchFromSandbox(iframe, "addonAssetRequest", {
+      assetId: "opaque-asset-id",
+      requestId: "asset-request",
+    });
+    dispatchFromSandbox(iframe, "addonAssetRequest", {
+      assetId: "opaque-asset-id",
+      requestId: "second-asset-request",
+    });
+    await vi.waitFor(() =>
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ok: true,
+          requestId: "asset-request",
+          result: expect.any(Blob),
+          type: "rpcResponse",
+        }),
+        "*",
+      ),
+    );
+    await vi.waitFor(() =>
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ok: true,
+          requestId: "second-asset-request",
+          result: expect.any(Blob),
+          type: "rpcResponse",
+        }),
+        "*",
+      ),
+    );
+    expect(loadAddonAsset).toHaveBeenCalledWith("test-addon", "opaque-asset-id", "image/png");
+
+    dispatchFromSandbox(iframe, "addonAssetRequest", {
+      assetId: "unregistered-id",
+      requestId: "invalid-asset-request",
+    });
+    await vi.waitFor(() =>
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ok: false,
+          requestId: "invalid-asset-request",
+          type: "rpcResponse",
+        }),
+        "*",
+      ),
+    );
+    expect(loadAddonAsset).toHaveBeenCalledTimes(1);
   });
 
   it("posts the same cached Blob instances to simultaneous addon frames", async () => {

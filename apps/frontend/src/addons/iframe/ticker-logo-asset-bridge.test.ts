@@ -32,6 +32,19 @@ describe("TickerLogoAssetBridge", () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
+  it("calls Window.fetch with the Window receiver required by WebKit", async () => {
+    const fetchMock = vi.fn(function (this: unknown) {
+      if (this !== globalThis) {
+        throw new TypeError("Window.fetch called with an invalid receiver");
+      }
+      return Promise.resolve(pngResponse());
+    });
+    const bridge = new TickerLogoAssetBridge(fetchMock as unknown as typeof fetch);
+
+    await expect(bridge.load("AAPL")).resolves.toBeInstanceOf(Blob);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("returns null for missing, non-PNG, and oversized responses", async () => {
     const fetchMock = vi
       .fn()
@@ -45,5 +58,34 @@ describe("TickerLogoAssetBridge", () => {
     await expect(bridge.load("MISSING")).resolves.toBeNull();
     await expect(bridge.load("TEXT")).resolves.toBeNull();
     await expect(bridge.load("HUGE")).resolves.toBeNull();
+  });
+
+  it("caches misses in the bounded LRU and retries transient failures", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(pngResponse("msft"))
+      .mockResolvedValueOnce(pngResponse("goog"))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }));
+    const bridge = new TickerLogoAssetBridge(fetchMock as unknown as typeof fetch, 2);
+
+    await expect(bridge.load("MISSING")).resolves.toBeNull();
+    await expect(bridge.load("MISSING")).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await bridge.load("MSFT");
+    await bridge.load("GOOG");
+    expect(bridge.cacheSize).toBe(2);
+    await expect(bridge.load("MISSING")).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+
+    const transientFetch = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("network unavailable"))
+      .mockResolvedValueOnce(pngResponse("recovered"));
+    const retryingBridge = new TickerLogoAssetBridge(transientFetch as unknown as typeof fetch);
+    await expect(retryingBridge.load("RETRY")).resolves.toBeNull();
+    await expect(retryingBridge.load("RETRY")).resolves.toBeInstanceOf(Blob);
+    expect(transientFetch).toHaveBeenCalledTimes(2);
   });
 });

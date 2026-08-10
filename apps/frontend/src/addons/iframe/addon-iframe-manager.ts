@@ -1,5 +1,5 @@
 import type { AddonManifest, Permission, SidebarItemConfig } from "@wealthfolio/addon-sdk";
-import type { AddonFile } from "@/adapters/types";
+import type { AddonAsset, AddonFile } from "@/adapters/types";
 import {
   clearAddonRegistrations,
   createAddonHostAPI,
@@ -8,7 +8,7 @@ import {
   removeAddonNavItem,
   removeAddonRoute,
 } from "@/addons/addons-runtime-context";
-import { logger } from "@/adapters";
+import { loadAddonAsset, logger } from "@/adapters";
 import { toast } from "sonner";
 import { collectAddonThemeSnapshot, type AddonThemeSnapshot } from "./addon-sandbox-theme";
 import { createPermissionGuard, type PermissionGuard } from "../type-bridge";
@@ -20,6 +20,7 @@ import { tickerLogoAssetBridge } from "./ticker-logo-asset-bridge";
 import addonSandboxDocument from "../../../addon-sandbox.html?raw";
 
 const CHANNEL = "wealthfolio:addon-sandbox:v1";
+const BOOTSTRAP_TIMEOUT_MS = 30_000;
 const LOAD_TIMEOUT_MS = 10_000;
 const ROUTE_RENDER_TIMEOUT_MS = 10_000;
 const DISABLE_TIMEOUT_MS = 1_000;
@@ -29,6 +30,9 @@ interface StartAddonInput {
   manifest: AddonManifest;
   code: string;
   files?: AddonFile[];
+  assets?: AddonAsset[];
+  /** Development-only asset source; installed add-ons use the platform adapter. */
+  loadAsset?: (assetId: string) => Promise<Blob>;
   permissions?: Permission[];
   /** False when a reload superseded the caller while start-up was awaiting. */
   isCurrent?: () => boolean;
@@ -59,6 +63,9 @@ interface Runtime {
   iframe: HTMLIFrameElement;
   code: string;
   files: AddonFile[];
+  assets: Map<string, AddonAsset>;
+  assetLoads: Map<string, Promise<Blob>>;
+  loadAsset: (assetId: string) => Promise<Blob>;
   api: unknown;
   activeContainer?: HTMLElement;
   containerResizeObserver?: ResizeObserver;
@@ -80,7 +87,7 @@ interface Runtime {
   stopPromise?: Promise<void>;
   resolveLoad: (handle: AddonRuntimeHandle) => void;
   rejectLoad: (error: Error) => void;
-  loadTimer: number;
+  loadTimer?: number;
 }
 
 interface SandboxMessage {
@@ -105,6 +112,7 @@ interface SandboxMessage {
   runtimeProtocolVersion?: number;
   kind?: string;
   symbol?: string;
+  assetId?: string;
 }
 
 function createNonce() {
@@ -461,20 +469,20 @@ export class AddonIframeManager {
       runtime = {
         addonId: input.addonId,
         api: createAddonHostAPI(input.addonId, input.permissions),
+        assets: new Map((input.assets ?? []).map((asset) => [asset.id, asset])),
+        assetLoads: new Map(),
         code: input.code,
         files: input.files ?? [],
         iframe,
         isLoaded: false,
         isRuntimeBootstrapping: false,
         loadPhase: "creating sandbox iframe",
-        loadTimer: window.setTimeout(() => {
-          if (this.runtimes.get(input.addonId) !== runtime) {
-            return;
-          }
-          const phase = runtime.loadPhase;
-          reject(new Error(`Timed out loading addon '${input.addonId}' during ${phase}`));
-          void this.stopRuntimeIfCurrent(runtime);
-        }, LOAD_TIMEOUT_MS),
+        loadAsset:
+          input.loadAsset ??
+          ((assetId) => {
+            const asset = runtime.assets.get(assetId);
+            return loadAddonAsset(input.addonId, assetId, asset?.mimeType);
+          }),
         nonce,
         permissionGuard: createPermissionGuard(input.addonId, input.permissions),
         rejectLoad: reject,
@@ -484,6 +492,7 @@ export class AddonIframeManager {
       };
       this.runtimes.set(input.addonId, runtime);
     });
+    this.armLoadTimeout(runtime, BOOTSTRAP_TIMEOUT_MS);
 
     getParkingRoot().appendChild(iframe);
     runtime.loadPhase = "loading sandbox document";
@@ -510,8 +519,29 @@ export class AddonIframeManager {
       }
       return handle;
     } finally {
-      clearTimeout(runtime.loadTimer);
+      this.clearLoadTimeout(runtime);
     }
+  }
+
+  private armLoadTimeout(runtime: Runtime, timeoutMs: number) {
+    this.clearLoadTimeout(runtime);
+    runtime.loadTimer = window.setTimeout(() => {
+      runtime.loadTimer = undefined;
+      if (this.runtimes.get(runtime.addonId) !== runtime) {
+        return;
+      }
+      const phase = runtime.loadPhase;
+      runtime.rejectLoad(new Error(`Timed out loading addon '${runtime.addonId}' during ${phase}`));
+      void this.stopRuntimeIfCurrent(runtime);
+    }, timeoutMs);
+  }
+
+  private clearLoadTimeout(runtime: Runtime) {
+    if (runtime.loadTimer === undefined) {
+      return;
+    }
+    clearTimeout(runtime.loadTimer);
+    runtime.loadTimer = undefined;
   }
 
   /** Whether an addon's iframe runtime has been booted (used by the activation coordinator). */
@@ -624,7 +654,7 @@ export class AddonIframeManager {
   }
 
   private async stopRuntime(runtime: Runtime) {
-    clearTimeout(runtime.loadTimer);
+    this.clearLoadTimeout(runtime);
     runtime.activeRouteRequestId = undefined;
     clearPendingRouteRender(runtime);
     const cancellation = createAddonLoadCancelledError(runtime.addonId);
@@ -639,6 +669,7 @@ export class AddonIframeManager {
     }
 
     await this.clearSubscriptions(runtime);
+    runtime.assetLoads.clear();
     runtime.containerResizeObserver?.disconnect();
     runtime.containerResizeObserver = undefined;
     this.hideFrame(runtime);
@@ -696,6 +727,8 @@ export class AddonIframeManager {
     }
     window.addEventListener("resize", this.scheduleFrameLayoutUpdate);
     window.addEventListener("scroll", this.scheduleFrameLayoutUpdate, true);
+    window.visualViewport?.addEventListener("resize", this.scheduleFrameLayoutUpdate);
+    window.visualViewport?.addEventListener("scroll", this.scheduleFrameLayoutUpdate);
     this.layoutListening = true;
   }
 
@@ -708,6 +741,8 @@ export class AddonIframeManager {
     }
     window.removeEventListener("resize", this.scheduleFrameLayoutUpdate);
     window.removeEventListener("scroll", this.scheduleFrameLayoutUpdate, true);
+    window.visualViewport?.removeEventListener("resize", this.scheduleFrameLayoutUpdate);
+    window.visualViewport?.removeEventListener("scroll", this.scheduleFrameLayoutUpdate);
     this.layoutListening = false;
     if (this.frameLayoutUpdateFrame) {
       cancelAnimationFrame(this.frameLayoutUpdateFrame);
@@ -819,9 +854,11 @@ export class AddonIframeManager {
             break;
           }
           runtime.loadPhase = "runtime ready";
+          this.armLoadTimeout(runtime, LOAD_TIMEOUT_MS);
           await this.resetRuntimeForReload(runtime);
           runtime.loadPhase = "host sent addon code";
           this.post(runtime, "loadAddon", {
+            assets: Array.from(runtime.assets.values()),
             code: runtime.code,
             files: runtime.files,
             theme: collectAddonThemeSnapshot(),
@@ -829,6 +866,7 @@ export class AddonIframeManager {
           break;
         }
         case "loaded":
+          this.clearLoadTimeout(runtime);
           runtime.isLoaded = true;
           runtime.loadPhase = "loaded";
           runtime.resolveLoad({
@@ -876,6 +914,9 @@ export class AddonIframeManager {
           break;
         case "hostAssetRequest":
           await this.handleHostAssetRequest(runtime, message);
+          break;
+        case "addonAssetRequest":
+          await this.handleAddonAssetRequest(runtime, message);
           break;
         case "sidebar.addItem":
           this.handleSidebarAdd(runtime, message);
@@ -943,6 +984,37 @@ export class AddonIframeManager {
 
     const logo = await tickerLogoAssetBridge.load(message.symbol);
     this.respond(runtime, message.requestId, true, logo);
+  }
+
+  private async handleAddonAssetRequest(runtime: Runtime, message: SandboxMessage) {
+    if (!message.requestId || !message.assetId) {
+      return;
+    }
+    const descriptor = runtime.assets.get(message.assetId);
+    if (!descriptor) {
+      throw new Error("Packaged addon asset is not registered for this addon");
+    }
+
+    let assetLoad = runtime.assetLoads.get(descriptor.id);
+    if (!assetLoad) {
+      assetLoad = runtime.loadAsset(descriptor.id).then((blob) => {
+        if (blob.size !== descriptor.size) {
+          throw new Error(`Packaged addon asset '${descriptor.path}' changed while loading`);
+        }
+        return blob.type === descriptor.mimeType
+          ? blob
+          : blob.slice(0, blob.size, descriptor.mimeType);
+      });
+      runtime.assetLoads.set(descriptor.id, assetLoad);
+    }
+    try {
+      this.respond(runtime, message.requestId, true, await assetLoad);
+    } catch (error) {
+      if (runtime.assetLoads.get(descriptor.id) === assetLoad) {
+        runtime.assetLoads.delete(descriptor.id);
+      }
+      throw error;
+    }
   }
 
   private async handleApiCall(runtime: Runtime, message: SandboxMessage) {

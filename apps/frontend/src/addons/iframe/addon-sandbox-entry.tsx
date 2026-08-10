@@ -9,10 +9,10 @@ import {
   clearAddonStyles,
   createCssModuleSource,
   installAddonCssFiles,
-  installAddonStyle,
   isCssFile,
   type SandboxAddonFile,
 } from "./addon-sandbox-styles";
+import { SandboxAddonAssetRegistry, type SandboxAddonAsset } from "./addon-sandbox-asset-registry";
 import { applyHostTheme, type AddonThemeSnapshot } from "./addon-sandbox-theme";
 import { rewriteModuleSpecifiers } from "./addon-module-rewriter";
 
@@ -53,6 +53,7 @@ interface SandboxMessage {
   requestId?: string;
   code?: string;
   files?: SandboxAddonFile[];
+  assets?: SandboxAddonAsset[];
   routeId?: string;
   location?: RouteLocation;
   ok?: boolean;
@@ -78,6 +79,7 @@ let addonDisable: (() => Promise<void> | void) | undefined;
 let addonCodeUrl: string | undefined;
 let addonQueryClient: QueryClient | undefined;
 let addonModuleUrls = new Map<string, string>();
+let addonAssetRegistry: SandboxAddonAssetRegistry;
 let reactRouteRoot: ReactDOMClient.Root | undefined;
 
 if (!ADDON_ID || !NONCE || !HOST_BASE_URL || !rootElement) {
@@ -100,6 +102,15 @@ function callHost(type: string, payload: Record<string, unknown> = {}) {
 
 globalThis.__wealthfolioRequestTickerLogo = (symbol: string) =>
   callHost("hostAssetRequest", { kind: "tickerLogo", symbol }) as Promise<Blob | null>;
+
+function createAddonAssetRegistry(assets: SandboxAddonAsset[] = []) {
+  return new SandboxAddonAssetRegistry(
+    assets,
+    (assetId) => callHost("addonAssetRequest", { assetId }) as Promise<Blob>,
+  );
+}
+
+addonAssetRegistry = createAddonAssetRegistry();
 
 function formatError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -236,9 +247,7 @@ function createAddonModuleRegistry(code: string, files: SandboxAddonFile[] = [])
       let cssModuleUrl = objectUrls.get(cssUrlKey);
       if (!cssModuleUrl) {
         cssModuleUrl = URL.createObjectURL(
-          new Blob([createCssModuleSource(cssEntry.path, cssEntry.source)], {
-            type: "text/javascript",
-          }),
+          new Blob([createCssModuleSource(cssEntry.source)], { type: "text/javascript" }),
         );
         objectUrls.set(cssUrlKey, cssModuleUrl);
       }
@@ -279,7 +288,6 @@ function createAddonModuleRegistry(code: string, files: SandboxAddonFile[] = [])
 
   Object.assign(globalThis, {
     __wealthfolioImport: importModule,
-    __wealthfolioInstallAddonStyle: installAddonStyle,
   });
 
   return {
@@ -549,6 +557,12 @@ function createContext() {
         });
       },
     },
+    assets: {
+      list: () => addonAssetRegistry.list(),
+      has: (path: string) => addonAssetRegistry.has(path),
+      getBlob: (path: string) => addonAssetRegistry.getBlob(path),
+      getUrl: (path: string) => addonAssetRegistry.getUrl(path),
+    },
     onDisable(callback: unknown) {
       if (typeof callback === "function") {
         disableCallbacks.add(callback as () => Promise<void> | void);
@@ -579,9 +593,15 @@ function resolveEnable(mod: Record<string, unknown>) {
   return null;
 }
 
-async function loadAddon(code: string, files: SandboxAddonFile[] = []) {
+async function loadAddon(
+  code: string,
+  files: SandboxAddonFile[] = [],
+  assets: SandboxAddonAsset[] = [],
+) {
+  addonAssetRegistry.clear();
+  addonAssetRegistry = createAddonAssetRegistry(assets);
   reportLoadPhase("installing addon styles");
-  installAddonCssFiles(files);
+  await installAddonCssFiles(files, (path) => addonAssetRegistry.getUrl(path));
   reportLoadPhase("creating addon module registry");
   const moduleRegistry = createAddonModuleRegistry(code, files);
   addonModuleUrls = moduleRegistry.objectUrls;
@@ -647,6 +667,7 @@ async function disableAddon() {
     }
   }
   addonModuleUrls.clear();
+  addonAssetRegistry.clear();
   clearAddonStyles();
   root.replaceChildren();
 }
@@ -710,7 +731,7 @@ window.addEventListener("message", (event: MessageEvent<SandboxMessage>) => {
         }
       } else if (message.type === "loadAddon" && typeof message.code === "string") {
         applyHostTheme(message.theme);
-        await loadAddon(message.code, message.files);
+        await loadAddon(message.code, message.files, message.assets);
         post("loaded");
       } else if (message.type === "renderRoute" && message.routeId && message.location) {
         await renderRoute(message.routeId, message.location);

@@ -20,7 +20,7 @@ export function normalizeTickerLogoSymbol(symbol: unknown) {
 }
 
 export class TickerLogoAssetBridge {
-  private readonly cache = new Map<string, Blob>();
+  private readonly cache = new Map<string, Blob | null>();
   private readonly pending = new Map<string, Promise<Blob | null>>();
 
   constructor(
@@ -35,7 +35,7 @@ export class TickerLogoAssetBridge {
     }
 
     const cached = this.cache.get(normalized);
-    if (cached) {
+    if (cached !== undefined) {
       this.cache.delete(normalized);
       this.cache.set(normalized, cached);
       return Promise.resolve(cached);
@@ -64,7 +64,8 @@ export class TickerLogoAssetBridge {
         `${basePath.replace(/\/?$/, "/")}ticker-logos/${encodeURIComponent(symbol)}.png`,
         window.location.href,
       );
-      const response = await this.fetchAsset(url, { cache: "no-cache" });
+      // WebKit brand-checks Window.fetch; a normal class-field call uses this bridge as receiver.
+      const response = await this.fetchAsset.call(globalThis, url, { cache: "no-cache" });
       const contentLength = Number(response.headers.get("content-length") || "0");
       const contentType = response.headers
         .get("content-type")
@@ -76,25 +77,34 @@ export class TickerLogoAssetBridge {
         contentType !== "image/png" ||
         (contentLength > 0 && contentLength > MAX_TICKER_LOGO_BYTES)
       ) {
+        if (response.status === 404 || response.ok) {
+          this.remember(symbol, null);
+        }
         return null;
       }
 
       const blob = await response.blob();
       if (blob.type.toLowerCase() !== "image/png" || blob.size > MAX_TICKER_LOGO_BYTES) {
+        this.remember(symbol, null);
         return null;
       }
 
-      this.cache.set(symbol, blob);
-      while (this.cache.size > this.maxEntries) {
-        const oldest = this.cache.keys().next().value as string | undefined;
-        if (!oldest) {
-          break;
-        }
-        this.cache.delete(oldest);
-      }
+      this.remember(symbol, blob);
       return blob;
     } catch {
       return null;
+    }
+  }
+
+  private remember(symbol: string, value: Blob | null) {
+    this.cache.delete(symbol);
+    this.cache.set(symbol, value);
+    while (this.cache.size > this.maxEntries) {
+      const oldest = this.cache.keys().next().value;
+      if (!oldest) {
+        break;
+      }
+      this.cache.delete(oldest);
     }
   }
 }
