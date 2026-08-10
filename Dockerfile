@@ -90,6 +90,6 @@ RUN addgroup -S -g 1000 wealthfolio \
  && chown -R wealthfolio:wealthfolio /data
 USER 1000:1000
 
-VOLUME ["/data"]
+# Persistence: mount /data (Railway Volume or compose named volume). No Dockerfile VOLUME — Railway rejects it.
 EXPOSE 8088
 CMD ["/usr/local/bin/wealthfolio-server"]
