@@ -67,6 +67,9 @@ export default defineConfig({
     headers: {
       "Access-Control-Allow-Origin": "*",
     },
+    allowedHosts: [
+      "b05a-143-44-184-88.ngrok-free.app"
+    ],
     hmr: host
       ? {
           protocol: "ws",

@@ -32,6 +32,7 @@ anyhow = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
 reqwest = { workspace = true }
+openssl-sys = { version = "0.9.111", features = ["vendored"] }
 
 # Additional dependencies
 tracing = "0.1"

@@ -98,7 +98,7 @@ impl ProviderCapabilities {
                 instruments: "Stocks".to_string(),
                 coverage: "Global".to_string(),
                 features: vec![
-                    "Real-time".to_string(),
+                    "Manual sync".to_string(),
                     "Historical".to_string(),
                     "Profiles".to_string(),
                 ],

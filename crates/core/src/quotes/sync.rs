@@ -223,6 +223,10 @@ fn should_include_closed_positions(mode: SyncMode, targeted_sync: bool) -> bool 
         )
 }
 
+fn is_incremental_style(mode: SyncMode) -> bool {
+    matches!(mode, SyncMode::Incremental | SyncMode::Periodic)
+}
+
 fn should_skip_for_error_limit(mode: SyncMode, targeted_sync: bool, error_count: i32) -> bool {
     !targeted_sync
         && !matches!(mode, SyncMode::BackfillHistory { .. })
@@ -386,6 +390,8 @@ pub enum AssetSkipReason {
     MaturedBond,
     /// Option has expired — no further quotes available.
     ExpiredOption,
+    /// Provider is excluded from background periodic sync (manual Sync only).
+    ManualSyncOnlyProvider,
 }
 
 impl std::fmt::Display for AssetSkipReason {
@@ -404,6 +410,9 @@ impl std::fmt::Display for AssetSkipReason {
             }
             AssetSkipReason::MaturedBond => write!(f, "Bond has matured (price is par)"),
             AssetSkipReason::ExpiredOption => write!(f, "Option has expired"),
+            AssetSkipReason::ManualSyncOnlyProvider => {
+                write!(f, "Provider is manual-sync only")
+            }
         }
     }
 }
@@ -682,8 +691,8 @@ where
         asset: &Asset,
     ) -> (NaiveDate, NaiveDate) {
         match mode {
-            SyncMode::Incremental => {
-                // Use category-based calculation for incremental mode
+            SyncMode::Incremental | SyncMode::Periodic => {
+                // Use category-based calculation for incremental-style modes
                 let category = determine_sync_category(
                     inputs,
                     CLOSED_POSITION_GRACE_PERIOD_DAYS,
@@ -1467,6 +1476,15 @@ where
             let fetch_end_date =
                 market_fetch_end_date(now, asset.instrument_exchange_mic.as_deref());
 
+            if matches!(mode, SyncMode::Periodic) && is_manual_sync_only_provider(&data_source) {
+                debug!(
+                    "Skipping {} - provider {} is manual-sync only",
+                    asset.id, data_source
+                );
+                result.add_skipped(asset.id.clone(), AssetSkipReason::ManualSyncOnlyProvider);
+                continue;
+            }
+
             // Explicit targeted retries bypass the broad-sync error cutoff.
             if let Some(ref s) = state {
                 if should_skip_for_error_limit(mode, targeted_sync, s.error_count) {
@@ -1517,7 +1535,7 @@ where
                     continue;
                 }
 
-                if targeted_sync && matches!(mode, SyncMode::Incremental) {
+                if targeted_sync && is_incremental_style(mode) {
                     info!(
                         "Planning targeted quote refresh for closed position {}",
                         asset.id
@@ -1528,7 +1546,7 @@ where
                 }
             }
 
-            if matches!(mode, SyncMode::Incremental)
+            if is_incremental_style(mode)
                 && matches!(category, SyncCategory::NeedsBackfill)
                 && planning_inputs.is_active
             {
@@ -1852,6 +1870,7 @@ mod tests {
     #[test]
     fn test_sync_mode_display() {
         assert_eq!(format!("{}", SyncMode::Incremental), "Incremental");
+        assert_eq!(format!("{}", SyncMode::Periodic), "Periodic");
         assert_eq!(
             format!("{}", SyncMode::RefetchRecent { days: 45 }),
             "RefetchRecent(45d)"
@@ -2108,6 +2127,10 @@ mod tests {
         assert_eq!(
             AssetSkipReason::NoDataForRange.to_string(),
             "No data for requested date range"
+        );
+        assert_eq!(
+            AssetSkipReason::ManualSyncOnlyProvider.to_string(),
+            "Provider is manual-sync only"
         );
     }
 

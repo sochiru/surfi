@@ -69,6 +69,7 @@ apps/tauri/Cargo.lock
 crates/core/Cargo.lock
 # addon-sdk is a pnpm workspace member; root pnpm-lock.yaml is authoritative
 packages/addon-sdk/package-lock.json
+.cargo-home/
 
 # Tauri generated
 apps/tauri/gen/schemas/

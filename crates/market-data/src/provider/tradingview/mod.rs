@@ -23,6 +23,7 @@ use crate::models::{
 };
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 use crate::resolver::ResolverChain;
+use crate::SymbolResolver;
 
 const BASE_URL: &str = "https://tradingview-data1.p.rapidapi.com";
 const RAPIDAPI_HOST: &str = "tradingview-data1.p.rapidapi.com";
@@ -525,6 +526,7 @@ impl MarketDataProvider for TradingViewProvider {
 
     fn priority(&self) -> u8 {
         // Lower than Finnhub/AlphaVantage due to strict rate limits.
+        // Background periodic sync skips this provider; manual Sync only.
         4
     }
 

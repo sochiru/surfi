@@ -27,6 +27,10 @@ pub enum SyncMode {
     #[default]
     Incremental,
 
+    /// Same date windows as Incremental, used by the background scheduler.
+    /// Skips providers marked as manual-sync-only (e.g. TradingView rate limits).
+    Periodic,
+
     /// Refetch recent window regardless of existing quotes.
     /// Useful for forcing a refresh of recent data without full history rebuild.
     /// - Start: today - days
@@ -131,6 +135,7 @@ impl std::fmt::Display for SyncMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SyncMode::Incremental => write!(f, "Incremental"),
+            SyncMode::Periodic => write!(f, "Periodic"),
             SyncMode::RefetchRecent { days } => write!(f, "RefetchRecent({}d)", days),
             SyncMode::BackfillHistory { days } => write!(f, "BackfillHistory({}d)", days),
         }

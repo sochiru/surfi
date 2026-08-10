@@ -27,6 +27,12 @@ pub const MARKET_DATA_PROVIDER_IDS: [&str; 10] = [
     DATA_SOURCE_CUSTOM_SCRAPER,
 ];
 
+/// Providers that must not run on the background periodic sync (strict API quotas).
+/// Manual Sync / targeted refresh still fetches them.
+pub fn is_manual_sync_only_provider(provider_id: &str) -> bool {
+    provider_id == DATA_SOURCE_TRADINGVIEW
+}
+
 /// Default number of days of history to fetch for new symbols when no activity date exists.
 /// This provides a generous fallback for assets added without activities.
 pub const DEFAULT_HISTORY_DAYS: i64 = 1825; // 5 years
