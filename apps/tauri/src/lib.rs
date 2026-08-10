@@ -660,6 +660,7 @@ pub fn run() {
             commands::addon::toggle_addon,
             commands::addon::uninstall_addon,
             commands::addon::load_addon_for_runtime,
+            commands::addon::load_addon_asset,
             commands::addon::get_enabled_addons_on_startup,
             commands::addon::check_addon_update,
             commands::addon::check_all_addon_updates,

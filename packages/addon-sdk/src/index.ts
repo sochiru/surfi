@@ -4,7 +4,7 @@
  * TypeScript SDK for building Wealthfolio addons with enhanced functionality,
  * type safety, and comprehensive permission management.
  *
- * @version 1.0.0
+ * @version 3.7.0
  * @author Wealthfolio Team
  * @license MIT
  */
@@ -12,6 +12,7 @@
 // Core types
 export type {
   AddonContext,
+  AddonAssets,
   AddonEnableFunction,
   AddonRouteLocation,
   AddonRouteRenderContext,
@@ -51,6 +52,7 @@ export type * from './data-types';
 // Manifest and metadata types
 export type {
   AddonFile,
+  AddonAsset,
   AddonContributedLink,
   AddonContributedRoute,
   AddonContributes,
