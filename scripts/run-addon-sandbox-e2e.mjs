@@ -33,8 +33,10 @@ async function waitForPreview(preview) {
   throw new Error("Timed out waiting for Vite preview");
 }
 
-await runCommand("pnpm", ["run", "build:types"]);
-await runCommand("pnpm", ["run", "build"]);
+if (process.env.WF_ADDON_SANDBOX_SKIP_BUILD !== "true") {
+  await runCommand("pnpm", ["run", "build:types"]);
+  await runCommand("pnpm", ["run", "build"]);
+}
 
 const previewUrl = new URL(BASE_URL);
 const preview = spawnCommand("pnpm", [

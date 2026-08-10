@@ -11,17 +11,92 @@ const NAVIGATION_SCRIPT_HASH = `sha256-${createHash("sha256")
   .digest("base64")}`;
 
 const ADDON_CODE = `
+import addonCss from "./addon.css";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { TickerAvatar } from "@wealthfolio/ui";
 
-export function enable(context) {
-  createRoot(context.ui.root).render(React.createElement(TickerAvatar, { symbol: "AAPL" }));
+function TickerAvatarProbe() {
+  React.useEffect(() => {
+    const timer = window.setInterval(() => {
+      const image = document.querySelector('img[alt="AAPL"]');
+      if (!(image instanceof HTMLImageElement) || !image.complete || image.naturalWidth === 0) {
+        return;
+      }
+      window.clearInterval(timer);
+      const init = new URLSearchParams(window.name);
+      parent.postMessage({
+        addonId: init.get("addonId"),
+        channel: "wealthfolio:addon-sandbox:v1",
+        nonce: init.get("nonce"),
+        type: "tickerAvatarLoaded",
+      }, "*");
+    }, 10);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return React.createElement(TickerAvatar, { symbol: "AAPL" });
+}
+
+function PackagedAssetProbe({ logoUrl }) {
+  React.useEffect(() => {
+    const timer = window.setInterval(() => {
+      const image = document.querySelector('img[alt="Packaged asset"]');
+      const container = image?.parentElement;
+      if (
+        !(image instanceof HTMLImageElement) ||
+        !container ||
+        !image.complete ||
+        image.naturalWidth === 0 ||
+        !getComputedStyle(container).backgroundImage.includes(logoUrl)
+      ) {
+        return;
+      }
+      window.clearInterval(timer);
+      const init = new URLSearchParams(window.name);
+      parent.postMessage({
+        addonId: init.get("addonId"),
+        channel: "wealthfolio:addon-sandbox:v1",
+        nonce: init.get("nonce"),
+        type: "packagedAssetLoaded",
+      }, "*");
+    }, 10);
+    return () => window.clearInterval(timer);
+  }, [logoUrl]);
+
+  return React.createElement("img", { alt: "Packaged asset", src: logoUrl });
+}
+
+export async function enable(context) {
+  if (!addonCss.includes("packaged-background")) {
+    throw new Error("Native CSS import did not resolve to its packaged source");
+  }
+  const [logoUrl, fontUrl, wasmBlob] = await Promise.all([
+    context.assets.getUrl("dist/assets/pixel.png"),
+    context.assets.getUrl("dist/assets/font.woff2"),
+    context.assets.getBlob("dist/assets/module.wasm"),
+  ]);
+  const listedAssets = context.assets.list();
+  if (listedAssets.length !== 3 || listedAssets.some((asset) => "id" in asset)) {
+    throw new Error("Invalid public asset metadata");
+  }
+  await WebAssembly.instantiate(await wasmBlob.arrayBuffer());
+  const font = await new FontFace("PackagedAssetProbe", 'url("' + fontUrl + '")').load();
+  document.fonts.add(font);
+  createRoot(context.ui.root).render(
+    React.createElement("div", {
+      className: "packaged-background",
+      style: { fontFamily: "PackagedAssetProbe" },
+    },
+      React.createElement(PackagedAssetProbe, { logoUrl }),
+      React.createElement(TickerAvatarProbe)
+    )
+  );
 }
 `;
 
 const HARNESS_HTML = `<!doctype html>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' '${SANDBOX_BOOTSTRAP_HASH}' '${NAVIGATION_SCRIPT_HASH}' blob:; style-src 'self' 'unsafe-inline' blob:; img-src 'self' data: blob:; font-src 'self' data:; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' '${SANDBOX_BOOTSTRAP_HASH}' '${NAVIGATION_SCRIPT_HASH}' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline' blob:; img-src 'self' data: blob:; font-src 'self' data: blob:; media-src 'self' data: blob:; frame-src 'none'">
 <main>Sandbox harness</main>`;
 
 test("boots the opaque sandbox from parent-delivered Blobs without child requests", async ({
@@ -63,11 +138,33 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
         fetch("/__generated__/addon-sandbox-runtime.css", { cache: "no-cache" }),
         fetch("/addon-sandbox.html", { cache: "no-cache" }),
       ]);
-      const [script, stylesheet, sandboxHtml] = await Promise.all([
+      const stylesheetTextResponse = stylesheetResponse.clone();
+      const [script, stylesheet, sandboxHtml, stylesheetText] = await Promise.all([
         scriptResponse.blob(),
         stylesheetResponse.blob(),
         sandboxResponse.text(),
+        stylesheetTextResponse.text(),
       ]);
+      const packagedAssetBytes = Uint8Array.from(
+        atob(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        ),
+        (character) => character.charCodeAt(0),
+      );
+      const packagedAsset = new Blob([packagedAssetBytes], { type: "image/png" });
+      const packagedFontBase64 = stylesheetText.match(
+        /data:font\/woff2;base64,([A-Za-z0-9+/=]+)/,
+      )?.[1];
+      if (!packagedFontBase64) {
+        throw new Error("Sandbox runtime CSS did not contain an inline WOFF2 test font");
+      }
+      const packagedFontBytes = Uint8Array.from(atob(packagedFontBase64), (character) =>
+        character.charCodeAt(0),
+      );
+      const packagedFont = new Blob([packagedFontBytes], { type: "font/woff2" });
+      const packagedWasm = new Blob([Uint8Array.from([0, 97, 115, 109, 1, 0, 0, 0])], {
+        type: "application/wasm",
+      });
       const csp = new DOMParser()
         .parseFromString(sandboxHtml, "text/html")
         .querySelector('meta[http-equiv="Content-Security-Policy"]')
@@ -90,10 +187,21 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
           iframe.srcdoc = sandboxHtml;
           const timer = window.setTimeout(() => reject(new Error("Sandbox did not load")), 15_000);
           let addonLoaded = false;
+          const packagedAssetsReturned = new Set<string>();
+          let packagedAssetLoaded = false;
           let tickerLogoReturned = false;
+          let tickerAvatarLoaded = false;
 
           const finish = () => {
-            if (!addonLoaded || !tickerLogoReturned) return;
+            if (
+              !addonLoaded ||
+              packagedAssetsReturned.size !== 3 ||
+              !packagedAssetLoaded ||
+              !tickerLogoReturned ||
+              !tickerAvatarLoaded
+            ) {
+              return;
+            }
             window.clearTimeout(timer);
             window.removeEventListener("message", onMessage);
             resolve({
@@ -125,7 +233,56 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
                 reject(new Error(`Unexpected runtime protocol ${message.runtimeProtocolVersion}`));
                 return;
               }
-              post("loadAddon", { code: addonCode, files: [] });
+              post("loadAddon", {
+                assets: [
+                  {
+                    id: "packaged-pixel",
+                    mimeType: "image/png",
+                    path: "dist/assets/pixel.png",
+                    size: packagedAsset.size,
+                  },
+                  {
+                    id: "packaged-font",
+                    mimeType: "font/woff2",
+                    path: "dist/assets/font.woff2",
+                    size: packagedFont.size,
+                  },
+                  {
+                    id: "packaged-wasm",
+                    mimeType: "application/wasm",
+                    path: "dist/assets/module.wasm",
+                    size: packagedWasm.size,
+                  },
+                ],
+                code: addonCode,
+                files: [
+                  {
+                    content:
+                      '.packaged-background { background-image: url("./assets/pixel.png"); }',
+                    name: "dist/addon.css",
+                  },
+                ],
+              });
+            } else if (message.type === "addonAssetRequest") {
+              const result =
+                message.assetId === "packaged-pixel"
+                  ? packagedAsset
+                  : message.assetId === "packaged-font"
+                    ? packagedFont
+                    : message.assetId === "packaged-wasm"
+                      ? packagedWasm
+                      : undefined;
+              if (!result) {
+                reject(new Error(`Unexpected packaged asset id ${message.assetId}`));
+                return;
+              }
+              post("rpcResponse", {
+                ok: true,
+                requestId: message.requestId,
+                result,
+              });
+              packagedAssetsReturned.add(message.assetId);
+              finish();
             } else if (message.type === "hostAssetRequest") {
               void (async () => {
                 const response = await fetch(
@@ -138,6 +295,12 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
               })();
             } else if (message.type === "loaded") {
               addonLoaded = true;
+              finish();
+            } else if (message.type === "packagedAssetLoaded") {
+              packagedAssetLoaded = true;
+              finish();
+            } else if (message.type === "tickerAvatarLoaded") {
+              tickerAvatarLoaded = true;
               finish();
             } else if (message.type === "loadError") {
               reject(new Error(`${message.phase || "load"}: ${message.error || "unknown error"}`));
@@ -154,8 +317,12 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
 
   expect(result.sandbox).toBe("allow-scripts");
   expect(result.embedderCsp).toContain(`'${SANDBOX_BOOTSTRAP_HASH}'`);
+  expect(result.embedderCsp).toContain("'wasm-unsafe-eval'");
   expect(result.embedderCsp).toContain("frame-src 'none'");
+  expect(result.embedderCsp).toContain("font-src 'self' data: blob:");
+  expect(result.embedderCsp).toContain("media-src 'self' data: blob:");
   expect(result.csp).toContain("default-src 'none'");
+  expect(result.csp).toContain("'wasm-unsafe-eval'");
   expect(result.csp).not.toMatch(/'self'|https?:|tauri:|asset:/);
   expect(childNetworkRequests).toEqual([]);
   expect(childLocalRequests.every((url) => url.startsWith("blob:"))).toBe(true);
