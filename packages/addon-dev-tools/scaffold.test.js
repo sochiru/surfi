@@ -13,4 +13,7 @@ test("pins the supported browser floor in generated addon projects", async (cont
 
   const viteConfig = fs.readFileSync(path.join(targetDir, "vite.config.ts"), "utf8");
   assert.match(viteConfig, /target: \["chrome107", "edge107", "firefox104", "safari16"\]/);
+
+  const packageJson = JSON.parse(fs.readFileSync(path.join(targetDir, "package.json"), "utf8"));
+  assert.match(packageJson.scripts.package, /mkdir -p dist assets/);
 });
