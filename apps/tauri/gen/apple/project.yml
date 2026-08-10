@@ -2,7 +2,7 @@ name: wealthfolio-app
 options:
   bundleIdPrefix: com.teymz.wealthfolio
   deploymentTarget:
-    iOS: 15.0
+    iOS: 16.0
 fileGroups: [../../src]
 configs:
   debug: debug
@@ -51,8 +51,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: 3.6.5
-        CFBundleVersion: "3.6.5"
+        CFBundleShortVersionString: 3.7.0
+        CFBundleVersion: "3.7.0"
     entitlements:
       path: wealthfolio-app_iOS/wealthfolio-app_iOS.entitlements
     scheme:

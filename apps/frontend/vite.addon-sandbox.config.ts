@@ -37,6 +37,7 @@ export default defineConfig({
     emptyOutDir: !process.argv.includes("--watch"),
     minify: "esbuild",
     outDir: "public/__generated__",
+    target: ["chrome107", "edge107", "firefox104", "safari16"],
     rollupOptions: {
       input: path.resolve(__dirname, "src/addons/iframe/addon-sandbox-entry.tsx"),
       output: {

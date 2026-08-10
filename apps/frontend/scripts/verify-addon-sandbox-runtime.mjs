@@ -9,9 +9,10 @@ const GENERATED_DIR = path.join(FRONTEND_ROOT, "public", "__generated__");
 const SANDBOX_HTML = path.join(FRONTEND_ROOT, "addon-sandbox.html");
 const INDEX_HTML = path.join(FRONTEND_ROOT, "index.html");
 const TAURI_CONFIG = path.resolve(FRONTEND_ROOT, "..", "tauri", "tauri.conf.json");
+const SERVER_API = path.resolve(FRONTEND_ROOT, "..", "server", "src", "api.rs");
 const EXPECTED_FILES = ["addon-sandbox-runtime.css", "addon-sandbox-runtime.js"];
 const EXPECTED_BOOTSTRAP_HASH = "sha256-s/UhdlprnzFxx+iXOtDj2n/Jk+MSRz1g/1lyBtFatVw=";
-const EXPECTED_SANDBOX_CSP = `default-src 'none'; script-src '${EXPECTED_BOOTSTRAP_HASH}' blob:; style-src 'unsafe-inline' blob:; img-src data: blob:; font-src data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
+const EXPECTED_SANDBOX_CSP = `default-src 'none'; script-src '${EXPECTED_BOOTSTRAP_HASH}' 'wasm-unsafe-eval' blob:; style-src 'unsafe-inline' blob:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
 
 function parseCsp(policy, label) {
   const directives = new Map();
@@ -40,6 +41,14 @@ function extractMetaCsps(html) {
   return policies;
 }
 
+function extractRustStringConstant(source, name) {
+  const match = source.match(new RegExp(`const ${name}: &str = "([^"]+)";`));
+  if (!match) {
+    throw new Error(`Could not find Rust string constant ${name}`);
+  }
+  return match[1];
+}
+
 function assertExactCsp(actualPolicy, expectedPolicy, label) {
   const actual = parseCsp(actualPolicy, label);
   const expected = parseCsp(expectedPolicy, "expected sandbox CSP");
@@ -57,11 +66,16 @@ function assertEmbedderAllowsSandboxRuntime(policy, label) {
   const directives = parseCsp(policy, label);
   const scriptSources = directives.get("script-src") ?? [];
   const styleSources = directives.get("style-src") ?? [];
+  const fontSources = directives.get("font-src") ?? [];
+  const mediaSources = directives.get("media-src") ?? [];
   if (
     JSON.stringify(directives.get("frame-src")) !== JSON.stringify(["'none'"]) ||
     !scriptSources.includes(`'${EXPECTED_BOOTSTRAP_HASH}'`) ||
+    !scriptSources.includes("'wasm-unsafe-eval'") ||
     !scriptSources.includes("blob:") ||
-    !styleSources.includes("blob:")
+    !styleSources.includes("blob:") ||
+    !fontSources.includes("blob:") ||
+    !mediaSources.includes("blob:")
   ) {
     throw new Error(`${label} must block frame navigation and allow the hashed Blob runtime`);
   }
@@ -91,13 +105,14 @@ export async function verifyAddonSandboxRuntime({ dist = false } = {}) {
 
   const jsPath = path.join(artifactDirectory, "addon-sandbox-runtime.js");
   const cssPath = path.join(artifactDirectory, "addon-sandbox-runtime.css");
-  const [javascript, css, html, embedderHtml, tauriConfigJson, jsStats, cssStats] =
+  const [javascript, css, html, embedderHtml, tauriConfigJson, serverApi, jsStats, cssStats] =
     await Promise.all([
       readFile(jsPath, "utf8"),
       readFile(cssPath, "utf8"),
       readFile(sandboxHtml, "utf8"),
       readFile(indexHtml, "utf8"),
       readFile(TAURI_CONFIG, "utf8"),
+      readFile(SERVER_API, "utf8"),
       stat(jsPath),
       stat(cssPath),
     ]);
@@ -148,6 +163,15 @@ export async function verifyAddonSandboxRuntime({ dist = false } = {}) {
   const tauriSecurity = JSON.parse(tauriConfigJson).app?.security;
   assertEmbedderAllowsSandboxRuntime(tauriSecurity?.csp ?? "", "Tauri CSP");
   assertEmbedderAllowsSandboxRuntime(tauriSecurity?.devCsp ?? "", "Tauri development CSP");
+  assertEmbedderAllowsSandboxRuntime(
+    extractRustStringConstant(serverApi, "SERVER_CSP"),
+    "Axum CSP",
+  );
+  assertExactCsp(
+    extractRustStringConstant(serverApi, "ADDON_SANDBOX_CSP"),
+    EXPECTED_SANDBOX_CSP,
+    "Axum sandbox CSP",
+  );
   if (jsStats.size > 8 * 1024 * 1024) {
     throw new Error(`Sandbox runtime JavaScript exceeds 8 MiB (${jsStats.size} bytes)`);
   }

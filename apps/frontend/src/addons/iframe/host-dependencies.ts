@@ -25,7 +25,6 @@ interface HostDependencyModule {
 
 declare global {
   // Host-provided ESM bridge used by generated blob modules in the sandbox.
-  // eslint-disable-next-line no-var
   var __wealthfolioHostModules: Record<string, HostDependencyModule> | undefined;
 }
 
@@ -66,8 +65,8 @@ Object.assign(globalThis, {
 
 export const HOST_DEPENDENCY_VERSION_RANGES = {
   "@tanstack/react-query": "^5.90.0",
-  "@wealthfolio/addon-sdk": "^3.6.0",
-  "@wealthfolio/ui": "^3.6.0",
+  "@wealthfolio/addon-sdk": "^3.7.0",
+  "@wealthfolio/ui": "^3.7.0",
   "date-fns": "^4.1.0",
   "lucide-react": "^0.561.0",
   react: "^19.2.0",
