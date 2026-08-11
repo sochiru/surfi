@@ -1843,6 +1843,18 @@ mod tests {
     }
 
     #[test]
+    fn fractional_asset_multiplier_is_value_stable() {
+        let asset = Asset {
+            instrument_type: Some(InstrumentType::Equity),
+            metadata: Some(serde_json::json!({ "contractMultiplier": 0.1 })),
+            ..Default::default()
+        };
+
+        assert_eq!(asset.contract_multiplier(), decimal("0.1"));
+        assert!(contract_multiplier_metadata_update(&asset, None, decimal("0.1")).is_none());
+    }
+
+    #[test]
     fn option_multiplier_update_changes_nested_spec() {
         let asset = Asset {
             instrument_type: Some(InstrumentType::Option),

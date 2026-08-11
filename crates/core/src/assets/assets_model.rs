@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::NaiveDateTime;
-use rust_decimal::Decimal;
+use rust_decimal::{prelude::FromPrimitive, Decimal};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -424,7 +424,7 @@ impl Asset {
             .and_then(|value| {
                 value
                     .as_f64()
-                    .and_then(Decimal::from_f64_retain)
+                    .and_then(Decimal::from_f64)
                     .or_else(|| value.as_str().and_then(|raw| raw.parse::<Decimal>().ok()))
             })
             .filter(|multiplier| *multiplier > Decimal::ZERO)
