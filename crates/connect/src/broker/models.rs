@@ -499,6 +499,9 @@ pub struct HoldingsPosition {
     pub open_pnl: Option<f64>,
     pub average_purchase_price: Option<f64>,
     pub currency: Option<HoldingsCurrency>,
+    /// Number of underlying units represented by one position unit.
+    #[serde(default)]
+    pub contract_multiplier: Option<f64>,
     #[serde(default)]
     pub cash_equivalent: Option<bool>,
 }
@@ -519,6 +522,10 @@ pub struct HoldingsOptionSymbol {
     pub option_type: Option<String>,
     pub strike_price: Option<f64>,
     pub expiration_date: Option<String>,
+    /// Exact number of underlying units represented by one option contract.
+    #[serde(default)]
+    pub multiplier: Option<f64>,
+    /// Deprecated compatibility flag used when multiplier is absent.
     #[serde(default)]
     pub is_mini_option: Option<bool>,
     pub underlying_symbol: Option<HoldingsUnderlyingSymbol>,
