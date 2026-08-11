@@ -554,7 +554,7 @@
     "defaultValue": "デフォルト: {{value}}",
     "effective": "適用値: {{value}}",
     "field": {
-      "temperature": "Temperature",
+      "temperature": "温度",
       "temperatureDescription": "ランダム性を制御します。値が小さいほど出力が決定的になります。",
       "maxTokens": "最大出力トークン数",
       "maxTokensDescription": "応答の長さの上限です。",
