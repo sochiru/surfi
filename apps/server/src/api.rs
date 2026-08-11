@@ -117,66 +117,6 @@ pub async fn security_headers(request: Request<Body>, next: Next) -> Response {
     response
 }
 
-#[cfg(test)]
-mod security_header_tests {
-    use super::*;
-    use axum::{routing::get, Router};
-    use tower::ServiceExt;
-
-    #[tokio::test]
-    async fn addon_sandbox_response_uses_network_free_csp() {
-        let app = Router::new()
-            .route("/addon-sandbox.html", get(|| async { "ok" }))
-            .layer(axum::middleware::from_fn(security_headers));
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .uri("/addon-sandbox.html")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        let csp = response
-            .headers()
-            .get("content-security-policy")
-            .unwrap()
-            .to_str()
-            .unwrap();
-
-        assert_eq!(csp, ADDON_SANDBOX_CSP);
-        for forbidden in ["'self'", "http:", "https:", "tauri:", "asset:"] {
-            assert!(
-                !csp.contains(forbidden),
-                "unexpected CSP source: {forbidden}"
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn application_response_blocks_frame_navigation() {
-        let app = Router::new()
-            .route("/", get(|| async { "ok" }))
-            .layer(axum::middleware::from_fn(security_headers));
-        let response = app
-            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
-            .await
-            .unwrap();
-
-        let csp = response
-            .headers()
-            .get("content-security-policy")
-            .unwrap()
-            .to_str()
-            .unwrap();
-        assert!(csp.contains("frame-src 'none'"));
-        assert!(csp.contains("'sha256-s/UhdlprnzFxx+iXOtDj2n/Jk+MSRz1g/1lyBtFatVw='"));
-        assert!(csp.contains("style-src 'self' 'unsafe-inline' blob:"));
-        assert!(csp.contains("font-src 'self' data: blob:"));
-        assert!(csp.contains("media-src 'self' data: blob:"));
-    }
-}
-
 #[allow(deprecated)]
 pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
     let cors = if config.cors_allow.iter().any(|o| o == "*") {
@@ -323,4 +263,64 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
                 .on_request(DefaultOnRequest::new().level(Level::INFO))
                 .on_response(DefaultOnResponse::new().level(Level::INFO)),
         )
+}
+
+#[cfg(test)]
+mod security_header_tests {
+    use super::*;
+    use axum::{routing::get, Router};
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn addon_sandbox_response_uses_network_free_csp() {
+        let app = Router::new()
+            .route("/addon-sandbox.html", get(|| async { "ok" }))
+            .layer(axum::middleware::from_fn(security_headers));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/addon-sandbox.html")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let csp = response
+            .headers()
+            .get("content-security-policy")
+            .unwrap()
+            .to_str()
+            .unwrap();
+
+        assert_eq!(csp, ADDON_SANDBOX_CSP);
+        for forbidden in ["'self'", "http:", "https:", "tauri:", "asset:"] {
+            assert!(
+                !csp.contains(forbidden),
+                "unexpected CSP source: {forbidden}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn application_response_blocks_frame_navigation() {
+        let app = Router::new()
+            .route("/", get(|| async { "ok" }))
+            .layer(axum::middleware::from_fn(security_headers));
+        let response = app
+            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        let csp = response
+            .headers()
+            .get("content-security-policy")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(csp.contains("frame-src 'none'"));
+        assert!(csp.contains("'sha256-s/UhdlprnzFxx+iXOtDj2n/Jk+MSRz1g/1lyBtFatVw='"));
+        assert!(csp.contains("style-src 'self' 'unsafe-inline' blob:"));
+        assert!(csp.contains("font-src 'self' data: blob:"));
+        assert!(csp.contains("media-src 'self' data: blob:"));
+    }
 }
