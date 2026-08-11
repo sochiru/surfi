@@ -107,6 +107,41 @@ describe("addon sandbox styles", () => {
     expect(css).not.toContain("?v=4.7.0");
   });
 
+  it("decodes escaped quoted and unquoted packaged URLs", async () => {
+    const getAssetUrl = vi.fn((path: string) => Promise.resolve(`blob:${path}`));
+    const css = await resolveAddonCssAssetUrls(
+      "dist/styles/addon.css",
+      [
+        String.raw`.quoted { background: u\72l("../assets/company\ logo.png"); }`,
+        String.raw`.unquoted { background: url(../assets/company\ logo.png); }`,
+      ].join("\n"),
+      getAssetUrl,
+    );
+
+    expect(getAssetUrl).toHaveBeenNthCalledWith(1, "dist/assets/company logo.png");
+    expect(getAssetUrl).toHaveBeenNthCalledWith(2, "dist/assets/company logo.png");
+    expect(css.match(/url\("blob:dist\/assets\/company logo\.png"\)/g)).toHaveLength(2);
+  });
+
+  it("rejects escaped remote schemes and import keywords", async () => {
+    await expect(
+      resolveAddonCssAssetUrls(
+        "dist/addon.css",
+        String.raw`.remote { background: url("https\3a //example.com/image.png"); }`,
+        vi.fn(),
+      ),
+    ).rejects.toThrow("is not a packaged addon asset");
+
+    await expect(
+      resolveAddonCssAssetUrls("dist/addon.css", String.raw`@\69mport "./theme.css";`, vi.fn()),
+    ).rejects.toThrow("@import rules are not supported");
+  });
+
+  it("leaves malformed CSS URL tokens unchanged", async () => {
+    const css = '.broken { background: url("./assets/logo.png"; }';
+    await expect(resolveAddonCssAssetUrls("dist/addon.css", css, vi.fn())).resolves.toBe(css);
+  });
+
   it("rejects CSS imports that would create a child-frame request", async () => {
     await expect(
       resolveAddonCssAssetUrls(

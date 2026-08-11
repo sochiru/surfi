@@ -1,3 +1,5 @@
+import { tokenize, tokenTypes } from "css-tree/tokenizer";
+import { ident as cssIdent, string as cssString, url as cssUrl } from "css-tree/utils";
 import { resolveAddonAssetPath } from "./addon-sandbox-asset-registry";
 
 export interface SandboxAddonFile {
@@ -34,86 +36,55 @@ interface CssUrlToken {
   value: string;
 }
 
+interface PendingQuotedCssUrl {
+  start: number;
+  value?: string;
+}
+
 function findCssUrlTokens(css: string) {
   const tokens: CssUrlToken[] = [];
-  let index = 0;
+  let pendingQuotedUrl: PendingQuotedCssUrl | undefined;
 
-  while (index < css.length) {
-    if (css.startsWith("/*", index)) {
-      const commentEnd = css.indexOf("*/", index + 2);
-      index = commentEnd === -1 ? css.length : commentEnd + 2;
-      continue;
-    }
-    const character = css[index];
-    if (character === '"' || character === "'") {
-      const quote = character;
-      index += 1;
-      while (index < css.length) {
-        if (css[index] === "\\") {
-          index += 2;
-        } else if (css[index] === quote) {
-          index += 1;
-          break;
-        } else {
-          index += 1;
-        }
+  tokenize(css, (type, start, end) => {
+    if (pendingQuotedUrl) {
+      if (type === tokenTypes.WhiteSpace || type === tokenTypes.Comment) {
+        return;
       }
-      continue;
+      if (pendingQuotedUrl.value === undefined && type === tokenTypes.String) {
+        pendingQuotedUrl.value = cssString.decode(css.slice(start, end));
+        return;
+      }
+      if (pendingQuotedUrl.value !== undefined && type === tokenTypes.RightParenthesis) {
+        tokens.push({ end, start: pendingQuotedUrl.start, value: pendingQuotedUrl.value });
+        pendingQuotedUrl = undefined;
+        return;
+      }
+      pendingQuotedUrl = undefined;
     }
+
     if (
-      css.slice(index, index + 7).toLowerCase() === "@import" &&
-      !/[\w-]/.test(css[index + 7] ?? "")
+      type === tokenTypes.AtKeyword &&
+      cssIdent.decode(css.slice(start + 1, end)).toLowerCase() === "import"
     ) {
       throw new Error("Addon CSS @import rules are not supported; bundle or package the CSS file");
     }
 
-    const candidate = css.slice(index, index + 3);
-    const previous = index > 0 ? css[index - 1] : "";
-    if (candidate.toLowerCase() !== "url" || /[\w-]/.test(previous)) {
-      index += 1;
-      continue;
+    if (type === tokenTypes.Url) {
+      tokens.push({
+        end,
+        start,
+        value: cssUrl.decode(css.slice(start, end)),
+      });
+      return;
     }
 
-    let cursor = index + 3;
-    while (/\s/.test(css[cursor] ?? "")) cursor += 1;
-    if (css[cursor] !== "(") {
-      index += 1;
-      continue;
+    if (
+      type === tokenTypes.Function &&
+      cssIdent.decode(css.slice(start, end - 1)).toLowerCase() === "url"
+    ) {
+      pendingQuotedUrl = { start };
     }
-    cursor += 1;
-    while (/\s/.test(css[cursor] ?? "")) cursor += 1;
-
-    const quote = css[cursor] === '"' || css[cursor] === "'" ? css[cursor] : undefined;
-    if (quote) cursor += 1;
-    const valueStart = cursor;
-    let valueEnd = cursor;
-    while (cursor < css.length) {
-      if (css[cursor] === "\\") {
-        cursor += 2;
-        valueEnd = cursor;
-        continue;
-      }
-      if ((quote && css[cursor] === quote) || (!quote && css[cursor] === ")")) {
-        valueEnd = cursor;
-        break;
-      }
-      cursor += 1;
-      valueEnd = cursor;
-    }
-    if (quote && css[cursor] === quote) cursor += 1;
-    while (/\s/.test(css[cursor] ?? "")) cursor += 1;
-    if (css[cursor] !== ")") {
-      index += 3;
-      continue;
-    }
-
-    tokens.push({
-      end: cursor + 1,
-      start: index,
-      value: css.slice(valueStart, valueEnd).trim(),
-    });
-    index = cursor + 1;
-  }
+  });
 
   return tokens;
 }
