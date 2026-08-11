@@ -30,9 +30,10 @@ Vite's changing default:
 | Wealthfolio for macOS                   | macOS 12                  |
 | Wealthfolio for iPhone and iPad         | iOS/iPadOS 16             |
 
-Linux and Android use the WebKitGTK and Android System WebView installed on the
-device. Keep those components updated. Addon Vite configurations should use the
-same explicit target:
+On macOS 12, apply current macOS and Safari updates so the system WKWebView
+meets the Safari 16 floor. Linux and Android use the WebKitGTK and Android
+System WebView installed on the device. Keep those components updated. Addon
+Vite configurations should use the same explicit target:
 
 ```typescript
 build: {

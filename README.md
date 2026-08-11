@@ -86,9 +86,11 @@ Visit the website at
 - **📱 Cross-Platform** - Desktop (Windows, macOS, Linux), iOS, and self-hosted
   Docker/web
 
-Wealthfolio 3.7 requires macOS 12 or newer and iOS/iPadOS 16 or newer. Windows
-uses the evergreen WebView2 runtime; Linux and self-hosted installations should
-keep WebKitGTK or their browser updated.
+Wealthfolio 3.7 requires macOS 12 or newer and iOS/iPadOS 16 or newer. macOS 12
+installations should apply current macOS and Safari updates so the system
+WKWebView meets the Safari 16 browser floor. Windows uses the evergreen WebView2
+runtime; Linux and self-hosted installations should keep WebKitGTK or their
+browser updated.
 
 ### 🧩 Addon System
 

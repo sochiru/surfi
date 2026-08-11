@@ -635,8 +635,10 @@ cash flows.
 
 Wealthfolio 3.7 supports Chrome/Edge 107+, Firefox 104+, and Safari 16+. The
 desktop app requires macOS 12+ and the native mobile app requires iOS/iPadOS
-16+. Addons run inside the platform system WebView, so build against this
-browser floor rather than relying on the browser used during development.
+16+. On macOS 12, apply current macOS and Safari updates so the system WKWebView
+meets the Safari 16 floor. Addons run inside the platform system WebView, so
+build against this browser floor rather than relying on the browser used during
+development.
 
 Files below `assets/` and `dist/assets/` are private to the addon package. Use
 `ctx.assets.list()`, `ctx.assets.getBlob(path)`, and `ctx.assets.getUrl(path)`

@@ -176,8 +176,12 @@ export interface ExtractedAddon {
   metadata: AddonManifest;
   /** List of files in the addon package */
   files: AddonFile[];
-  /** Packaged static files under `assets/**` and `dist/assets/**` (metadata only). */
-  assets: AddonAsset[];
+  /**
+   * Packaged static files under `assets/**` and `dist/assets/**` (metadata only).
+   * Wealthfolio 3.7 hosts always return an array; optionality preserves source
+   * compatibility with values constructed against earlier SDK versions.
+   */
+  assets?: AddonAsset[];
 }
 
 /**
