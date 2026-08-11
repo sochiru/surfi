@@ -28,8 +28,8 @@ use wealthfolio_core::activities::{
     NewActivity, ACTIVITY_TYPE_BUY, ACTIVITY_TYPE_SELL,
 };
 use wealthfolio_core::assets::{
-    build_option_metadata, parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix,
-    AssetServiceTrait, AssetSpec, InstrumentType, OptionSpec,
+    build_option_metadata, parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, Asset,
+    AssetServiceTrait, AssetSpec, InstrumentType, OptionSpec, CONTRACT_MULTIPLIER_METADATA_KEY,
 };
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
@@ -55,11 +55,14 @@ fn normalize_holdings_money(amount: Decimal, currency: &str) -> (Decimal, String
     )
 }
 
-fn positive_contract_multiplier(value: Option<f64>, fallback: Decimal) -> Decimal {
+fn exact_positive_contract_multiplier(value: Option<f64>) -> Option<Decimal> {
     value
         .and_then(Decimal::from_f64)
         .filter(|multiplier| *multiplier > Decimal::ZERO)
-        .unwrap_or(fallback)
+}
+
+fn positive_contract_multiplier(value: Option<f64>, fallback: Decimal) -> Decimal {
+    exact_positive_contract_multiplier(value).unwrap_or(fallback)
 }
 
 fn normalize_regular_average_cost(
@@ -118,9 +121,94 @@ fn holdings_option_metadata(
     option: &HoldingsOptionSymbol,
     ticker: &str,
     multiplier: Decimal,
-) -> Option<serde_json::Value> {
+) -> serde_json::Value {
     build_option_metadata(ticker, multiplier)
         .or_else(|| structured_holdings_option_metadata(option, multiplier))
+        .unwrap_or_else(|| top_level_contract_multiplier_metadata(multiplier))
+}
+
+fn top_level_contract_multiplier_metadata(multiplier: Decimal) -> serde_json::Value {
+    let mut metadata = serde_json::Map::new();
+    metadata.insert(
+        CONTRACT_MULTIPLIER_METADATA_KEY.to_string(),
+        serde_json::json!(multiplier),
+    );
+    serde_json::Value::Object(metadata)
+}
+
+fn regular_contract_multiplier_metadata(multiplier: Option<Decimal>) -> Option<serde_json::Value> {
+    multiplier
+        .filter(|multiplier| *multiplier != Decimal::ONE)
+        .map(top_level_contract_multiplier_metadata)
+}
+
+fn record_authoritative_multiplier(
+    multipliers: &mut HashMap<String, Decimal>,
+    spec_key: &str,
+    multiplier: Option<Decimal>,
+) -> bool {
+    let Some(multiplier) = multiplier else {
+        return false;
+    };
+    match multipliers.entry(spec_key.to_string()) {
+        Entry::Vacant(entry) => {
+            entry.insert(multiplier);
+            true
+        }
+        Entry::Occupied(entry) => {
+            if *entry.get() != multiplier {
+                warn!(
+                    "Broker returned inconsistent contract multipliers for {}; retaining the first",
+                    spec_key
+                );
+            }
+            false
+        }
+    }
+}
+
+fn contract_multiplier_metadata_update(
+    asset: &Asset,
+    incoming: Option<&serde_json::Value>,
+    multiplier: Decimal,
+) -> Option<serde_json::Value> {
+    if asset.contract_multiplier() == multiplier {
+        return None;
+    }
+
+    let mut metadata = asset
+        .metadata
+        .as_ref()
+        .and_then(serde_json::Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    if let Some(incoming) = incoming.and_then(serde_json::Value::as_object) {
+        metadata.extend(incoming.clone());
+    }
+
+    if asset.is_option() {
+        if let Some(option) = metadata
+            .get_mut("option")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            option.insert("multiplier".to_string(), serde_json::json!(multiplier));
+            metadata.remove(CONTRACT_MULTIPLIER_METADATA_KEY);
+        } else {
+            metadata.insert(
+                CONTRACT_MULTIPLIER_METADATA_KEY.to_string(),
+                serde_json::json!(multiplier),
+            );
+        }
+    } else if multiplier == Decimal::ONE {
+        metadata.remove(CONTRACT_MULTIPLIER_METADATA_KEY);
+    } else {
+        metadata.insert(
+            CONTRACT_MULTIPLIER_METADATA_KEY.to_string(),
+            serde_json::json!(multiplier),
+        );
+    }
+
+    Some(serde_json::Value::Object(metadata))
 }
 
 #[derive(Debug, Clone)]
@@ -766,6 +854,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         let mut asset_specs: Vec<AssetSpec> = Vec::new();
         // Canonical instrument key → index into asset_specs
         let mut spec_key_to_idx: HashMap<String, usize> = HashMap::new();
+        let mut authoritative_multipliers: HashMap<String, Decimal> = HashMap::new();
         let mut position_data: Vec<HoldingsPositionData> = Vec::new();
 
         for pos in &positions {
@@ -824,13 +913,14 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
 
             let instrument_type =
                 map_broker_symbol_type(symbol_type_code.as_deref(), is_crypto_asset);
-            let contract_multiplier =
-                positive_contract_multiplier(pos.contract_multiplier, Decimal::ONE);
+            let exact_multiplier = exact_positive_contract_multiplier(pos.contract_multiplier);
+            let contract_multiplier = exact_multiplier.unwrap_or(Decimal::ONE);
 
             let asset_name = symbol_info.and_then(|s| s.name.clone().or(s.description.clone()));
 
             let spec = AssetSpec {
                 name: asset_name,
+                metadata: regular_contract_multiplier_metadata(exact_multiplier),
                 ..AssetSpec::market_instrument(
                     symbol.clone(),
                     symbol.clone(),
@@ -848,6 +938,16 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     if is_crypto_asset { "CRYPTO" } else { "EQUITY" }
                 )
             });
+
+            if record_authoritative_multiplier(
+                &mut authoritative_multipliers,
+                &spec_key,
+                exact_multiplier,
+            ) {
+                if let Some(existing_idx) = spec_key_to_idx.get(&spec_key) {
+                    asset_specs[*existing_idx].metadata = spec.metadata.clone();
+                }
+            }
 
             if !spec_key_to_idx.contains_key(&spec_key) {
                 let idx = asset_specs.len();
@@ -921,6 +1021,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .unwrap_or_else(|| account_currency.clone());
             let position_currency = normalize_currency_code(&raw_quote_currency).to_string();
 
+            let exact_multiplier = exact_positive_contract_multiplier(option_symbol.multiplier);
             let multiplier = option_contract_multiplier(option_symbol);
             let metadata = holdings_option_metadata(option_symbol, &normalized_ticker, multiplier);
 
@@ -931,7 +1032,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
 
             let spec = AssetSpec {
                 name: asset_name,
-                metadata,
+                metadata: Some(metadata),
                 ..AssetSpec::market_instrument(
                     normalized_ticker.clone(),
                     normalized_ticker.clone(),
@@ -944,6 +1045,16 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             let spec_key = spec
                 .instrument_key()
                 .unwrap_or_else(|| format!("OPTION:{}", normalized_ticker.to_uppercase()));
+
+            if record_authoritative_multiplier(
+                &mut authoritative_multipliers,
+                &spec_key,
+                exact_multiplier,
+            ) {
+                if let Some(existing_idx) = spec_key_to_idx.get(&spec_key) {
+                    asset_specs[*existing_idx].metadata = spec.metadata.clone();
+                }
+            }
 
             if !spec_key_to_idx.contains_key(&spec_key) {
                 let idx = asset_specs.len();
@@ -1014,6 +1125,38 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 if let Some(asset_id) = key_to_asset_id.get(id) {
                     spec_key_to_asset_id.insert(spec_key.clone(), asset_id.clone());
                 }
+            }
+        }
+
+        // Broker multipliers are asset economics shared by every account. New assets already carry
+        // this metadata through AssetSpec; existing assets are updated only when the resolved value
+        // changes. A failed backfill is best-effort and will be retried by the next holdings sync.
+        for (spec_key, multiplier) in &authoritative_multipliers {
+            let Some(asset_id) = spec_key_to_asset_id.get(spec_key) else {
+                continue;
+            };
+            let Some(asset) = ensure_result.assets.get(asset_id) else {
+                continue;
+            };
+            let incoming_metadata = spec_key_to_idx
+                .get(spec_key)
+                .and_then(|idx| asset_specs.get(*idx))
+                .and_then(|spec| spec.metadata.as_ref());
+            let Some(metadata) =
+                contract_multiplier_metadata_update(asset, incoming_metadata, *multiplier)
+            else {
+                continue;
+            };
+
+            if let Err(error) = self
+                .asset_service
+                .update_asset_metadata(asset_id, metadata)
+                .await
+            {
+                warn!(
+                    "Could not persist broker contract multiplier for asset {}: {}",
+                    asset_id, error
+                );
             }
         }
 
@@ -1581,15 +1724,18 @@ mod tests {
     use wealthfolio_core::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotSource};
 
     use super::{
-        default_tracking_mode_for_broker_account_type, holdings_option_metadata,
-        normalize_holdings_money, normalize_regular_average_cost, option_contract_multiplier,
-        positive_contract_multiplier, BrokerSyncService,
+        contract_multiplier_metadata_update, default_tracking_mode_for_broker_account_type,
+        holdings_option_metadata, normalize_holdings_money, normalize_regular_average_cost,
+        option_contract_multiplier, positive_contract_multiplier,
+        regular_contract_multiplier_metadata, BrokerSyncService,
     };
     use crate::broker::models::{
         HoldingsOptionPosition, HoldingsOptionSymbol, HoldingsPosition, HoldingsUnderlyingSymbol,
     };
     use wealthfolio_core::accounts::{account_types, TrackingMode};
-    use wealthfolio_core::assets::{AssetSpec, InstrumentType, OptionSpec};
+    use wealthfolio_core::assets::{
+        Asset, AssetSpec, InstrumentType, OptionSpec, CONTRACT_MULTIPLIER_METADATA_KEY,
+    };
 
     fn decimal(value: &str) -> Decimal {
         Decimal::from_str(value).expect("valid decimal")
@@ -1659,6 +1805,74 @@ mod tests {
     }
 
     #[test]
+    fn regular_asset_metadata_stores_only_non_default_multiplier() {
+        assert!(regular_contract_multiplier_metadata(None).is_none());
+        assert!(regular_contract_multiplier_metadata(Some(Decimal::ONE)).is_none());
+
+        let metadata = regular_contract_multiplier_metadata(Some(decimal("50")))
+            .expect("non-default multiplier metadata");
+        let asset = Asset {
+            instrument_type: Some(InstrumentType::Equity),
+            metadata: Some(metadata),
+            ..Default::default()
+        };
+
+        assert_eq!(asset.contract_multiplier(), decimal("50"));
+    }
+
+    #[test]
+    fn asset_multiplier_update_compares_resolved_value() {
+        let asset = Asset {
+            instrument_type: Some(InstrumentType::Equity),
+            metadata: Some(serde_json::json!({
+                "contractMultiplier": "50",
+                "identifiers": { "isin": "US0378331005" }
+            })),
+            ..Default::default()
+        };
+
+        assert!(contract_multiplier_metadata_update(&asset, None, decimal("50")).is_none());
+
+        let updated = contract_multiplier_metadata_update(&asset, None, Decimal::ONE)
+            .expect("changed multiplier");
+        assert!(updated.get(CONTRACT_MULTIPLIER_METADATA_KEY).is_none());
+        assert_eq!(
+            updated["identifiers"],
+            asset.metadata.unwrap()["identifiers"]
+        );
+    }
+
+    #[test]
+    fn option_multiplier_update_changes_nested_spec() {
+        let asset = Asset {
+            instrument_type: Some(InstrumentType::Option),
+            metadata: Some(serde_json::json!({
+                "option": {
+                    "underlyingAssetId": "AAPL",
+                    "expiration": "2026-12-18",
+                    "right": "CALL",
+                    "strike": "150",
+                    "multiplier": "100"
+                },
+                "identifiers": { "occ": "AAPL  261218C00150000" }
+            })),
+            ..Default::default()
+        };
+
+        let updated = contract_multiplier_metadata_update(&asset, None, decimal("50"))
+            .expect("changed multiplier");
+        let spec: OptionSpec =
+            serde_json::from_value(updated["option"].clone()).expect("valid option spec");
+
+        assert_eq!(spec.multiplier, decimal("50"));
+        assert_eq!(
+            updated["identifiers"],
+            asset.metadata.unwrap()["identifiers"]
+        );
+        assert!(updated.get(CONTRACT_MULTIPLIER_METADATA_KEY).is_none());
+    }
+
+    #[test]
     fn holdings_contract_multiplier_prefers_exact_value_with_safe_defaults() {
         assert_eq!(
             positive_contract_multiplier(Some(50.0), Decimal::ONE),
@@ -1725,8 +1939,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metadata = holdings_option_metadata(&option, "BROKER-ADJUSTED-OPTION", decimal("50"))
-            .expect("structured option metadata");
+        let metadata = holdings_option_metadata(&option, "BROKER-ADJUSTED-OPTION", decimal("50"));
         let spec: OptionSpec =
             serde_json::from_value(metadata["option"].clone()).expect("valid option spec");
 

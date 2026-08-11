@@ -1899,6 +1899,22 @@ impl AssetServiceTrait for AssetService {
         Ok(asset)
     }
 
+    async fn update_asset_metadata(
+        &self,
+        asset_id: &str,
+        metadata: serde_json::Value,
+    ) -> Result<Asset> {
+        let asset = self
+            .asset_repository
+            .update_metadata(asset_id, metadata)
+            .await?;
+
+        self.event_sink
+            .emit(DomainEvent::assets_updated(vec![asset.id.clone()]));
+
+        Ok(asset)
+    }
+
     /// Creates a new asset directly without network lookups.
     async fn create_asset(&self, mut new_asset: NewAsset) -> Result<Asset> {
         let canonical = canonicalize_market_identity(

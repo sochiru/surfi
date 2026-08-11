@@ -153,6 +153,9 @@ pub struct OptionSpec {
     pub occ_symbol: Option<String>,
 }
 
+/// Top-level asset metadata key for instruments whose value is scaled per contract.
+pub const CONTRACT_MULTIPLIER_METADATA_KEY: &str = "contractMultiplier";
+
 /// Bond specification stored in Asset.metadata["bond"]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -410,10 +413,23 @@ impl Asset {
     /// Returns the contract multiplier for this asset.
     ///
     /// For options, this is the number of shares per contract (typically 100).
-    /// For all other instruments it is 1.
+    /// Other contract instruments can provide an explicit multiplier in asset metadata.
     pub fn contract_multiplier(&self) -> Decimal {
         if let Some(spec) = self.option_spec() {
             spec.multiplier
+        } else if let Some(multiplier) = self
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get(CONTRACT_MULTIPLIER_METADATA_KEY))
+            .and_then(|value| {
+                value
+                    .as_f64()
+                    .and_then(Decimal::from_f64_retain)
+                    .or_else(|| value.as_str().and_then(|raw| raw.parse::<Decimal>().ok()))
+            })
+            .filter(|multiplier| *multiplier > Decimal::ZERO)
+        {
+            multiplier
         } else if self.is_option() {
             // Option without metadata — default to standard 100 multiplier
             Decimal::from(100)
@@ -1124,6 +1140,23 @@ pub fn canonicalize_market_identity(
 }
 
 impl UpdateAssetProfile {
+    /// Builds a repository update that changes only metadata while preserving asset identity.
+    pub fn metadata_only(asset: &Asset, metadata: Value) -> Self {
+        Self {
+            name: asset.name.clone(),
+            display_code: asset.display_code.clone(),
+            notes: asset.notes.clone().unwrap_or_default(),
+            kind: Some(asset.kind.clone()),
+            quote_mode: Some(asset.quote_mode),
+            quote_ccy: Some(asset.quote_ccy.clone()),
+            instrument_type: asset.instrument_type.clone(),
+            instrument_symbol: asset.instrument_symbol.clone(),
+            instrument_exchange_mic: asset.instrument_exchange_mic.clone(),
+            provider_config: asset.provider_config.clone(),
+            metadata: Some(metadata),
+        }
+    }
+
     /// Validates the asset profile update data
     pub fn validate(&self) -> Result<()> {
         Ok(())
