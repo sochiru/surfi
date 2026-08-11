@@ -7,6 +7,7 @@ export const SUPPORTED_LOCALES = [
   { code: "es", label: "Español" },
   { code: "zh", label: "简体中文" },
   { code: "ko", label: "한국어" },
+  { code: "ja", label: "日本語" },
 ] as const;
 
 export type LocaleCode = (typeof SUPPORTED_LOCALES)[number]["code"];
