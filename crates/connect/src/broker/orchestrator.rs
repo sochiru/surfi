@@ -51,7 +51,13 @@ impl AccountSyncJob {
         let tracking_mode = match account.tracking_mode {
             TrackingMode::Holdings => BrokerTrackingMode::Holdings,
             TrackingMode::Transactions => BrokerTrackingMode::Transactions,
-            TrackingMode::NotSet => return None,
+            TrackingMode::NotSet => {
+                info!(
+                    "Skipping sync for account '{}' (trackingMode=NOT_SET)",
+                    account.name
+                );
+                return None;
+            }
         };
         Some(Self {
             account_id: account.id,
@@ -354,13 +360,6 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
         let mut activities_summary = SyncActivitiesResponse::default();
 
         for account in synced_accounts {
-            if account.tracking_mode == TrackingMode::NotSet {
-                info!(
-                    "Skipping sync for account '{}' (trackingMode=NOT_SET)",
-                    account.name
-                );
-                continue;
-            }
             let Some(job) = AccountSyncJob::from_account(account) else {
                 continue;
             };
@@ -402,13 +401,6 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
         let mut holdings_summary = SyncHoldingsResponse::default();
 
         for account in synced_accounts {
-            if account.tracking_mode == TrackingMode::NotSet {
-                info!(
-                    "Skipping sync for account '{}' (trackingMode=NOT_SET)",
-                    account.name
-                );
-                continue;
-            }
             let Some(job) = AccountSyncJob::from_account(account) else {
                 continue;
             };

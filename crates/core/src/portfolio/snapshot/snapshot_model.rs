@@ -201,7 +201,8 @@ impl AccountStateSnapshot {
     /// Returns true if the holdings are effectively the same, ignoring metadata
     /// like id, snapshot_date, calculated_at, source, etc.
     ///
-    /// For positions, compares: asset_id, quantity, average_cost, total_cost_basis.
+    /// For positions, compares: asset_id, quantity, average_cost, total_cost_basis,
+    /// currency, and contract_multiplier.
     /// Ignores: lots, timestamps, inception_date.
     pub fn is_content_equal(&self, other: &Self) -> bool {
         // Compare cash balances
@@ -237,5 +238,6 @@ impl AccountStateSnapshot {
             && a.average_cost == b.average_cost
             && a.total_cost_basis == b.total_cost_basis
             && a.currency == b.currency
+            && a.contract_multiplier == b.contract_multiplier
     }
 }

@@ -327,6 +327,47 @@ mod tests {
     }
 
     #[test]
+    fn test_is_content_equal_detects_contract_multiplier_change() {
+        use crate::portfolio::snapshot::{AccountStateSnapshot, Position};
+        use chrono::Utc;
+        use rust_decimal::Decimal;
+        use std::collections::HashMap;
+
+        let now = Utc::now();
+        let position = Position {
+            id: "pos-1".to_string(),
+            account_id: "account-1".to_string(),
+            asset_id: "contract-1".to_string(),
+            quantity: Decimal::from(2),
+            average_cost: Decimal::from(500),
+            total_cost_basis: Decimal::from(1000),
+            currency: "USD".to_string(),
+            inception_date: now,
+            lots: Default::default(),
+            created_at: now,
+            last_updated: now,
+            is_alternative: false,
+            contract_multiplier: Decimal::ONE,
+            cost_basis_account: None,
+            cost_basis_base: None,
+        };
+
+        let mut first = AccountStateSnapshot::default();
+        first
+            .positions
+            .insert(position.asset_id.clone(), position.clone());
+
+        let mut second_position = position;
+        second_position.contract_multiplier = Decimal::from(50);
+        let second = AccountStateSnapshot {
+            positions: HashMap::from([(second_position.asset_id.clone(), second_position)]),
+            ..Default::default()
+        };
+
+        assert!(!first.is_content_equal(&second));
+    }
+
+    #[test]
     fn test_is_content_equal_different_position_count() {
         use crate::portfolio::snapshot::{AccountStateSnapshot, Position};
         use chrono::Utc;

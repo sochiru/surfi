@@ -25,7 +25,6 @@ use super::broker::{BrokerApiClient, BrokerTrackingMode};
 /// Default timeout for API requests.
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
 
-pub const TRACKING_MODE_HEADER: &str = "X-Wealthfolio-Tracking-Mode";
 const TRACKING_MODE_HEADER_NAME: HeaderName =
     HeaderName::from_static("x-wealthfolio-tracking-mode");
 
@@ -203,18 +202,7 @@ impl ConnectApiClient {
 
     /// Make a GET request and parse the response.
     async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
-        let context = CloudRequestContext::new("GET", path, None);
-        let url = format!("{}{}", self.base_url, path);
-
-        let response = self
-            .client
-            .get(&url)
-            .headers(self.headers(&context.client_request_id)?)
-            .send()
-            .await
-            .map_err(|e| self.request_transport_error(&context, e))?;
-
-        self.parse_response(response, &context).await
+        self.get_with_tracking_mode(path, None).await
     }
 
     /// Make an account-scoped GET request with the account's configured tracking mode.
@@ -223,13 +211,27 @@ impl ConnectApiClient {
         path: &str,
         tracking_mode: BrokerTrackingMode,
     ) -> Result<T> {
+        self.get_with_tracking_mode(path, Some(tracking_mode)).await
+    }
+
+    async fn get_with_tracking_mode<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        tracking_mode: Option<BrokerTrackingMode>,
+    ) -> Result<T> {
         let context = CloudRequestContext::new("GET", path, None);
         let url = format!("{}{}", self.base_url, path);
+        let headers = match tracking_mode {
+            Some(tracking_mode) => {
+                self.account_headers(&context.client_request_id, tracking_mode)?
+            }
+            None => self.headers(&context.client_request_id)?,
+        };
 
         let response = self
             .client
             .get(&url)
-            .headers(self.account_headers(&context.client_request_id, tracking_mode)?)
+            .headers(headers)
             .send()
             .await
             .map_err(|e| self.request_transport_error(&context, e))?;
@@ -724,7 +726,7 @@ mod tests {
             let headers = captured.lock().unwrap().clone().expect("captured request");
             assert_eq!(
                 headers
-                    .get(&TRACKING_MODE_HEADER.to_ascii_lowercase())
+                    .get(TRACKING_MODE_HEADER_NAME.as_str())
                     .map(String::as_str),
                 Some(expected)
             );
@@ -741,7 +743,7 @@ mod tests {
             let headers = captured.lock().unwrap().clone().expect("captured request");
             assert_eq!(
                 headers
-                    .get(&TRACKING_MODE_HEADER.to_ascii_lowercase())
+                    .get(TRACKING_MODE_HEADER_NAME.as_str())
                     .map(String::as_str),
                 Some(expected)
             );
