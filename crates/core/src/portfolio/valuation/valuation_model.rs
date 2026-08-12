@@ -392,6 +392,11 @@ pub struct CurrentAccountValuation {
     pub account_id: String,
     pub account_currency: String,
     pub base_currency: String,
+    /// Latest conversion rate from the account currency to the base currency.
+    ///
+    /// `None` means the rate could not be resolved safely, so consumers must
+    /// not label base-currency amounts as account-currency amounts.
+    pub fx_rate_to_base: Option<Decimal>,
     pub cash_balance: Decimal,
     pub investment_market_value: Decimal,
     pub total_value: Decimal,

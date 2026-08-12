@@ -1030,6 +1030,7 @@ export interface CurrentAccountValuation {
   accountId: string;
   accountCurrency: string;
   baseCurrency: string;
+  fxRateToBase: number | null;
   cashBalance: number;
   investmentMarketValue: number;
   totalValue: number;

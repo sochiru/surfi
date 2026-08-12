@@ -578,6 +578,7 @@ function createCurrentAccountValuation(
     accountId: "account-1",
     accountCurrency: "USD",
     baseCurrency: "USD",
+    fxRateToBase: 1,
     cashBalance: 0,
     investmentMarketValue: overrides.totalValue ?? 125,
     totalValue: overrides.totalValue ?? 125,
