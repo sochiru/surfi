@@ -1023,7 +1023,7 @@ impl PerformanceService {
         let start_index = if first_value.is_sign_negative() {
             full_history
                 .iter()
-                .position(|point| Self::return_total_value(point, flow_basis).is_sign_positive())?
+                .position(|point| Self::return_total_value(point, flow_basis) > Decimal::ZERO)?
         } else {
             0
         };
@@ -9469,6 +9469,59 @@ mod tests {
             .not_applicable_reasons
             .iter()
             .any(|reason| reason.contains("portfolio value is negative")));
+    }
+
+    #[test]
+    fn value_return_skips_zero_within_negative_prefix() {
+        let mut history = vec![
+            valuation(
+                "2026-06-24",
+                dec!(-110),
+                Decimal::ZERO,
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-25",
+                Decimal::ZERO,
+                Decimal::ZERO,
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-26",
+                dec!(999525),
+                dec!(1000000),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-27",
+                dec!(968216),
+                dec!(1000000),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+        ];
+        history[2].external_inflow_base = dec!(1000000);
+        history[2].external_flow_source = ExternalFlowSource::CashAmount;
+
+        let result = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Transactions),
+            None,
+            true,
+        )
+        .expect("performance should compute");
+
+        let expected = (dec!(968216) / dec!(999525) - Decimal::ONE).round_dp(DECIMAL_PRECISION);
+        assert_eq!(result.returns.twr, Some(expected));
+        assert_eq!(result.returns.value_return, Some(expected));
+        assert!(!result
+            .data_quality
+            .not_applicable_reasons
+            .iter()
+            .any(|reason| reason.contains("starting value is zero or negative")));
     }
 
     #[test]
