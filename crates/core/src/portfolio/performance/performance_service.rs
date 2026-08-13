@@ -615,7 +615,10 @@ impl PerformanceService {
                 warned_partial_value_coverage = true;
             }
 
-            if prev_value.is_sign_negative() || curr_value.is_sign_negative() {
+            // A negative closing value is always fatal. A negative opening
+            // value is fatal only after the return chain has started; before
+            // that it belongs to the pre-funding prefix handled below.
+            if curr_value.is_sign_negative() || (chain_started && prev_value.is_sign_negative()) {
                 not_applicable_reasons.push(format!(
                     "TWR unavailable for {} because portfolio value is negative. Review the underlying transactions, prices, and cash balances.",
                     curr_point.valuation_date
@@ -9337,6 +9340,108 @@ mod tests {
             .not_applicable_reasons
             .iter()
             .any(|reason| reason.contains("denominator") && reason.contains("negative")));
+    }
+
+    #[test]
+    fn twr_skips_negative_prefix_before_first_funded_period() {
+        let mut history = vec![
+            valuation(
+                "2026-06-24",
+                dec!(-110),
+                Decimal::ZERO,
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-25",
+                dec!(999525),
+                dec!(1000000),
+                dec!(190900),
+                dec!(190900),
+            ),
+            valuation(
+                "2026-06-26",
+                dec!(968216),
+                dec!(1000000),
+                dec!(704200),
+                dec!(704200),
+            ),
+        ];
+        history[1].external_inflow_base = dec!(1000000);
+        history[1].external_flow_source = ExternalFlowSource::CashAmount;
+
+        let result = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Transactions),
+            None,
+            true,
+        )
+        .expect("performance should compute");
+
+        let expected = (dec!(968216) / dec!(999525) - Decimal::ONE).round_dp(DECIMAL_PRECISION);
+        assert_eq!(result.returns.twr, Some(expected));
+        assert_eq!(result.summary.percent, Some(expected));
+        assert_eq!(result.series[1].value, Decimal::ZERO);
+        assert_eq!(result.series[2].value, expected);
+        assert!(!result
+            .data_quality
+            .not_applicable_reasons
+            .iter()
+            .any(|reason| reason.contains("portfolio value is negative")));
+    }
+
+    #[test]
+    fn twr_rejects_negative_closing_value_before_chain_starts() {
+        let mut history = vec![
+            valuation(
+                "2026-06-24",
+                Decimal::ZERO,
+                Decimal::ZERO,
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-25",
+                dec!(-50),
+                dec!(100),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-26",
+                dec!(100),
+                dec!(250),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-27",
+                dec!(110),
+                dec!(250),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+        ];
+        history[1].external_inflow_base = dec!(100);
+        history[1].external_flow_source = ExternalFlowSource::CashAmount;
+        history[2].external_inflow_base = dec!(150);
+        history[2].external_flow_source = ExternalFlowSource::CashAmount;
+
+        let result = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Transactions),
+            None,
+            true,
+        )
+        .expect("performance should compute");
+
+        assert_eq!(result.returns.twr, None);
+        assert_eq!(result.summary.percent, None);
+        assert!(result
+            .data_quality
+            .not_applicable_reasons
+            .iter()
+            .any(|reason| reason.contains("portfolio value is negative")));
     }
 
     #[test]
