@@ -46,6 +46,12 @@ function resolveOidcError(t: TFunction, code: string): string {
   return key ? t(key) : t("auth:context.oidcErrors.generic");
 }
 
+/**
+ * Set on logout so the login page offers the SSO button instead of bouncing the
+ * user straight back into the IdP, which would make signing out impossible.
+ */
+export const MANUAL_LOGIN_STORAGE_KEY = "wf.manual-login";
+
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -187,6 +193,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     if (isWeb) {
+      try {
+        window.sessionStorage.setItem(MANUAL_LOGIN_STORAGE_KEY, "1");
+      } catch {
+        // noop – sessionStorage may be unavailable
+      }
       if (oidcEnabled) {
         // Full-page navigation: the server clears the session (and OIDC id-token
         // cookie) and may redirect to the IdP for single logout.
