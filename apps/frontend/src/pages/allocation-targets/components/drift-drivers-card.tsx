@@ -78,7 +78,7 @@ export function DriftDriversCard({
     .sort((a, b) => Math.abs(b.driftBps) - Math.abs(a.driftBps));
   const visibleRows = oobRows.slice(0, 3);
   const remainingRows = oobRows.slice(3);
-  const showRebalanceCta = oobRows.length > 0 && onRebalanceClick;
+  const showRebalanceCta = Boolean(onRebalanceClick);
 
   return (
     <Card className="flex h-full flex-col">
