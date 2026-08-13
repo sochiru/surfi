@@ -76,7 +76,7 @@ function HoldingRow({
         <TickerAvatar symbol={avatarSymbol} className="size-9 shrink-0" />
         <div className="flex min-w-0 flex-col">
           <span className="truncate text-sm font-semibold">{title}</span>
-          <span className="text-muted-foreground text-xs">{subtitle}</span>
+          <span className="text-muted-foreground truncate text-xs">{subtitle}</span>
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
