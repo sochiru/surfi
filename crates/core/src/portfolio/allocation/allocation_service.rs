@@ -19,6 +19,12 @@ use super::{
 
 const CUSTOM_GROUPS_TAXONOMY_ID: &str = "custom_groups";
 
+/// Largest assignment shortfall (in basis points) absorbed pro rata instead of surfacing as
+/// "Unknown". Provider asset-class breakdowns routinely land a few bps under 100% — an "other"
+/// sleeve we don't map, or the provider's own weights not summing to exactly 1.0 — and that
+/// noise should not become a top-level category. Larger gaps are real missing coverage.
+const RESIDUAL_TOLERANCE_BPS: i32 = 75;
+
 #[derive(Debug, Clone)]
 struct HoldingTaxonomyShare {
     category_id: String,
@@ -422,7 +428,16 @@ impl AllocationService {
             }];
         }
 
-        let weight_divisor = Decimal::from(total_active_weight.max(10000));
+        // A small shortfall is provider noise: rescale the assigned weights to fill it rather
+        // than attributing it to "Unknown".
+        let absorb_residual =
+            total_active_weight < 10000 && 10000 - total_active_weight <= RESIDUAL_TOLERANCE_BPS;
+
+        let weight_divisor = if absorb_residual {
+            Decimal::from(total_active_weight)
+        } else {
+            Decimal::from(total_active_weight.max(10000))
+        };
         let mut shares: Vec<HoldingTaxonomyShare> = Vec::new();
 
         for assignment in active_assignments {
@@ -443,7 +458,7 @@ impl AllocationService {
             });
         }
 
-        if total_active_weight < 10000 {
+        if total_active_weight < 10000 && !absorb_residual {
             shares.push(HoldingTaxonomyShare {
                 category_id: "__UNKNOWN__".to_string(),
                 assigned_category_id: "__UNKNOWN__".to_string(),
@@ -1702,6 +1717,102 @@ mod tests {
         assert_eq!(north_america.percentage, dec!(60));
         assert_eq!(unknown.value, dec!(400));
         assert_eq!(unknown.percentage, dec!(40));
+    }
+
+    /// Provider asset-class breakdowns routinely land a few bps under 100% (an "other" sleeve we
+    /// don't map, or provider weights not summing to exactly 1.0). That noise must be absorbed
+    /// pro rata, not promoted to an "Unknown" row sitting next to the same holding's real
+    /// categories. Weights here are VOO's actual provider-derived assignments.
+    #[test]
+    fn sub_tolerance_weight_shortfall_is_absorbed_instead_of_unknown() {
+        let svc = svc();
+        let holdings = vec![make_holding("VOO", dec!(1000))];
+        let categories = vec![
+            make_category("EQUITY", None),
+            make_category("CASH_BANK_DEPOSITS", None),
+        ];
+
+        // 99.57% equity + 0.22% cash = 99.79%, a 21 bp shortfall.
+        let mut assignments: HashMap<String, Vec<AssetTaxonomyAssignment>> = HashMap::new();
+        assignments.insert(
+            "VOO".to_string(),
+            vec![
+                make_assignment("VOO", "asset_classes", "EQUITY", 9957),
+                make_assignment("VOO", "asset_classes", "CASH_BANK_DEPOSITS", 22),
+            ],
+        );
+
+        let result = svc.aggregate_by_taxonomy(
+            &holdings,
+            "asset_classes",
+            "Asset Classes",
+            "#ccc",
+            &categories,
+            &assignments,
+            dec!(1000),
+            false,
+            &HashMap::new(),
+        );
+
+        assert!(
+            !result
+                .categories
+                .iter()
+                .any(|c| c.category_id == "__UNKNOWN__"),
+            "a 21 bp shortfall must not produce an Unknown category"
+        );
+
+        let total: Decimal = result.categories.iter().map(|c| c.value).sum();
+        assert!(
+            (total - dec!(1000)).abs() < dec!(0.0001),
+            "absorbed shares should still account for the full market value, got {total}"
+        );
+
+        let equity = result
+            .categories
+            .iter()
+            .find(|c| c.category_id == "EQUITY")
+            .expect("EQUITY category missing");
+        // 9957 / 9979 * 1000
+        assert!(
+            (equity.value - dec!(997.7954)).abs() < dec!(0.001),
+            "equity should absorb its pro-rata share of the shortfall, got {}",
+            equity.value
+        );
+    }
+
+    /// The tolerance is a boundary, not a blanket: a shortfall at the limit is absorbed, one
+    /// basis point past it is real missing coverage and still surfaces as Unknown.
+    #[test]
+    fn weight_shortfall_beyond_tolerance_still_reports_unknown() {
+        let svc = svc();
+        let holdings = vec![make_holding("AAPL", dec!(1000))];
+        let categories = vec![make_category("EQUITY", None)];
+
+        let has_unknown = |weight: i32| {
+            let mut assignments: HashMap<String, Vec<AssetTaxonomyAssignment>> = HashMap::new();
+            assignments.insert(
+                "AAPL".to_string(),
+                vec![make_assignment("AAPL", "asset_classes", "EQUITY", weight)],
+            );
+            svc.aggregate_by_taxonomy(
+                &holdings,
+                "asset_classes",
+                "Asset Classes",
+                "#ccc",
+                &categories,
+                &assignments,
+                dec!(1000),
+                false,
+                &HashMap::new(),
+            )
+            .categories
+            .iter()
+            .any(|c| c.category_id == "__UNKNOWN__")
+        };
+
+        assert!(!has_unknown(9925), "a 75 bp shortfall is within tolerance");
+        assert!(has_unknown(9924), "a 76 bp shortfall exceeds tolerance");
     }
 
     /// When an asset is assigned to both a parent region (Americas) and a child (United_States),
