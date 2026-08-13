@@ -615,10 +615,14 @@ impl PerformanceService {
                 warned_partial_value_coverage = true;
             }
 
-            // A negative closing value is always fatal. A negative opening
-            // value is fatal only after the return chain has started; before
-            // that it belongs to the pre-funding prefix handled below.
-            if curr_value.is_sign_negative() || (chain_started && prev_value.is_sign_negative()) {
+            // Skip a contiguous negative prefix before the return chain has a
+            // valid base. Once compounding starts, or if history falls from a
+            // zero/positive opening into a negative close, any negative value
+            // remains fatal.
+            let prev_value_is_negative = prev_value.is_sign_negative();
+            let curr_value_is_negative = curr_value.is_sign_negative();
+            let is_leading_negative_prefix = !chain_started && prev_value_is_negative;
+            if (prev_value_is_negative || curr_value_is_negative) && !is_leading_negative_prefix {
                 not_applicable_reasons.push(format!(
                     "TWR unavailable for {} because portfolio value is negative. Review the underlying transactions, prices, and cash balances.",
                     curr_point.valuation_date
@@ -1025,6 +1029,9 @@ impl PerformanceService {
         };
         let scoped_history = &full_history[start_index..];
         let scoped_flows = &daily_flows[start_index..];
+        if scoped_history.len() < 2 {
+            return None;
+        }
         let start_point = scoped_history.first()?;
         let start_value = Self::return_total_value(start_point, flow_basis);
         if start_value <= Decimal::ZERO {
@@ -9412,6 +9419,97 @@ mod tests {
     }
 
     #[test]
+    fn twr_skips_multiple_negative_prefix_rows() {
+        let mut history = vec![
+            valuation(
+                "2026-06-24",
+                dec!(-110),
+                Decimal::ZERO,
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-25",
+                dec!(-110),
+                Decimal::ZERO,
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-26",
+                dec!(999525),
+                dec!(1000000),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-27",
+                dec!(968216),
+                dec!(1000000),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+        ];
+        history[2].external_inflow_base = dec!(1000000);
+        history[2].external_flow_source = ExternalFlowSource::CashAmount;
+
+        let result = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Transactions),
+            None,
+            true,
+        )
+        .expect("performance should compute");
+
+        let expected = (dec!(968216) / dec!(999525) - Decimal::ONE).round_dp(DECIMAL_PRECISION);
+        assert_eq!(result.returns.twr, Some(expected));
+        assert_eq!(result.returns.value_return, Some(expected));
+        assert!(!result
+            .data_quality
+            .not_applicable_reasons
+            .iter()
+            .any(|reason| reason.contains("portfolio value is negative")));
+    }
+
+    #[test]
+    fn value_return_requires_window_after_rebased_start() {
+        let mut history = vec![
+            valuation(
+                "2026-06-24",
+                dec!(-1),
+                Decimal::ZERO,
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-25",
+                dec!(100),
+                dec!(101),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+        ];
+        history[1].external_inflow_base = dec!(101);
+        history[1].external_flow_source = ExternalFlowSource::CashAmount;
+
+        let result = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Transactions),
+            None,
+            true,
+        )
+        .expect("performance should compute");
+
+        assert_eq!(result.returns.twr, None);
+        assert_eq!(result.returns.value_return, None);
+        assert!(result
+            .data_quality
+            .not_applicable_reasons
+            .iter()
+            .any(|reason| reason.contains("starting value is zero or negative")));
+    }
+
+    #[test]
     fn twr_rejects_negative_closing_value_before_chain_starts() {
         let mut history = vec![
             valuation(
@@ -9463,6 +9561,65 @@ mod tests {
             .not_applicable_reasons
             .iter()
             .any(|reason| reason.contains("portfolio value is negative")));
+    }
+
+    #[test]
+    fn twr_keeps_post_chain_negative_opening_fatal() {
+        let mut history = vec![
+            valuation(
+                "2026-06-24",
+                dec!(100),
+                dec!(100),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-25",
+                dec!(110),
+                dec!(100),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-26",
+                dec!(-50),
+                dec!(100),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-27",
+                dec!(100),
+                dec!(250),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+        ];
+        history[3].external_inflow_base = dec!(150);
+        history[3].external_flow_source = ExternalFlowSource::CashAmount;
+        let daily_flows = PerformanceService::daily_external_flow_series(
+            &history,
+            ExternalFlowBasis::BaseCurrency,
+        );
+
+        let result = PerformanceService::compute_time_weighted_returns(
+            &history,
+            &daily_flows,
+            ExternalFlowBasis::BaseCurrency,
+        )
+        .expect("TWR computation should complete");
+
+        assert!(!result.samples[0].1.excluded_from_compounding);
+        assert!(result.samples[1].1.excluded_from_compounding);
+        assert!(result.samples[2].1.excluded_from_compounding);
+        assert_eq!(
+            result
+                .not_applicable_reasons
+                .iter()
+                .filter(|reason| reason.contains("portfolio value is negative"))
+                .count(),
+            2
+        );
     }
 
     #[test]
