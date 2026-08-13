@@ -1017,13 +1017,14 @@ impl PerformanceService {
         let first_point = full_history.first()?;
         let first_value = Self::return_total_value(first_point, flow_basis);
         // A leading negative row can be pre-funding history (for example, a
-        // trade before its covering deposit). Rebase on the first positive
-        // observation, excluding the flows that established that base. A zero
-        // start remains unavailable because simple return has no denominator.
+        // trade before its covering deposit). Rebase on the first observation
+        // with at least one base-currency unit, excluding the flows that
+        // established that base. This avoids amplifying rounding dust into an
+        // extreme simple return.
         let start_index = if first_value.is_sign_negative() {
             full_history
                 .iter()
-                .position(|point| Self::return_total_value(point, flow_basis) > Decimal::ZERO)?
+                .position(|point| Self::return_total_value(point, flow_basis) >= Decimal::ONE)?
         } else {
             0
         };
@@ -9517,6 +9518,67 @@ mod tests {
         let expected = (dec!(968216) / dec!(999525) - Decimal::ONE).round_dp(DECIMAL_PRECISION);
         assert_eq!(result.returns.twr, Some(expected));
         assert_eq!(result.returns.value_return, Some(expected));
+        assert!(!result
+            .data_quality
+            .not_applicable_reasons
+            .iter()
+            .any(|reason| reason.contains("starting value is zero or negative")));
+    }
+
+    #[test]
+    fn value_return_skips_dust_within_negative_prefix() {
+        let mut history = vec![
+            valuation(
+                "2026-06-24",
+                dec!(-110),
+                Decimal::ZERO,
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-25",
+                dec!(0.5),
+                Decimal::ZERO,
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-26",
+                dec!(999525),
+                dec!(1000000),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-06-27",
+                dec!(968216),
+                dec!(1000000),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+        ];
+        history[2].external_inflow_base = dec!(1000000);
+        history[2].external_flow_source = ExternalFlowSource::CashAmount;
+
+        let result = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Transactions),
+            None,
+            true,
+        )
+        .expect("performance should compute");
+
+        let funding_period_return =
+            (dec!(999525) - dec!(0.5) - dec!(1000000)) / (dec!(0.5) + dec!(1000000));
+        let funded_period_return = dec!(968216) / dec!(999525) - Decimal::ONE;
+        let expected_twr = ((Decimal::ONE + funding_period_return)
+            * (Decimal::ONE + funded_period_return)
+            - Decimal::ONE)
+            .round_dp(DECIMAL_PRECISION);
+        let expected_value_return = funded_period_return.round_dp(DECIMAL_PRECISION);
+
+        assert_eq!(result.returns.twr, Some(expected_twr));
+        assert_eq!(result.returns.value_return, Some(expected_value_return));
         assert!(!result
             .data_quality
             .not_applicable_reasons
