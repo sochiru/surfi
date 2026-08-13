@@ -298,6 +298,7 @@ pub struct PerformanceService {
 const DAYS_PER_YEAR_DECIMAL: Decimal = dec!(365.25);
 const SQRT_DAYS_PER_YEAR_APPROX: Decimal = dec!(19.111514854); // sqrt(365.25)
 const MIN_ANNUALIZATION_DAYS: i64 = 30;
+const MIN_RETURN_BASE: Decimal = Decimal::ONE;
 const ATTRIBUTION_RESIDUAL_TOLERANCE_RATE: Decimal = dec!(0.002);
 const ATTRIBUTION_RESIDUAL_LEGACY_WARNING_PREFIX: &str = "Attribution residual ";
 const ATTRIBUTION_INCOMPLETE_WARNING_PREFIX: &str = "Performance attribution is incomplete";
@@ -646,7 +647,7 @@ impl PerformanceService {
             // and must stay fatal — it nulls the headline exactly like a
             // negative portfolio value, rather than being silently paused.
             let denom_is_benign_low_base =
-                twr_denominator >= Decimal::ZERO && twr_denominator < Decimal::ONE;
+                twr_denominator >= Decimal::ZERO && twr_denominator < MIN_RETURN_BASE;
 
             // A negative denominator is fatal only where it was before: once the
             // chain has started, or on a pre-chain day whose opening value is
@@ -1024,7 +1025,7 @@ impl PerformanceService {
         let start_index = if first_value.is_sign_negative() {
             full_history
                 .iter()
-                .position(|point| Self::return_total_value(point, flow_basis) >= Decimal::ONE)?
+                .position(|point| Self::return_total_value(point, flow_basis) >= MIN_RETURN_BASE)?
         } else {
             0
         };
@@ -5361,6 +5362,20 @@ mod tests {
         }
     }
 
+    fn cash_valuation(
+        date: &str,
+        total_value: Decimal,
+        net_contribution: Decimal,
+    ) -> DailyAccountValuation {
+        valuation(
+            date,
+            total_value,
+            net_contribution,
+            Decimal::ZERO,
+            Decimal::ZERO,
+        )
+    }
+
     fn account_valuation(
         account_id: &str,
         date: &str,
@@ -9366,7 +9381,7 @@ mod tests {
     }
 
     #[test]
-    fn twr_skips_negative_prefix_before_first_funded_period() {
+    fn returns_skip_negative_prefix_before_first_funded_period() {
         let mut history = vec![
             valuation(
                 "2026-06-24",
@@ -9420,189 +9435,61 @@ mod tests {
     }
 
     #[test]
-    fn twr_skips_multiple_negative_prefix_rows() {
-        let mut history = vec![
-            valuation(
-                "2026-06-24",
-                dec!(-110),
-                Decimal::ZERO,
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-25",
-                dec!(-110),
-                Decimal::ZERO,
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-26",
-                dec!(999525),
-                dec!(1000000),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-27",
-                dec!(968216),
-                dec!(1000000),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-        ];
-        history[2].external_inflow_base = dec!(1000000);
-        history[2].external_flow_source = ExternalFlowSource::CashAmount;
-
-        let result = PerformanceService::compute_account_performance(
-            &history,
-            Some(TrackingMode::Transactions),
-            None,
-            true,
-        )
-        .expect("performance should compute");
-
-        let expected = (dec!(968216) / dec!(999525) - Decimal::ONE).round_dp(DECIMAL_PRECISION);
-        assert_eq!(result.returns.twr, Some(expected));
-        assert_eq!(result.returns.value_return, Some(expected));
-        assert!(!result
-            .data_quality
-            .not_applicable_reasons
-            .iter()
-            .any(|reason| reason.contains("portfolio value is negative")));
-    }
-
-    #[test]
-    fn value_return_skips_zero_within_negative_prefix() {
-        let mut history = vec![
-            valuation(
-                "2026-06-24",
-                dec!(-110),
-                Decimal::ZERO,
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-25",
-                Decimal::ZERO,
-                Decimal::ZERO,
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-26",
-                dec!(999525),
-                dec!(1000000),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-27",
-                dec!(968216),
-                dec!(1000000),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-        ];
-        history[2].external_inflow_base = dec!(1000000);
-        history[2].external_flow_source = ExternalFlowSource::CashAmount;
-
-        let result = PerformanceService::compute_account_performance(
-            &history,
-            Some(TrackingMode::Transactions),
-            None,
-            true,
-        )
-        .expect("performance should compute");
-
-        let expected = (dec!(968216) / dec!(999525) - Decimal::ONE).round_dp(DECIMAL_PRECISION);
-        assert_eq!(result.returns.twr, Some(expected));
-        assert_eq!(result.returns.value_return, Some(expected));
-        assert!(!result
-            .data_quality
-            .not_applicable_reasons
-            .iter()
-            .any(|reason| reason.contains("starting value is zero or negative")));
-    }
-
-    #[test]
-    fn value_return_skips_dust_within_negative_prefix() {
-        let mut history = vec![
-            valuation(
-                "2026-06-24",
-                dec!(-110),
-                Decimal::ZERO,
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-25",
-                dec!(0.5),
-                Decimal::ZERO,
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-26",
-                dec!(999525),
-                dec!(1000000),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-27",
-                dec!(968216),
-                dec!(1000000),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-        ];
-        history[2].external_inflow_base = dec!(1000000);
-        history[2].external_flow_source = ExternalFlowSource::CashAmount;
-
-        let result = PerformanceService::compute_account_performance(
-            &history,
-            Some(TrackingMode::Transactions),
-            None,
-            true,
-        )
-        .expect("performance should compute");
-
-        let funding_period_return =
-            (dec!(999525) - dec!(0.5) - dec!(1000000)) / (dec!(0.5) + dec!(1000000));
+    fn returns_skip_prefunding_prefix_variants() {
         let funded_period_return = dec!(968216) / dec!(999525) - Decimal::ONE;
-        let expected_twr = ((Decimal::ONE + funding_period_return)
+        let dust_funding_period_return =
+            (dec!(999525) - dec!(0.5) - dec!(1000000)) / (dec!(0.5) + dec!(1000000));
+        let dust_twr = ((Decimal::ONE + dust_funding_period_return)
             * (Decimal::ONE + funded_period_return)
             - Decimal::ONE)
             .round_dp(DECIMAL_PRECISION);
         let expected_value_return = funded_period_return.round_dp(DECIMAL_PRECISION);
 
-        assert_eq!(result.returns.twr, Some(expected_twr));
-        assert_eq!(result.returns.value_return, Some(expected_value_return));
-        assert!(!result
-            .data_quality
-            .not_applicable_reasons
-            .iter()
-            .any(|reason| reason.contains("starting value is zero or negative")));
+        for (label, prefix_end_value, expected_twr) in [
+            ("negative", dec!(-110), expected_value_return),
+            ("zero", Decimal::ZERO, expected_value_return),
+            ("dust", dec!(0.5), dust_twr),
+        ] {
+            let mut history = vec![
+                cash_valuation("2026-06-24", dec!(-110), Decimal::ZERO),
+                cash_valuation("2026-06-25", prefix_end_value, Decimal::ZERO),
+                cash_valuation("2026-06-26", dec!(999525), dec!(1000000)),
+                cash_valuation("2026-06-27", dec!(968216), dec!(1000000)),
+            ];
+            history[2].external_inflow_base = dec!(1000000);
+            history[2].external_flow_source = ExternalFlowSource::CashAmount;
+
+            let result = PerformanceService::compute_account_performance(
+                &history,
+                Some(TrackingMode::Transactions),
+                None,
+                true,
+            )
+            .expect("performance should compute");
+
+            assert_eq!(result.returns.twr, Some(expected_twr), "{label} prefix");
+            assert_eq!(
+                result.returns.value_return,
+                Some(expected_value_return),
+                "{label} prefix"
+            );
+            assert!(
+                !result
+                    .data_quality
+                    .not_applicable_reasons
+                    .iter()
+                    .any(|reason| reason.contains("portfolio value is negative")
+                        || reason.contains("starting value is zero or negative")),
+                "{label} prefix"
+            );
+        }
     }
 
     #[test]
     fn value_return_requires_window_after_rebased_start() {
         let mut history = vec![
-            valuation(
-                "2026-06-24",
-                dec!(-1),
-                Decimal::ZERO,
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-25",
-                dec!(100),
-                dec!(101),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
+            cash_valuation("2026-06-24", dec!(-1), Decimal::ZERO),
+            cash_valuation("2026-06-25", dec!(100), dec!(101)),
         ];
         history[1].external_inflow_base = dec!(101);
         history[1].external_flow_source = ExternalFlowSource::CashAmount;
@@ -9627,34 +9514,10 @@ mod tests {
     #[test]
     fn twr_rejects_negative_closing_value_before_chain_starts() {
         let mut history = vec![
-            valuation(
-                "2026-06-24",
-                Decimal::ZERO,
-                Decimal::ZERO,
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-25",
-                dec!(-50),
-                dec!(100),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-26",
-                dec!(100),
-                dec!(250),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-27",
-                dec!(110),
-                dec!(250),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
+            cash_valuation("2026-06-24", Decimal::ZERO, Decimal::ZERO),
+            cash_valuation("2026-06-25", dec!(-50), dec!(100)),
+            cash_valuation("2026-06-26", dec!(100), dec!(250)),
+            cash_valuation("2026-06-27", dec!(110), dec!(250)),
         ];
         history[1].external_inflow_base = dec!(100);
         history[1].external_flow_source = ExternalFlowSource::CashAmount;
@@ -9681,34 +9544,10 @@ mod tests {
     #[test]
     fn twr_keeps_post_chain_negative_opening_fatal() {
         let mut history = vec![
-            valuation(
-                "2026-06-24",
-                dec!(100),
-                dec!(100),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-25",
-                dec!(110),
-                dec!(100),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-26",
-                dec!(-50),
-                dec!(100),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
-            valuation(
-                "2026-06-27",
-                dec!(100),
-                dec!(250),
-                Decimal::ZERO,
-                Decimal::ZERO,
-            ),
+            cash_valuation("2026-06-24", dec!(100), dec!(100)),
+            cash_valuation("2026-06-25", dec!(110), dec!(100)),
+            cash_valuation("2026-06-26", dec!(-50), dec!(100)),
+            cash_valuation("2026-06-27", dec!(100), dec!(250)),
         ];
         history[3].external_inflow_base = dec!(150);
         history[3].external_flow_source = ExternalFlowSource::CashAmount;
