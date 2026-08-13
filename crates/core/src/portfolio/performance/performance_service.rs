@@ -1010,13 +1010,28 @@ impl PerformanceService {
         daily_flows: &[DailyExternalFlow],
         flow_basis: ExternalFlowBasis,
     ) -> Option<Decimal> {
-        let start_point = full_history.first()?;
+        let first_point = full_history.first()?;
+        let first_value = Self::return_total_value(first_point, flow_basis);
+        // A leading negative row can be pre-funding history (for example, a
+        // trade before its covering deposit). Rebase on the first positive
+        // observation, excluding the flows that established that base. A zero
+        // start remains unavailable because simple return has no denominator.
+        let start_index = if first_value.is_sign_negative() {
+            full_history
+                .iter()
+                .position(|point| Self::return_total_value(point, flow_basis).is_sign_positive())?
+        } else {
+            0
+        };
+        let scoped_history = &full_history[start_index..];
+        let scoped_flows = &daily_flows[start_index..];
+        let start_point = scoped_history.first()?;
         let start_value = Self::return_total_value(start_point, flow_basis);
         if start_value <= Decimal::ZERO {
             return None;
         }
 
-        Self::compute_simple_value_return_amount(full_history, daily_flows, flow_basis)
+        Self::compute_simple_value_return_amount(scoped_history, scoped_flows, flow_basis)
             .map(|amount| amount / start_value)
     }
 
@@ -9380,6 +9395,7 @@ mod tests {
 
         let expected = (dec!(968216) / dec!(999525) - Decimal::ONE).round_dp(DECIMAL_PRECISION);
         assert_eq!(result.returns.twr, Some(expected));
+        assert_eq!(result.returns.value_return, Some(expected));
         assert_eq!(result.summary.percent, Some(expected));
         assert_eq!(result.series[1].value, Decimal::ZERO);
         assert_eq!(result.series[2].value, expected);
@@ -9388,6 +9404,11 @@ mod tests {
             .not_applicable_reasons
             .iter()
             .any(|reason| reason.contains("portfolio value is negative")));
+        assert!(!result
+            .data_quality
+            .not_applicable_reasons
+            .iter()
+            .any(|reason| reason.contains("starting value is zero or negative")));
     }
 
     #[test]
