@@ -47,10 +47,22 @@ function resolveOidcError(t: TFunction, code: string): string {
 }
 
 /**
- * Set on logout so the login page offers the SSO button instead of bouncing the
- * user straight back into the IdP, which would make signing out impossible.
+ * One-shot per-tab guard for the automatic SSO redirect. Armed before every
+ * automatic redirect and on logout; cleared only once `/auth/me` confirms a
+ * session. While armed, the login page suppresses further automatic redirects
+ * (the manual SSO button is unaffected), so a callback that fails to establish
+ * a session — no cookie, `/auth/me` rejecting — lands on the login page once
+ * instead of looping through the IdP.
  */
-export const MANUAL_LOGIN_STORAGE_KEY = "wf.manual-login";
+export const SSO_REDIRECT_GUARD_STORAGE_KEY = "wf.sso-redirect-guard";
+
+function clearSsoRedirectGuard() {
+  try {
+    window.sessionStorage.removeItem(SSO_REDIRECT_GUARD_STORAGE_KEY);
+  } catch {
+    // noop – sessionStorage may be unavailable
+  }
+}
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -100,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               credentials: "same-origin",
             });
             if (meRes.ok && !cancelled) {
+              clearSsoRedirectGuard();
               setCookieSession(true);
             }
           } catch {
@@ -194,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     if (isWeb) {
       try {
-        window.sessionStorage.setItem(MANUAL_LOGIN_STORAGE_KEY, "1");
+        window.sessionStorage.setItem(SSO_REDIRECT_GUARD_STORAGE_KEY, "1");
       } catch {
         // noop – sessionStorage may be unavailable
       }
