@@ -23,7 +23,13 @@ const CUSTOM_GROUPS_TAXONOMY_ID: &str = "custom_groups";
 /// "Unknown". Provider asset-class breakdowns routinely land a few bps under 100% — an "other"
 /// sleeve we don't map, or the provider's own weights not summing to exactly 1.0 — and that
 /// noise should not become a top-level category. Larger gaps are real missing coverage.
+///
+/// Only applied to auto-classified `asset_classes` assignments: a shortfall a user entered by
+/// hand is intentional and must be reported as-is.
 const RESIDUAL_TOLERANCE_BPS: i32 = 75;
+
+/// `source` written by auto-classification (`crates/core/src/assets/auto_classification.rs`).
+const AUTO_SOURCE: &str = "AUTO";
 
 #[derive(Debug, Clone)]
 struct HoldingTaxonomyShare {
@@ -428,10 +434,15 @@ impl AllocationService {
             }];
         }
 
-        // A small shortfall is provider noise: rescale the assigned weights to fill it rather
-        // than attributing it to "Unknown".
-        let absorb_residual =
-            total_active_weight < 10000 && 10000 - total_active_weight <= RESIDUAL_TOLERANCE_BPS;
+        // A small shortfall in auto-classified asset-class weights is provider noise: rescale the
+        // assigned weights to fill it rather than attributing it to "Unknown". Manual and custom
+        // classifications are left alone — their shortfalls are deliberate.
+        let absorb_residual = taxonomy_id == "asset_classes"
+            && total_active_weight < 10000
+            && 10000 - total_active_weight <= RESIDUAL_TOLERANCE_BPS
+            && active_assignments
+                .iter()
+                .all(|a| a.source.eq_ignore_ascii_case(AUTO_SOURCE));
 
         let weight_divisor = if absorb_residual {
             Decimal::from(total_active_weight)
@@ -1540,6 +1551,18 @@ mod tests {
         }
     }
 
+    fn make_auto_assign(
+        asset_id: &str,
+        taxonomy_id: &str,
+        category_id: &str,
+        weight: i32,
+    ) -> AssetTaxonomyAssignment {
+        AssetTaxonomyAssignment {
+            source: AUTO_SOURCE.to_string(),
+            ..make_assignment(asset_id, taxonomy_id, category_id, weight)
+        }
+    }
+
     fn make_holding(asset_id: &str, base_value: Decimal) -> Holding {
         Holding {
             id: asset_id.to_string(),
@@ -1737,8 +1760,8 @@ mod tests {
         assignments.insert(
             "VOO".to_string(),
             vec![
-                make_assignment("VOO", "asset_classes", "EQUITY", 9957),
-                make_assignment("VOO", "asset_classes", "CASH_BANK_DEPOSITS", 22),
+                make_auto_assign("VOO", "asset_classes", "EQUITY", 9957),
+                make_auto_assign("VOO", "asset_classes", "CASH_BANK_DEPOSITS", 22),
             ],
         );
 
@@ -1793,7 +1816,7 @@ mod tests {
             let mut assignments: HashMap<String, Vec<AssetTaxonomyAssignment>> = HashMap::new();
             assignments.insert(
                 "AAPL".to_string(),
-                vec![make_assignment("AAPL", "asset_classes", "EQUITY", weight)],
+                vec![make_auto_assign("AAPL", "asset_classes", "EQUITY", weight)],
             );
             svc.aggregate_by_taxonomy(
                 &holdings,
@@ -1813,6 +1836,70 @@ mod tests {
 
         assert!(!has_unknown(9925), "a 75 bp shortfall is within tolerance");
         assert!(has_unknown(9924), "a 76 bp shortfall exceeds tolerance");
+    }
+
+    /// Absorption only applies to what auto-classification wrote into `asset_classes`. A shortfall
+    /// a user entered by hand is deliberate, and other taxonomies never carry provider composition
+    /// noise, so both must keep reporting Unknown.
+    #[test]
+    fn residual_absorption_is_scoped_to_auto_asset_class_assignments() {
+        let svc = svc();
+        let holdings = vec![make_holding("VOO", dec!(1000))];
+        let categories = vec![
+            make_category("EQUITY", None),
+            make_category("CASH_BANK_DEPOSITS", None),
+        ];
+
+        let has_unknown = |taxonomy_id: &str, holding_assignments: Vec<AssetTaxonomyAssignment>| {
+            let mut assignments: HashMap<String, Vec<AssetTaxonomyAssignment>> = HashMap::new();
+            assignments.insert("VOO".to_string(), holding_assignments);
+            svc.aggregate_by_taxonomy(
+                &holdings,
+                taxonomy_id,
+                "Taxonomy",
+                "#ccc",
+                &categories,
+                &assignments,
+                dec!(1000),
+                false,
+                &HashMap::new(),
+            )
+            .categories
+            .iter()
+            .any(|c| c.category_id == "__UNKNOWN__")
+        };
+
+        assert!(
+            !has_unknown(
+                "asset_classes",
+                vec![make_auto_assign("VOO", "asset_classes", "EQUITY", 9979)],
+            ),
+            "an AUTO asset-class residual is provider noise"
+        );
+        assert!(
+            has_unknown(
+                "asset_classes",
+                vec![make_assignment("VOO", "asset_classes", "EQUITY", 9979)],
+            ),
+            "a manual asset-class shortfall is intentional and must stay Unknown"
+        );
+        assert!(
+            has_unknown(
+                "asset_classes",
+                vec![
+                    make_auto_assign("VOO", "asset_classes", "EQUITY", 9957),
+                    make_assignment("VOO", "asset_classes", "CASH_BANK_DEPOSITS", 22),
+                ],
+            ),
+            "a hand-edited assignment opts the whole asset out of absorption"
+        );
+        assert!(
+            has_unknown(
+                "regions",
+                vec![make_auto_assign("VOO", "regions", "EQUITY", 9979)],
+            ),
+            "absorption must not apply outside the asset-class taxonomy"
+        );
     }
 
     /// When an asset is assigned to both a parent region (Americas) and a child (United_States),
