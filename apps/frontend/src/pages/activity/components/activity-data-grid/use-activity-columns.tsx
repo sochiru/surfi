@@ -5,6 +5,7 @@ import {
   isCashActivity,
   localizeActivitySubtypeName,
   localizeActivityTypeName,
+  supportsPerformanceBoundary,
 } from "@/lib/activity-utils";
 import {
   ActivityStatus,
@@ -251,7 +252,7 @@ export function useActivityColumns({
           },
         },
       },
-      // 7. External (checkbox for TRANSFER_IN/TRANSFER_OUT only)
+      // 7. Explicit performance boundary for transfers and credits
       {
         id: "isExternal",
         accessorKey: "isExternal",
@@ -262,14 +263,9 @@ export function useActivityColumns({
         meta: {
           cell: {
             variant: "checkbox",
-            // Only enabled for transfer types
             isDisabled: (rowData: unknown) => {
               const row = rowData as LocalTransaction;
-              const activityType = row.activityType?.toUpperCase();
-              return (
-                activityType !== ActivityType.TRANSFER_IN &&
-                activityType !== ActivityType.TRANSFER_OUT
-              );
+              return !supportsPerformanceBoundary(row.activityType);
             },
           },
         },

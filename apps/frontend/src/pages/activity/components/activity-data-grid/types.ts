@@ -145,7 +145,7 @@ interface ActivityBasePayload {
   tax?: string | null;
   fxRate?: string | null;
   notes?: string | null;
-  /** JSON blob for metadata (e.g., flow.is_external for transfers) */
+  /** JSON blob for metadata, including explicit transfer and credit boundaries. */
   metadata?: string;
 }
 

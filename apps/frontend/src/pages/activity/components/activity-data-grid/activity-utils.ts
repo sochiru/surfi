@@ -371,7 +371,7 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     }
     updated = applyCashDefaults(updated, resolveTransactionCurrency, fallbackCurrency);
   } else if (field === "isExternal") {
-    // isExternal flag for TRANSFER_IN/TRANSFER_OUT (stored in metadata.flow.is_external)
+    // Explicit performance boundary stored in metadata.flow.is_external.
     updated = { ...updated, isExternal: Boolean(value) };
   } else if (field === "instrumentType") {
     // Instrument type (EQUITY, OPTION, BOND, etc.) — also set pendingInstrumentType for save payload
