@@ -965,6 +965,56 @@ mod tests {
     }
 
     #[test]
+    fn test_activity_import_to_new_activity_preserves_credit_boundary_metadata() {
+        for (subtype, is_external) in [("REFUND", true), ("BONUS", false)] {
+            let import = ActivityImport {
+                id: None,
+                date: "2024-01-15".to_string(),
+                symbol: String::new(),
+                activity_type: "CREDIT".to_string(),
+                quantity: None,
+                unit_price: None,
+                currency: "USD".to_string(),
+                fee: None,
+                tax: None,
+                amount: Some(dec!(100)),
+                comment: None,
+                account_id: Some("acc-1".to_string()),
+                account_name: None,
+                symbol_name: None,
+                exchange_mic: None,
+                quote_ccy: None,
+                instrument_type: None,
+                quote_mode: None,
+                provider_id: None,
+                provider_symbol: None,
+                errors: None,
+                warnings: None,
+                duplicate_of_id: None,
+                duplicate_of_line_number: None,
+                is_draft: false,
+                is_valid: true,
+                line_number: Some(1),
+                fx_rate: None,
+                subtype: Some(subtype.to_string()),
+                asset_id: None,
+                isin: None,
+                force_import: false,
+                is_external: Some(is_external),
+            };
+
+            let converted = NewActivity::from(import);
+            let metadata = converted.metadata.expect("credit metadata should be set");
+            let parsed: serde_json::Value = serde_json::from_str(&metadata).unwrap();
+            assert_eq!(
+                parsed["flow"]["is_external"],
+                serde_json::Value::Bool(is_external),
+                "credit subtype: {subtype}"
+            );
+        }
+    }
+
+    #[test]
     fn test_activity_import_to_new_activity_omits_metadata_when_not_external() {
         let import = ActivityImport {
             id: None,

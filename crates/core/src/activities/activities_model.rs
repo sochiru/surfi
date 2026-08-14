@@ -1007,7 +1007,7 @@ pub struct ActivityImport {
     /// DB unique constraint is not violated. Set by the user in the review step.
     #[serde(default)]
     pub force_import: bool,
-    /// True when a TRANSFER_IN/OUT crosses the tracked-account boundary (e.g. RSU grant deposit).
+    /// Whether a transfer or credit crosses the tracked-account boundary.
     /// Persisted as `metadata.flow.is_external` so net-contribution and flow classification work.
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1894,14 +1894,18 @@ impl From<ActivityImport> for NewActivity {
             Some(ActivityStatus::Posted)
         };
 
-        // Persist `is_external` as flow metadata so net_contribution and flow classification
-        // see this transfer the same way the manual activity form would.
+        // Persist boundary metadata so imported activities and manually entered activities
+        // have the same net-contribution and flow-classification semantics.
         let is_transfer = import.activity_type == ACTIVITY_TYPE_TRANSFER_IN
             || import.activity_type == ACTIVITY_TYPE_TRANSFER_OUT;
-        let metadata = if is_transfer && import.is_external == Some(true) {
-            Some(serde_json::json!({ "flow": { "is_external": true } }).to_string())
-        } else {
-            None
+        let metadata = match (import.activity_type.as_str(), import.is_external) {
+            (ACTIVITY_TYPE_CREDIT, Some(is_external)) => {
+                Some(serde_json::json!({ "flow": { "is_external": is_external } }).to_string())
+            }
+            (_, Some(true)) if is_transfer => {
+                Some(serde_json::json!({ "flow": { "is_external": true } }).to_string())
+            }
+            _ => None,
         };
 
         NewActivity {
