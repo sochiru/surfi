@@ -661,6 +661,7 @@ impl MarketDataProvider for TradingViewProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Datelike;
     use std::sync::Arc;
 
     #[test]

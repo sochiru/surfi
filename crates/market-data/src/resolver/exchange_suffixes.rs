@@ -81,6 +81,21 @@ impl ExchangeMap {
                 );
             }
 
+            if let Some(ref eodhd) = entry.eodhd {
+                let currency = eodhd
+                    .currency
+                    .as_deref()
+                    .or(entry.currency.as_deref())
+                    .unwrap_or("USD");
+                provider_map.insert(
+                    Cow::Owned("EODHD".to_string()),
+                    ExchangeSuffix {
+                        suffix: Cow::Owned(eodhd.suffix.clone()),
+                        currency: Cow::Owned(currency.to_string()),
+                    },
+                );
+            }
+
             if let Some(ref tv) = entry.tradingview {
                 self.tradingview_prefixes
                     .insert(Cow::Owned(entry.mic.clone()), Cow::Owned(tv.prefix.clone()));

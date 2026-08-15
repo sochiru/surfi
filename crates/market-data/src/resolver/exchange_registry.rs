@@ -34,6 +34,8 @@ pub struct ExchangeEntry {
     #[serde(default)]
     pub alpha_vantage: Option<ProviderInfo>,
     #[serde(default)]
+    pub eodhd: Option<ProviderInfo>,
+    #[serde(default)]
     pub tradingview: Option<TradingViewInfo>,
 }
 

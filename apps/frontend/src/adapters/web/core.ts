@@ -84,6 +84,13 @@ export const COMMANDS: CommandMap = {
   get_retirement_overview: { method: "GET", path: "/goals" },
   get_save_up_overview: { method: "GET", path: "/goals" },
   preview_save_up_overview: { method: "POST", path: "/goals/save-up/preview" },
+  // Dividends
+  get_dividend_sync_settings: { method: "GET", path: "/dividends/settings" },
+  update_dividend_sync_settings: { method: "PUT", path: "/dividends/settings" },
+  sync_dividends: { method: "POST", path: "/dividends/sync" },
+  remove_auto_dividends: { method: "DELETE", path: "/dividends/auto" },
+  get_dividend_calendar_events: { method: "GET", path: "/dividends/calendar" },
+  get_asset_dividend_view: { method: "GET", path: "/dividends/assets" },
   // Retirement plan simulations
   calculate_retirement_projection: { method: "POST", path: "/goals/retirement/projection" },
   run_retirement_monte_carlo: { method: "POST", path: "/goals/retirement/monte-carlo" },
@@ -796,6 +803,16 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "preview_save_up_overview": {
       const { input } = payload as { input: Record<string, unknown> };
       body = JSON.stringify(input);
+      break;
+    }
+    case "update_dividend_sync_settings": {
+      const { settings } = payload as { settings: Record<string, unknown> };
+      body = JSON.stringify(settings);
+      break;
+    }
+    case "get_asset_dividend_view": {
+      const { assetId } = payload as { assetId: string };
+      url += `/${encodeURIComponent(assetId)}`;
       break;
     }
     // Retirement plan simulation commands

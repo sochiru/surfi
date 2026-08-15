@@ -1,6 +1,8 @@
 # Add PSE Support: TradingView Provider + Dividend Tracker Addon
 
-> **Two deliverables:** (1) TradingView market data provider in core for PSE quotes, (2) PSE Dividend Tracker addon that auto-creates dividend transactions from TradingView dividend history.
+> **Status:** Part 2 (dividend addon) is **superseded**. Dividend automation lives in core at `/dividends` (`MARKET_DATA_DIVIDEND`). The `addons/pse-dividend-tracker/` package was removed. Legacy `PSE_DIVIDEND_ADDON` / `pse-div:` activities are still recognized by core sync for dedupe.
+>
+> **Original deliverables:** (1) TradingView market data provider in core for PSE quotes, (2) ~~PSE Dividend Tracker addon~~ → core Dividends.
 
 ## Todos
 
@@ -12,7 +14,7 @@
 - [ ] Add XPHS entry to `exchanges.json` + PHP currency priority
 - [ ] Create migration to INSERT TRADINGVIEW provider row
 - [ ] Add `tradingview.png` logo
-- [ ] Create `addons/pse-dividend-tracker/` with manifest, TradingView API client, dividend sync logic, and settings/calendar UI
+- [x] ~~Create `addons/pse-dividend-tracker/`~~ → replaced by core Dividends (`/dividends`)
 
 ---
 
@@ -76,6 +78,8 @@ Extend `resolve_equity` in `RulesResolver` to check for a `tradingview.prefix` k
 ---
 
 ## Part 2: PSE Dividend Tracker Addon
+
+> **Removed.** Implemented in core (`crates/core/src/dividends/`, UI `/dividends`) instead of an addon. Section below is historical.
 
 An addon that auto-creates dividend transactions based on TradingView dividend history and current/historical holdings. Like Portseido's "Auto Cash Dividend" feature.
 

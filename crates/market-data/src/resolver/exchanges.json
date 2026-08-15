@@ -711,6 +711,7 @@
       "currency": "PHP",
       "timezone": "Asia/Manila",
       "close": [14, 45],
+      "eodhd": { "suffix": ".PSE" },
       "tradingview": { "prefix": "PSE" }
     }
   ],

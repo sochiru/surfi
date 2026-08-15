@@ -40,6 +40,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AlternativeAssetContent, useAlternativeAssetActions } from "./alternative-asset-content";
 import AssetDetailCard from "./asset-detail-card";
+import { AssetDividendSection } from "@/features/dividends/components/asset-dividend-section";
 import { AssetEditSheet } from "./asset-edit-sheet";
 import AssetHistoryCard from "./asset-history-card";
 import { AssetSnapshotHistory, useHasManualSnapshots } from "./asset-account-holdings";
@@ -1508,7 +1509,10 @@ export const AssetProfilePage = () => {
                   className={`col-span-1 ${symbolHolding ? "md:col-span-2" : "md:col-span-3"}`}
                 />
                 {symbolHolding && (
-                  <AssetDetailCard assetData={symbolHolding} className="col-span-1 md:col-span-1" />
+                  <div className="col-span-1 flex flex-col gap-4 md:col-span-1">
+                    <AssetDetailCard assetData={symbolHolding} />
+                    {!isAltAsset ? <AssetDividendSection assetId={assetId} /> : null}
+                  </div>
                 )}
               </div>
             )}
@@ -1541,7 +1545,10 @@ export const AssetProfilePage = () => {
                   className={`col-span-1 ${symbolHolding ? "md:col-span-2" : "md:col-span-3"}`}
                 />
                 {symbolHolding && (
-                  <AssetDetailCard assetData={symbolHolding} className="col-span-1 md:col-span-1" />
+                  <div className="col-span-1 flex flex-col gap-4 md:col-span-1">
+                    <AssetDetailCard assetData={symbolHolding} />
+                    {!isAltAsset ? <AssetDividendSection assetId={assetId} /> : null}
+                  </div>
                 )}
               </div>
             )}

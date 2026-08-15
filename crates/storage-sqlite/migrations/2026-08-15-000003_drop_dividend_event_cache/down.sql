@@ -1,0 +1,1 @@
+-- No-op: durable dividend event cache removed.

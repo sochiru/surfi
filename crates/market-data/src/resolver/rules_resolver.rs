@@ -475,6 +475,24 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_ph_equity_eodhd() {
+        let resolver = RulesResolver::new();
+        let context = make_equity_context("SM", Some("XPHS"));
+
+        let result = resolver.resolve(&"EODHD".into(), &context);
+
+        assert!(result.is_some());
+        let resolved = result.unwrap().unwrap();
+
+        match resolved.instrument {
+            ProviderInstrument::EquitySymbol { symbol } => {
+                assert_eq!(symbol.as_ref(), "SM.PSE");
+            }
+            _ => panic!("Expected EquitySymbol"),
+        }
+    }
+
+    #[test]
     fn test_resolve_fx_yahoo() {
         let resolver = RulesResolver::new();
         let context = make_fx_context("EUR", "USD");

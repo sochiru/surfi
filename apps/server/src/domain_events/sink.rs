@@ -83,6 +83,7 @@ impl WebDomainEventSink {
         categorization_rules_service: Arc<
             wealthfolio_spending::categorization_rules::CategorizationRulesService,
         >,
+        dividend_sync_service: Arc<dyn wealthfolio_core::dividends::DividendSyncServiceTrait>,
     ) {
         let rx = self
             .rx
@@ -110,6 +111,7 @@ impl WebDomainEventSink {
             token_lifecycle,
             spending_settings_service,
             categorization_rules_service,
+            dividend_sync_service,
         });
 
         // Spawn the background worker

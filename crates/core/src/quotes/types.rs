@@ -76,6 +76,7 @@ impl ProviderId {
     pub const METAL_PRICE_API: &'static str = "METAL_PRICE_API";
     pub const FINNHUB: &'static str = "FINNHUB";
     pub const TRADINGVIEW: &'static str = "TRADINGVIEW";
+    pub const EODHD: &'static str = "EODHD";
     pub const US_TREASURY_CALC: &'static str = "US_TREASURY_CALC";
     pub const BOERSE_FRANKFURT: &'static str = "BOERSE_FRANKFURT";
     pub const OPENFIGI: &'static str = "OPENFIGI";
@@ -108,6 +109,10 @@ impl ProviderId {
 
     pub fn tradingview() -> Self {
         Self(Self::TRADINGVIEW.to_string())
+    }
+
+    pub fn eodhd() -> Self {
+        Self(Self::EODHD.to_string())
     }
 
     pub fn us_treasury_calc() -> Self {
