@@ -22,8 +22,8 @@ pub async fn run_periodic_sync(
     );
 
     loop {
-        info!("Periodic market data sync: starting incremental sync");
-        match quote_service.sync(SyncMode::Incremental, None).await {
+        info!("Periodic market data sync: starting (skips manual-sync-only providers)");
+        match quote_service.sync(SyncMode::Periodic, None).await {
             Ok(result) => {
                 info!(
                     "Periodic market data sync completed: {} synced, {} skipped, {} failed",

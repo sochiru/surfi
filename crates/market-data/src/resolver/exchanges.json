@@ -703,6 +703,15 @@
       "timezone": "Africa/Cairo",
       "close": [14, 30],
       "yahoo": { "suffix": ".CA", "codes": ["CAI"] }
+    },
+    {
+      "mic": "XPHS",
+      "name": "PSE",
+      "long_name": "Philippine Stock Exchange",
+      "currency": "PHP",
+      "timezone": "Asia/Manila",
+      "close": [14, 45],
+      "tradingview": { "prefix": "PSE" }
     }
   ],
   "currency_priority": {
@@ -730,6 +739,7 @@
     "ILS": ["XTAE"],
     "ILA": ["XTAE"],
     "ZAR": ["XJSE"],
-    "TWD": ["XTAI", "XTAI_OTC"]
+    "TWD": ["XTAI", "XTAI_OTC"],
+    "PHP": ["XPHS"]
   }
 }

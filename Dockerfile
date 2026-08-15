@@ -40,7 +40,8 @@ WORKDIR /app
 # Install build tools for the HOST (to run cargo, build scripts)
 # clang/lld are needed for cross-linking
 # pkgconfig is required for openssl-sys to find the target libraries
-RUN apk add --no-cache clang lld build-base git file pkgconfig
+# perl is required when openssl-sys builds OpenSSL from source (OPENSSL_STATIC)
+RUN apk add --no-cache clang lld build-base git file pkgconfig perl
 
 # Install TARGET dependencies
 # xx-apk installs into /$(xx-info triple)/...
@@ -90,6 +91,6 @@ RUN addgroup -S -g 1000 wealthfolio \
  && chown -R wealthfolio:wealthfolio /data
 USER 1000:1000
 
-VOLUME ["/data"]
+# Persistence: mount /data (Railway Volume or compose named volume). No Dockerfile VOLUME — Railway rejects it.
 EXPOSE 8088
 CMD ["/usr/local/bin/wealthfolio-server"]

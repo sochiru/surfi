@@ -2192,6 +2192,7 @@ where
                     | DATA_SOURCE_MARKET_DATA_APP
                     | DATA_SOURCE_METAL_PRICE_API
                     | DATA_SOURCE_FINNHUB
+                    | DATA_SOURCE_TRADINGVIEW
             );
             // Check if API key is set (skip for disabled providers to avoid keychain prompts)
             let has_key = if requires_key && setting.enabled {
