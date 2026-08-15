@@ -15,6 +15,7 @@ use super::model::{
 use super::settings::{
     default_tax_for_currency_or_mic, DividendSyncSettings, PSE_MIC, SETTINGS_KEY,
 };
+use super::projection::project_future_dividends;
 use super::shares::{compute_shares_at_ex_date, TradeLikeActivity};
 use crate::accounts::{AccountServiceTrait, TrackingMode};
 use crate::activities::{
@@ -32,6 +33,9 @@ use wealthfolio_market_data::DividendEvent;
 /// Provider history is fetched per distinct symbol; the registry rate limiter
 /// still paces the actual outbound calls.
 const FETCH_CONCURRENCY: usize = 8;
+
+/// How far ahead cadence-based dividend projections run.
+const PROJECTION_HORIZON_DAYS: i64 = 366;
 
 type FetchedDividends = HashMap<String, std::result::Result<Vec<DividendEvent>, String>>;
 
@@ -661,7 +665,7 @@ impl DividendSyncServiceTrait for DividendSyncService {
                     .unwrap_or_default();
                 let current_qty = holding.quantity;
 
-                for div in dividends {
+                for div in &dividends {
                     let Some(ex_date) = Self::ex_date_from_unix(div.date) else {
                         continue;
                     };
@@ -716,6 +720,50 @@ impl DividendSyncServiceTrait for DividendSyncService {
                         } else {
                             "Not synced".into()
                         }),
+                    });
+                }
+
+                // Providers rarely announce dividends more than a few weeks out, so
+                // fall back to the asset's own cadence for the rest of the year.
+                if current_qty <= Decimal::ZERO {
+                    continue;
+                }
+                let announced_upcoming = dividends
+                    .iter()
+                    .filter_map(|div| Self::ex_date_from_unix(div.date))
+                    .any(|ex_date| ex_date > now);
+                if announced_upcoming {
+                    continue;
+                }
+                let history: Vec<(NaiveDate, Decimal)> = dividends
+                    .iter()
+                    .filter_map(|div| {
+                        Some((
+                            Self::ex_date_from_unix(div.date)?,
+                            Decimal::from_f64_retain(div.amount)?,
+                        ))
+                    })
+                    .collect();
+
+                for projected in project_future_dividends(
+                    &history,
+                    now,
+                    now + chrono::Duration::days(PROJECTION_HORIZON_DAYS),
+                ) {
+                    events.push(DividendCalendarEvent {
+                        id: format!(
+                            "projected-{}-{}-{}",
+                            account.id, symbol, projected.ex_date
+                        ),
+                        date: projected.ex_date.format("%Y-%m-%d").to_string(),
+                        symbol: symbol.clone(),
+                        account_id: account.id.clone(),
+                        account_name: account.name.clone(),
+                        display_amount: current_qty * projected.per_share,
+                        currency: ccy.clone(),
+                        kind: DividendCalendarEventKind::UpcomingEstimated,
+                        activity_id: None,
+                        notes: Some("Projected from past cadence".into()),
                     });
                 }
             }
