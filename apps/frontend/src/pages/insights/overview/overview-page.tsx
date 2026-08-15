@@ -32,6 +32,7 @@ import { computeValueStrip, valueStripFromCurrentSummary } from "./allocation-de
 import { PortfolioExplorer } from "./portfolio-explorer";
 import { TargetRailsCard } from "./target-rails-card";
 import { ValueStrip } from "./value-strip";
+import { DividendIncomeOverviewCard } from "./dividend-income-overview-card";
 
 interface OverviewPageProps {
   filter?: AccountScope;
@@ -408,6 +409,15 @@ export function OverviewPage({
       <div className="space-y-4">
         {/* Row 1 — compact value strip */}
         <ValueStrip data={valueStrip} currency={baseCurrency} isLoading={isLoading} compact />
+
+        {/* Dividend cash income for the filtered accounts */}
+        <DividendIncomeOverviewCard
+          accountFilter={accountFilter}
+          holdings={portfolioHoldings}
+          portfolios={portfolios}
+          baseCurrency={baseCurrency}
+          holdingsLoading={holdingsLoading}
+        />
 
         {/* Row 2 — exploration previews */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

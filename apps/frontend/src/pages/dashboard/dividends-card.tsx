@@ -6,7 +6,7 @@ import { AmountDisplay, Button, Skeleton } from "@wealthfolio/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
-const ADDON_ROUTE = "/addons/pse-dividend-tracker";
+const DIVIDENDS_ROUTE = "/dividends";
 
 export function DividendsCard() {
   const { settings } = useSettingsContext();
@@ -34,8 +34,8 @@ export function DividendsCard() {
     <DashboardCard
       title="Dividends"
       action={
-        <Link to={ADDON_ROUTE} className="text-muted-foreground text-xs hover:underline">
-          PSE Dividends
+        <Link to={DIVIDENDS_ROUTE} className="text-muted-foreground text-xs hover:underline">
+          View dividends
         </Link>
       }
     >
@@ -69,12 +69,12 @@ export function DividendsCard() {
             </ul>
           ) : (
             <p className="text-muted-foreground text-sm">
-              Sync PSE holdings via the PSE Dividends addon to auto-create payouts.
+              Sync missing dividends to auto-create payouts from market data.
             </p>
           )}
 
           <Button asChild variant="outline" size="sm" className="w-full">
-            <Link to={ADDON_ROUTE}>Open PSE Dividends</Link>
+            <Link to={DIVIDENDS_ROUTE}>Open dividends</Link>
           </Button>
         </div>
       )}

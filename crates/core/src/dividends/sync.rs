@@ -23,7 +23,7 @@ use crate::activities::{
     ACTIVITY_TYPE_SELL, ACTIVITY_TYPE_SPLIT, ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
 };
 use crate::errors::{Error, Result};
-use crate::portfolio::holdings::{Holding, HoldingsServiceTrait};
+use crate::portfolio::holdings::{Holding, HoldingType, HoldingsServiceTrait};
 use crate::portfolio::snapshot::SnapshotRepositoryTrait;
 use crate::quotes::{FetchDividendsParams, QuoteServiceTrait};
 use crate::settings::SettingsServiceTrait;
@@ -111,6 +111,13 @@ impl DividendSyncService {
         }
     }
 
+    /// A symbol without an exchange MIC is resolved as a bare US listing, so a
+    /// non-USD instrument would silently receive another company's dividend
+    /// history (e.g. PSE `BPI` matching a US ticker).
+    fn listing_is_ambiguous(mic: Option<&str>, currency: &str) -> bool {
+        mic.map_or(true, str::is_empty) && !currency.eq_ignore_ascii_case("USD")
+    }
+
     fn fetch_key(symbol: &str, mic: Option<&str>, provider: Option<&str>) -> String {
         format!(
             "{}|{}|{}",
@@ -157,6 +164,9 @@ impl DividendSyncService {
             let Some((_, mic, symbol, ccy, asset_pref)) = Self::holding_symbol(holding) else {
                 continue;
             };
+            if Self::listing_is_ambiguous(mic.as_deref(), &ccy) {
+                continue;
+            }
             let provider = Self::preferred_provider(mic.as_deref(), asset_pref.as_deref());
             let key = Self::fetch_key(&symbol, mic.as_deref(), provider.as_deref());
             targets.entry(key).or_insert((symbol, mic, ccy, provider));
@@ -180,9 +190,12 @@ impl DividendSyncService {
     fn holding_symbol(
         holding: &Holding,
     ) -> Option<(String, Option<String>, String, String, Option<String>)> {
+        if holding.holding_type != HoldingType::Security {
+            return None;
+        }
         let instrument = holding.instrument.as_ref()?;
         let asset_id = instrument.id.clone();
-        if asset_id.is_empty() || asset_id.starts_with("CASH:") {
+        if asset_id.is_empty() || asset_id.to_ascii_uppercase().starts_with("CASH:") {
             return None;
         }
         let raw = instrument.symbol.clone();
@@ -390,6 +403,14 @@ impl DividendSyncServiceTrait for DividendSyncService {
                 else {
                     continue;
                 };
+
+                if Self::listing_is_ambiguous(mic.as_deref(), &ccy) {
+                    result.errors.push(format!(
+                        "Skipped {symbol} ({}): set an exchange for this {ccy} asset so dividends resolve to the right listing",
+                        account.name
+                    ));
+                    continue;
+                }
 
                 let provider = Self::preferred_provider(mic.as_deref(), asset_pref.as_deref());
                 let fetch_k = Self::fetch_key(&symbol, mic.as_deref(), provider.as_deref());
@@ -778,5 +799,21 @@ impl DividendSyncServiceTrait for DividendSyncService {
             ttm_income: ttm,
             events: filtered,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type Svc = DividendSyncService;
+
+    #[test]
+    fn ambiguous_listing_requires_mic_for_non_usd() {
+        assert!(Svc::listing_is_ambiguous(None, "PHP"));
+        assert!(Svc::listing_is_ambiguous(Some(""), "PHP"));
+        assert!(!Svc::listing_is_ambiguous(Some(PSE_MIC), "PHP"));
+        assert!(!Svc::listing_is_ambiguous(None, "USD"));
+        assert!(!Svc::listing_is_ambiguous(None, "usd"));
     }
 }

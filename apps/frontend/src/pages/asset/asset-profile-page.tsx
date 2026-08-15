@@ -1,5 +1,6 @@
 import { createActivity, getAssetHoldings, getAssetLots, searchActivities } from "@/adapters";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
+import { AccountScopeSelector } from "@/components/account-filter-selector";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useHapticFeedback } from "@/hooks";
 import { useAccounts } from "@/hooks/use-accounts";
@@ -14,7 +15,7 @@ import { ActivityStatus, ActivityType } from "@/lib/constants";
 import { generateId } from "@/lib/id";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
-import type { ActivityDetails, AssetKind, AssetLotView, Holding, Quote } from "@/lib/types";
+import type { AccountScope, ActivityDetails, AssetKind, AssetLotView, Holding, Quote } from "@/lib/types";
 import { normalizeCurrency } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthfolio/ui";
@@ -57,6 +58,8 @@ import { RefreshQuotesConfirmDialog } from "./refresh-quotes-confirm-dialog";
 import { useQuoteMutations } from "./hooks/use-quote-mutations";
 import { QuoteHistoryDataGrid } from "./quote-history-data-grid";
 
+const ACCOUNT_SCOPE_ALL = "all";
+const ACCOUNT_SCOPE_TAB_LIMIT = 4;
 // Alternative asset kinds that should use ValueHistoryDataGrid
 const ALTERNATIVE_ASSET_KINDS: AssetKind[] = [
   "PROPERTY",
@@ -311,7 +314,43 @@ export const AssetProfilePage = () => {
     isError: isHoldingError,
   } = useHoldings({ type: "all" });
 
-  const holding = useMemo<Holding | null>(() => {
+  const { accounts } = useAccounts({ filterActive: false });
+
+  const { data: accountHoldings = [] } = useQuery<Holding[], Error>({
+    queryKey: [QueryKeys.ASSET_HOLDINGS, assetId],
+    queryFn: () => getAssetHoldings(assetId),
+    enabled: !!assetId && !isAssetProfileLoading,
+  });
+
+  const accountScopeOptions = useMemo(() => {
+    const names = new Map(accounts.map((account) => [account.id, account.name]));
+    const seen = new Set<string>();
+    const options: { value: string; label: string }[] = [];
+    for (const item of accountHoldings) {
+      if (seen.has(item.accountId)) continue;
+      if (Number(item.quantity) === 0) continue;
+      seen.add(item.accountId);
+      options.push({
+        value: item.accountId,
+        label: names.get(item.accountId) ?? item.accountId,
+      });
+    }
+    return options;
+  }, [accountHoldings, accounts]);
+
+  const showAccountScope = accountScopeOptions.length > 1;
+  const accountParam = queryParams.get("account");
+  const selectedAccountId = useMemo(() => {
+    if (!showAccountScope || !accountParam || accountParam === ACCOUNT_SCOPE_ALL) return null;
+    return accountScopeOptions.some((option) => option.value === accountParam) ? accountParam : null;
+  }, [accountParam, accountScopeOptions, showAccountScope]);
+
+  const accountScopeValue = selectedAccountId ?? ACCOUNT_SCOPE_ALL;
+  const accountScopeFilter: AccountScope = selectedAccountId
+    ? { type: "account", accountId: selectedAccountId }
+    : { type: "all" };
+
+  const aggregatedHolding = useMemo<Holding | null>(() => {
     if (!assetId) return null;
     return (
       allHoldings.find(
@@ -323,6 +362,32 @@ export const AssetProfilePage = () => {
     );
   }, [allHoldings, assetId]);
 
+  const holding = useMemo<Holding | null>(() => {
+    if (selectedAccountId) {
+      return accountHoldings.find((item) => item.accountId === selectedAccountId) ?? null;
+    }
+    return aggregatedHolding;
+  }, [selectedAccountId, accountHoldings, aggregatedHolding]);
+
+  const updateAssetSearchParams = useCallback(
+    (updates: { tab?: string | null; account?: string | null }) => {
+      const next = new URLSearchParams(location.search);
+      if ("tab" in updates) {
+        if (updates.tab) next.set("tab", updates.tab);
+        else next.delete("tab");
+      }
+      if ("account" in updates) {
+        if (updates.account && updates.account !== ACCOUNT_SCOPE_ALL) {
+          next.set("account", updates.account);
+        } else {
+          next.delete("account");
+        }
+      }
+      const query = next.toString();
+      navigate(`${location.pathname}${query ? `?${query}` : ""}`, { replace: true });
+    },
+    [location.pathname, location.search, navigate],
+  );
   const {
     data: quoteHistory,
     isLoading: isQuotesLoading,
@@ -582,7 +647,15 @@ export const AssetProfilePage = () => {
     enabled: !!assetId && !isAssetProfileLoading,
   });
 
-  const { accounts } = useAccounts({ filterActive: false });
+  const scopedLots = useMemo(() => {
+    if (!selectedAccountId) return assetLots;
+    return assetLots.filter((lot) => lot.accountId === selectedAccountId);
+  }, [assetLots, selectedAccountId]);
+
+  const scopedActivities = useMemo(() => {
+    if (!selectedAccountId) return assetActivities;
+    return assetActivities.filter((activity) => activity.accountId === selectedAccountId);
+  }, [assetActivities, selectedAccountId]);
 
   const activityFormAccounts = useMemo<AccountSelectOption[]>(
     () =>
@@ -618,11 +691,34 @@ export const AssetProfilePage = () => {
       if (next === overviewSubTab) return;
       triggerHaptic();
       setOverviewSubTab(next);
-      navigate(`${location.pathname}?tab=${next}`, { replace: true });
+      updateAssetSearchParams({ tab: next });
     },
-    [overviewSubTab, triggerHaptic, navigate, location.pathname],
+    [overviewSubTab, triggerHaptic, updateAssetSearchParams],
   );
 
+  const handleAccountScopeChange = useCallback(
+    (next: string) => {
+      if (next === accountScopeValue) return;
+      triggerHaptic();
+      updateAssetSearchParams({
+        account: next === ACCOUNT_SCOPE_ALL ? null : next,
+      });
+    },
+    [accountScopeValue, triggerHaptic, updateAssetSearchParams],
+  );
+
+  const handleAccountScopeFilterChange = useCallback(
+    (filter: AccountScope) => {
+      const next =
+        filter.type === "account"
+          ? filter.accountId
+          : filter.type === "all"
+            ? ACCOUNT_SCOPE_ALL
+            : ACCOUNT_SCOPE_ALL;
+      handleAccountScopeChange(next);
+    },
+    [handleAccountScopeChange],
+  );
   // Fetch alternative asset holding data (for alternative assets only)
   const { data: altHolding } = useAlternativeAssetHolding({
     assetId,
@@ -684,7 +780,7 @@ export const AssetProfilePage = () => {
   const symbolHolding = useMemo((): AssetDetailData | null => {
     const instrument = holding?.instrument;
     const asset = assetProfile;
-    const hasAssetHistory = assetLots.length > 0 || assetActivities.length > 0 || quote != null;
+    const hasAssetHistory = scopedLots.length > 0 || scopedActivities.length > 0 || quote != null;
     if (!holding && !hasAssetHistory) return null;
 
     const displayCurrency =
@@ -733,7 +829,7 @@ export const AssetProfilePage = () => {
             return first && last != null && first !== 0 ? Number(last / first - 1) : null;
           })()
         : null;
-    const incomeActivities = assetActivities.filter(
+    const incomeActivities = scopedActivities.filter(
       (activity) =>
         activity.assetId === assetId &&
         activity.status === ActivityStatus.POSTED &&
@@ -749,7 +845,7 @@ export const AssetProfilePage = () => {
       return Number.isFinite(amount) ? sum + amount : sum;
     }, 0);
     const income = holding?.income?.local != null ? Number(holding.income.local) : fallbackIncome;
-    const realizedLots = assetLots.filter(
+    const realizedLots = scopedLots.filter(
       (lot) => lot.source === "TRANSACTION_LOT" && lot.valuationRealizedPnl != null,
     );
     const realizedPnlFromLots = realizedLots.reduce(
@@ -772,7 +868,7 @@ export const AssetProfilePage = () => {
         : realizedLots.length > 0 && realizedCostBasisFromLots > 0
           ? realizedPnlFromLots / realizedCostBasisFromLots
           : null;
-    const hasOpenTransactionLotWithBase = assetLots.some(
+    const hasOpenTransactionLotWithBase = scopedLots.some(
       (lot) => lot.source === "TRANSACTION_LOT" && !lot.isClosed && lot.costBasisBase != null,
     );
     const isForeignCurrency =
@@ -842,8 +938,8 @@ export const AssetProfilePage = () => {
     holding,
     quote,
     quoteHistory,
-    assetActivities,
-    assetLots,
+    scopedActivities,
+    scopedLots,
     assetProfile,
     assetId,
     bondSpec,
@@ -933,9 +1029,9 @@ export const AssetProfilePage = () => {
     );
 
     const lotsContent =
-      profile && assetLots.length > 0 ? (
+      profile && scopedLots.length > 0 ? (
         <AssetLotsTable
-          lots={assetLots}
+          lots={scopedLots}
           currency={
             holding?.localCurrency ?? symbolHolding?.currency ?? profile.currency ?? baseCurrency
           }
@@ -969,7 +1065,7 @@ export const AssetProfilePage = () => {
 
     const activitiesContent = isMobile ? (
       <ActivityTableMobile
-        activities={assetActivities}
+        activities={scopedActivities}
         isCompactView={true}
         handleEdit={handleActivityEdit}
         handleDelete={handleActivityDelete}
@@ -977,7 +1073,7 @@ export const AssetProfilePage = () => {
       />
     ) : (
       <ActivityTable
-        activities={assetActivities}
+        activities={scopedActivities}
         isLoading={isActivitiesLoading}
         sorting={[{ id: "date", desc: true }]}
         onSortingChange={() => undefined}
@@ -998,7 +1094,7 @@ export const AssetProfilePage = () => {
     baseCurrency,
     profile,
     holding,
-    assetLots,
+    scopedLots,
     symbolHolding,
     quoteHistory,
     quote,
@@ -1009,7 +1105,7 @@ export const AssetProfilePage = () => {
     saveQuoteMutation,
     deleteQuoteMutation,
     updateQuoteModeMutation,
-    assetActivities,
+    scopedActivities,
     isActivitiesLoading,
     isMobile,
     handleActivityEdit,
@@ -1424,6 +1520,37 @@ export const AssetProfilePage = () => {
           onClear={clearHealthContext}
         />
 
+        {showAccountScope && !isAltAsset && (
+          <div className="flex items-center gap-2 overflow-x-auto">
+            {accountScopeOptions.length <= ACCOUNT_SCOPE_TAB_LIMIT ? (
+              <AnimatedToggleGroup
+                size="xs"
+                items={[
+                  {
+                    value: ACCOUNT_SCOPE_ALL,
+                    label: t("common:component.all_accounts"),
+                    "data-testid": "segmented-asset-account-all",
+                  },
+                  ...accountScopeOptions.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                    title: option.label,
+                    "data-testid": `segmented-asset-account-${option.value}`,
+                  })),
+                ]}
+                value={accountScopeValue}
+                onValueChange={handleAccountScopeChange}
+              />
+            ) : (
+              <AccountScopeSelector
+                value={accountScopeFilter}
+                onChange={handleAccountScopeFilterChange}
+                allowMultiAccount={false}
+              />
+            )}
+          </div>
+        )}
+
         {/* Alternative Asset Content */}
         {isAltAsset && altHolding && assetProfile ? (
           isMobile ? (
@@ -1506,12 +1633,15 @@ export const AssetProfilePage = () => {
                       ? symbolHolding.averagePrice
                       : undefined
                   }
+                  accountId={selectedAccountId}
                   className={`col-span-1 ${symbolHolding ? "md:col-span-2" : "md:col-span-3"}`}
                 />
                 {symbolHolding && (
                   <div className="col-span-1 flex flex-col gap-4 md:col-span-1">
                     <AssetDetailCard assetData={symbolHolding} />
-                    {!isAltAsset ? <AssetDividendSection assetId={assetId} /> : null}
+                    {!isAltAsset ? (
+                      <AssetDividendSection assetId={assetId} accountId={selectedAccountId} />
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -1542,12 +1672,15 @@ export const AssetProfilePage = () => {
                       ? symbolHolding.averagePrice
                       : undefined
                   }
+                  accountId={selectedAccountId}
                   className={`col-span-1 ${symbolHolding ? "md:col-span-2" : "md:col-span-3"}`}
                 />
                 {symbolHolding && (
                   <div className="col-span-1 flex flex-col gap-4 md:col-span-1">
                     <AssetDetailCard assetData={symbolHolding} />
-                    {!isAltAsset ? <AssetDividendSection assetId={assetId} /> : null}
+                    {!isAltAsset ? (
+                      <AssetDividendSection assetId={assetId} accountId={selectedAccountId} />
+                    ) : null}
                   </div>
                 )}
               </div>

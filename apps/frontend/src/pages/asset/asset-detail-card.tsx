@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { formatPercent } from "@wealthfolio/ui";
 import { GainPercent } from "@wealthfolio/ui";
 import { AmountDisplay } from "@wealthfolio/ui";
@@ -203,11 +205,30 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
             </div>
             <div className="text-muted-foreground text-sm font-normal">{quantityLabel}</div>
           </div>
-          <div>
+          <div className="text-right">
             <div className="text-xl font-extrabold">
               <AmountDisplay value={marketValue} currency={currency} isHidden={isBalanceHidden} />
             </div>
-            <div className="text-muted-foreground text-right text-sm font-normal">{currency}</div>
+            <div className="text-muted-foreground flex items-center justify-end gap-1 text-sm font-normal">
+              <span>{currency}</span>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground inline-flex"
+                      aria-label={t("asset:detailCard.market_value_gross_tooltip")}
+                      data-testid="button-market-value-gross-info"
+                    >
+                      <Icons.Info className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-left">
+                    <p>{t("asset:detailCard.market_value_gross_tooltip")}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
         </CardTitle>
       </CardHeader>

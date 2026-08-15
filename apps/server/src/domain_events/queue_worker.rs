@@ -415,9 +415,10 @@ async fn run_portfolio_job(
                 match deps.dividend_sync_service.sync().await {
                     Ok(result) if result.created > 0 || !result.errors.is_empty() => {
                         tracing::info!(
-                            "Dividend sync after market data: created={}, errors={}",
+                            "Dividend sync after market data: created={}, errors={} {:?}",
                             result.created,
-                            result.errors.len()
+                            result.errors.len(),
+                            result.errors
                         );
                     }
                     Ok(_) => {}

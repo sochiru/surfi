@@ -53,6 +53,8 @@ interface AssetHistoryProps {
   quoteHistory: Quote[];
   assetId: string;
   averageCost?: number;
+  /** When set, buy/sell markers and related activity overlays are limited to this account. */
+  accountId?: string | null;
   className?: string;
 }
 
@@ -64,6 +66,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   quoteHistory,
   assetId,
   averageCost,
+  accountId = null,
   className,
 }) => {
   const { t } = useTranslation();
@@ -133,6 +136,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   const { data: markerActivities = [], isLoading: isMarkerActivitiesLoading } =
     useAssetMarkerActivities({
       assetId,
+      accountId,
       dateFrom: activityDateFrom,
       dateTo: activityDateTo,
       enabled: showActivityMarkers,
@@ -320,6 +324,7 @@ interface FilteredData {
 
 interface UseAssetTradeActivitiesOptions {
   assetId: string;
+  accountId?: string | null;
   dateFrom?: string;
   dateTo?: string;
   enabled: boolean;
@@ -327,23 +332,33 @@ interface UseAssetTradeActivitiesOptions {
 
 function useAssetMarkerActivities({
   assetId,
+  accountId,
   dateFrom,
   dateTo,
   enabled,
 }: UseAssetTradeActivitiesOptions) {
   return useQuery({
-    queryKey: [QueryKeys.ACTIVITY_DATA, "asset-activity-markers", assetId, dateFrom, dateTo],
-    queryFn: () => fetchAssetMarkerActivities({ assetId, dateFrom, dateTo }),
+    queryKey: [
+      QueryKeys.ACTIVITY_DATA,
+      "asset-activity-markers",
+      assetId,
+      accountId ?? "all",
+      dateFrom,
+      dateTo,
+    ],
+    queryFn: () => fetchAssetMarkerActivities({ assetId, accountId, dateFrom, dateTo }),
     enabled: enabled && assetId.length > 0,
   });
 }
 
 async function fetchAssetMarkerActivities({
   assetId,
+  accountId,
   dateFrom,
   dateTo,
 }: {
   assetId: string;
+  accountId?: string | null;
   dateFrom?: string;
   dateTo?: string;
 }) {
@@ -362,6 +377,7 @@ async function fetchAssetMarkerActivities({
         dateTo,
         activityTypes: [...ASSET_MARKER_ACTIVITY_TYPES],
         needsReview: false,
+        ...(accountId ? { accountIds: [accountId] } : {}),
       },
       "",
       { id: "date", desc: false },

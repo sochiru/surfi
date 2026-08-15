@@ -120,7 +120,7 @@ export const HoldingsEditMode = ({
         let averageCost = "";
         if (h.costBasis?.local && h.quantity > 0) {
           const avgCostValue = h.costBasis.local / h.quantity;
-          averageCost = avgCostValue.toFixed(8).replace(/\.?0+$/, "");
+          averageCost = avgCostValue.toFixed(4).replace(/\.?0+$/, "");
         }
         return {
           assetId: h.instrument?.id ?? h.id,
@@ -492,6 +492,7 @@ export const HoldingsEditMode = ({
                         <div className="col-span-2">
                           <MoneyInput
                             value={holding.averageCost}
+                            maxDecimalPlaces={4}
                             onValueChange={(value) =>
                               handleAverageCostChange(holding.assetId, value)
                             }
