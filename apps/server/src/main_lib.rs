@@ -140,6 +140,7 @@ pub struct AppState {
     pub mcp_enabled: bool,
     /// Whether agent tool calls are audited (from `Config::mcp_audit_enabled`).
     pub mcp_audit_enabled: bool,
+    pub dividend_sync_service: Arc<dyn wealthfolio_core::dividends::DividendSyncServiceTrait>,
 }
 
 pub fn init_tracing() {
@@ -559,6 +560,17 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         .with_event_sink(domain_event_sink.clone()),
     );
 
+    let dividend_sync_service: Arc<dyn wealthfolio_core::dividends::DividendSyncServiceTrait> =
+        Arc::new(wealthfolio_core::dividends::DividendSyncService::new(
+            settings_service.clone(),
+            account_service.clone(),
+            activity_service.clone(),
+            holdings_service.clone(),
+            quote_service.clone(),
+            snapshot_repository.clone(),
+            base_currency.clone(),
+        ));
+
     // Spending: events + event_types
     let event_types_repo: Arc<dyn wealthfolio_spending::events::EventTypesRepositoryTrait> =
         Arc::new(
@@ -807,6 +819,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         token_lifecycle.clone(),
         spending_settings_service.clone(),
         categorization_rules_service.clone(),
+        dividend_sync_service.clone(),
     );
 
     let addon_storage_repository =
@@ -887,6 +900,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         agent_environment,
         mcp_enabled: config.mcp_enabled,
         mcp_audit_enabled: config.mcp_audit_enabled,
+        dividend_sync_service,
     });
 
     #[cfg(feature = "device-sync")]

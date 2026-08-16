@@ -86,6 +86,7 @@ pub struct ServiceContext {
     pub budget_service: Arc<BudgetService>,
     pub spending_analytics_service: Arc<AnalyticsService>,
     pub spending_insight_service: Arc<InsightService>,
+    pub dividend_sync_service: Arc<dyn wealthfolio_core::dividends::DividendSyncServiceTrait>,
 }
 
 impl ServiceContext {
@@ -271,5 +272,11 @@ impl ServiceContext {
 
     pub fn health_service(&self) -> Arc<health::HealthService> {
         Arc::clone(&self.health_service)
+    }
+
+    pub fn dividend_sync_service(
+        &self,
+    ) -> Arc<dyn wealthfolio_core::dividends::DividendSyncServiceTrait> {
+        Arc::clone(&self.dividend_sync_service)
     }
 }

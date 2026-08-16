@@ -10,6 +10,7 @@ pub mod addons;
 pub mod assets;
 pub mod constants;
 pub mod custom_provider;
+pub mod dividends;
 pub mod errors;
 pub mod events;
 pub mod exports;

@@ -274,6 +274,8 @@ export type SymbolInput = AssetResolutionInput;
 export interface ActivityCreate {
   id?: string;
   idempotencyKey?: string;
+  /** Origin system for auto-created / synced activities (e.g. MARKET_DATA_DIVIDEND). */
+  sourceSystem?: string;
   accountId: string;
   activityType: string;
   subtype?: string | null; // Semantic variation (DRIP, STAKING_REWARD, etc.)

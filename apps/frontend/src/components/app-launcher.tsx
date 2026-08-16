@@ -381,6 +381,13 @@ export function AppLauncher() {
         label: t("common:component.manage_goals"),
       },
       {
+        title: t("common:component.view_dividends"),
+        href: "/dividends",
+        icon: <Icons.Income className="size-6" />,
+        keywords: ["dividends", "dividend", "income", "payout", "yield", "calendar", "search"],
+        label: t("common:component.view_dividends"),
+      },
+      {
         title: t("common:component.manage_contribution_limits"),
         href: "/settings/contribution-limits",
         icon: <Icons.TrendingUp className="size-6" />,
@@ -389,11 +396,14 @@ export function AppLauncher() {
       },
     ];
 
-    const navItems = [
-      ...(navigation.primary ?? []),
-      ...(navigation.secondary ?? []),
-      ...(navigation.addons ?? []),
-    ] as LauncherActionItem[];
+    const quickActionHrefs = new Set(quickActions.map((action) => action.href));
+    const navItems = (
+      [
+        ...(navigation.primary ?? []),
+        ...(navigation.secondary ?? []),
+        ...(navigation.addons ?? []),
+      ] as LauncherActionItem[]
+    ).filter((item) => !quickActionHrefs.has(item.href));
 
     return [...quickActions, ...navItems];
   }, [
@@ -585,9 +595,11 @@ export function AppLauncher() {
   // Filter items based on search
   const searchLower = search.toLowerCase();
   const filteredActions = actionItems.filter((action) => {
-    const displayText = (action.label ?? action.title).toLowerCase();
-    const keywords = (action.keywords ?? []).map((k) => k.toLowerCase());
-    return displayText.includes(searchLower) || keywords.some((k) => k.includes(searchLower));
+    const haystack = [action.title, action.label, ...(action.keywords ?? [])]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(searchLower);
   });
 
   const filteredHoldings = holdingOptions.filter((holding) => {
@@ -672,11 +684,14 @@ export function AppLauncher() {
             {filteredActions.map((action, index) => {
               const resizedIcon = renderIcon(action.icon);
               const displayText = action.label ?? action.title;
+              const searchValue = [action.title, action.label, ...(action.keywords ?? [])]
+                .filter(Boolean)
+                .join(" ");
 
               return (
                 <CommandItem
-                  key={action.href ?? index}
-                  value={displayText}
+                  key={`${action.href}-${displayText}` ?? index}
+                  value={searchValue}
                   keywords={action.keywords ?? []}
                   disabled={action.disabled}
                   onSelect={() => handleSelectAction(action.href, displayText)}

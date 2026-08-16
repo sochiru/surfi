@@ -44,6 +44,7 @@ pub mod connect;
 mod custom_providers;
 mod data_exports;
 mod database_backups;
+mod dividends;
 #[cfg(feature = "device-sync")]
 mod device_sync;
 #[cfg(feature = "device-sync")]
@@ -148,6 +149,7 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .merge(performance::router())
         .merge(activities::router())
         .merge(goals::router())
+        .merge(dividends::router())
         .merge(exchange_rates::router())
         .merge(market_data::router())
         .merge(assets::router())

@@ -80,6 +80,7 @@ pub use resolver::{
 // Re-export provider types
 pub use provider::alpha_vantage::AlphaVantageProvider;
 pub use provider::boerse_frankfurt::BoerseFrankfurtProvider;
+pub use provider::eodhd::EodhdProvider;
 pub use provider::finnhub::FinnhubProvider;
 pub use provider::fixture::FixtureProvider;
 pub use provider::tradingview::TradingViewProvider;

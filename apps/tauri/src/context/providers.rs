@@ -450,6 +450,17 @@ pub async fn initialize_context(
         .with_lot_repository(lots_repository.clone()),
     );
 
+    let dividend_sync_service: Arc<dyn wealthfolio_core::dividends::DividendSyncServiceTrait> =
+        Arc::new(wealthfolio_core::dividends::DividendSyncService::new(
+            settings_service.clone(),
+            account_service.clone(),
+            activity_service.clone(),
+            holdings_service.clone(),
+            quote_service.clone(),
+            snapshot_repository.clone(),
+            base_currency.clone(),
+        ));
+
     let allocation_service = Arc::new(
         AllocationService::new(holdings_service.clone(), taxonomy_service.clone())
             .with_account_service(account_service.clone()),
@@ -654,6 +665,7 @@ pub async fn initialize_context(
             budget_service,
             spending_analytics_service,
             spending_insight_service,
+            dividend_sync_service,
         },
         event_receiver,
         sync_outbox_wake_receiver,

@@ -103,6 +103,16 @@ impl ProviderCapabilities {
                     "Profiles".to_string(),
                 ],
             }),
+            "EODHD" => Some(Self {
+                instruments: "Stocks".to_string(),
+                coverage: "Global".to_string(),
+                features: vec![
+                    "Manual sync".to_string(),
+                    "Historical".to_string(),
+                    "Profiles".to_string(),
+                    "Dividends".to_string(),
+                ],
+            }),
             "BOERSE_FRANKFURT" => Some(Self {
                 instruments: "Stocks • ETFs • Bonds".to_string(),
                 coverage: "XETR • XFRA".to_string(),

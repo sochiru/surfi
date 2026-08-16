@@ -241,6 +241,20 @@ pub async fn process_portfolio_job(
                         err
                     );
                 }
+                match state.dividend_sync_service.sync().await {
+                    Ok(result) if result.created > 0 || !result.errors.is_empty() => {
+                        tracing::info!(
+                            "Dividend sync after market data: created={}, errors={} {:?}",
+                            result.created,
+                            result.errors.len(),
+                            result.errors
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(err) => {
+                        tracing::warn!("Dividend sync after market data failed: {}", err);
+                    }
+                }
             }
             Err(err) => {
                 let err_msg = err.to_string();

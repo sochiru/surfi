@@ -71,9 +71,8 @@ const DisplayModeToggle: React.FC<{
 // sage to a deep green, losses from a light clay to a deep red.
 const POS_LO = [205, 217, 191]; // #cdd9bf
 const POS_HI = [53, 92, 76]; // #355c4c
-// Loss ramp tuned to the theme's --destructive (flexoki red). NEG_HI matches the
-// dark-mode token hsl(5 61% 54%) = #d14e42; NEG_LO is a saturated tint of the same
-// hue so small losses read red-tinted instead of washed-out pink.
+// Loss ramp tuned to the theme's --destructive red. NEG_LO is a saturated tint
+// of the same hue so small losses read red-tinted instead of washed-out pink.
 const NEG_LO = [233, 179, 168]; // #e9b3a8
 const NEG_HI = [209, 78, 66]; // #d14e42
 

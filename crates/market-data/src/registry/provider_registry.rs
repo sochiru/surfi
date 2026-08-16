@@ -700,7 +700,11 @@ impl ProviderRegistry {
     /// Uses the same resolver as quote fetching to build provider-specific symbols
     /// (e.g., "VFV.TO" for Yahoo when the MIC is XTSE).
     ///
-    /// Tries providers that support profiles until one succeeds.
+    /// Tries providers that support profiles until one returns classification data.
+    ///
+    /// A name-only profile (common for Yahoo on PSE and other thin listings) is
+    /// kept as a fallback so a later provider like EODHD fundamentals can supply
+    /// sector and country.
     pub async fn get_profile(
         &self,
         context: &QuoteContext,
@@ -715,6 +719,7 @@ impl ProviderRegistry {
         }
 
         let mut last_error: Option<MarketDataError> = None;
+        let mut fallback_profile: Option<AssetProfile> = None;
 
         for provider in providers {
             let provider_id: ProviderId = Cow::Borrowed(provider.id());
@@ -736,7 +741,16 @@ impl ProviderRegistry {
             match provider.get_profile(&symbol).await {
                 Ok(profile) => {
                     self.circuit_breaker.record_success(&provider_id);
-                    return Ok(profile);
+                    if profile_has_classification(&profile) {
+                        return Ok(profile);
+                    }
+                    debug!(
+                        "Profile from {} has no sector/country; trying next provider",
+                        provider.id()
+                    );
+                    if fallback_profile.is_none() {
+                        fallback_profile = Some(profile);
+                    }
                 }
                 Err(MarketDataError::NotSupported { .. }) => {
                     continue;
@@ -756,6 +770,10 @@ impl ProviderRegistry {
                     last_error = Some(e);
                 }
             }
+        }
+
+        if let Some(profile) = fallback_profile {
+            return Ok(profile);
         }
 
         Err(last_error.unwrap_or_else(|| {
@@ -977,6 +995,16 @@ impl ProviderRegistry {
             diagnostics,
         )
     }
+}
+
+fn profile_has_classification(profile: &AssetProfile) -> bool {
+    let has_text = |value: &Option<String>| value.as_deref().is_some_and(|s| !s.trim().is_empty());
+    has_text(&profile.sector)
+        || has_text(&profile.country)
+        || profile.sectors.as_deref().is_some_and(|s| {
+            let trimmed = s.trim();
+            !trimmed.is_empty() && trimmed != "[]"
+        })
 }
 
 #[cfg(test)]
@@ -1676,6 +1704,112 @@ mod tests {
         assert_eq!(profile.name.as_deref(), Some("GLOBAL_PROFILE"));
         assert_eq!(us_calls.load(Ordering::SeqCst), 0);
         assert_eq!(global_calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_profile_skips_name_only_for_classified_provider() {
+        struct ClassifyingProvider {
+            id: &'static str,
+            priority: u8,
+            sector: Option<&'static str>,
+            country: Option<&'static str>,
+            call_count: Arc<AtomicUsize>,
+        }
+
+        #[async_trait::async_trait]
+        impl MarketDataProvider for ClassifyingProvider {
+            fn id(&self) -> &'static str {
+                self.id
+            }
+
+            fn priority(&self) -> u8 {
+                self.priority
+            }
+
+            fn capabilities(&self) -> ProviderCapabilities {
+                ProviderCapabilities {
+                    instrument_kinds: &[InstrumentKind::Equity],
+                    coverage: Coverage::global_best_effort(),
+                    supports_latest: false,
+                    supports_historical: false,
+                    supports_search: false,
+                    supports_profile: true,
+                    supports_dividends: false,
+                }
+            }
+
+            fn rate_limit(&self) -> RateLimit {
+                RateLimit::default()
+            }
+
+            async fn get_latest_quote(
+                &self,
+                _: &QuoteContext,
+                _: ProviderInstrument,
+            ) -> Result<Quote, MarketDataError> {
+                unreachable!()
+            }
+
+            async fn get_historical_quotes(
+                &self,
+                _: &QuoteContext,
+                _: ProviderInstrument,
+                _: DateTime<Utc>,
+                _: DateTime<Utc>,
+            ) -> Result<Vec<Quote>, MarketDataError> {
+                unreachable!()
+            }
+
+            async fn get_profile(&self, _: &str) -> Result<AssetProfile, MarketDataError> {
+                self.call_count.fetch_add(1, Ordering::SeqCst);
+                Ok(AssetProfile {
+                    name: Some(self.id.to_string()),
+                    sector: self.sector.map(str::to_string),
+                    country: self.country.map(str::to_string),
+                    ..Default::default()
+                })
+            }
+        }
+
+        let yahoo_calls = Arc::new(AtomicUsize::new(0));
+        let eodhd_calls = Arc::new(AtomicUsize::new(0));
+        let providers: Vec<Arc<dyn MarketDataProvider>> = vec![
+            Arc::new(ClassifyingProvider {
+                id: "YAHOO",
+                priority: 1,
+                sector: None,
+                country: None,
+                call_count: yahoo_calls.clone(),
+            }),
+            Arc::new(ClassifyingProvider {
+                id: "EODHD",
+                priority: 5,
+                sector: Some("Utilities"),
+                country: Some("PH"),
+                call_count: eodhd_calls.clone(),
+            }),
+        ];
+
+        let registry = ProviderRegistry::new(providers, Arc::new(MockResolver));
+        let context = QuoteContext {
+            instrument: InstrumentId::Equity {
+                ticker: Arc::from("ACEN"),
+                mic: Some(Cow::Borrowed("XPHS")),
+            },
+            identifiers: Default::default(),
+            overrides: None,
+            currency_hint: None,
+            preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
+        };
+
+        let profile = registry.get_profile(&context).await.unwrap();
+        assert_eq!(profile.name.as_deref(), Some("EODHD"));
+        assert_eq!(profile.sector.as_deref(), Some("Utilities"));
+        assert_eq!(profile.country.as_deref(), Some("PH"));
+        assert_eq!(yahoo_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(eodhd_calls.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]

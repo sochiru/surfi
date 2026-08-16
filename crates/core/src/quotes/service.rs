@@ -1848,8 +1848,11 @@ where
             end,
         } = params;
 
-        let end_date = end.unwrap_or_else(|| Utc::now().date_naive());
-        let start_date = start.unwrap_or_else(|| end_date - Duration::days(365 * 5));
+        // Include ~1y of future ex-dates when providers publish announced schedules.
+        // Lookback stays anchored to today so extending `end` does not shrink history.
+        let today = Utc::now().date_naive();
+        let end_date = end.unwrap_or_else(|| today + Duration::days(366));
+        let start_date = start.unwrap_or_else(|| today - Duration::days(365 * 5));
         let start_dt = Utc.from_utc_datetime(&start_date.and_hms_opt(0, 0, 0).unwrap());
         let end_dt = Utc.from_utc_datetime(&end_date.and_hms_opt(23, 59, 59).unwrap());
 
@@ -2193,6 +2196,7 @@ where
                     | DATA_SOURCE_METAL_PRICE_API
                     | DATA_SOURCE_FINNHUB
                     | DATA_SOURCE_TRADINGVIEW
+                    | DATA_SOURCE_EODHD
             );
             // Check if API key is set (skip for disabled providers to avoid keychain prompts)
             let has_key = if requires_key && setting.enabled {

@@ -510,6 +510,13 @@ pub fn run() {
             commands::goal::get_retirement_overview,
             commands::goal::get_save_up_overview,
             commands::goal::preview_save_up_overview,
+            // Dividend automation
+            commands::dividends::get_dividend_sync_settings,
+            commands::dividends::update_dividend_sync_settings,
+            commands::dividends::sync_dividends,
+            commands::dividends::remove_auto_dividends,
+            commands::dividends::get_dividend_calendar_events,
+            commands::dividends::get_asset_dividend_view,
             // Portfolios (saved reporting scopes)
             commands::portfolios::get_portfolios,
             commands::portfolios::get_portfolio,

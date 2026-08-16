@@ -30,6 +30,7 @@ const INSTRUMENT_TYPE_TAXONOMY: &str = "instrument_type";
 fn map_quote_type_to_instrument_type(quote_type: &str, name: Option<&str>) -> Option<&'static str> {
     match quote_type.to_uppercase().as_str() {
         "EQUITY" => Some("STOCK_COMMON"),
+        "PREFERRED STOCK" | "PREFERRED" => Some("STOCK_PREFERRED"),
         "ETF" => Some("ETF"),
         "MUTUALFUND" | "MUTUAL FUND" => Some("FUND_MUTUAL"),
         "INDEX" => Some("ETF"), // Index funds are typically ETFs
@@ -135,7 +136,8 @@ fn map_fund_name_to_asset_class(name: Option<&str>) -> Option<&'static str> {
 fn map_quote_type_to_asset_class(quote_type: &str) -> Option<&'static str> {
     match quote_type.to_uppercase().as_str() {
         // Equity fallback: stocks, funds without composition data, options
-        "EQUITY" | "ETF" | "MUTUALFUND" | "MUTUAL FUND" | "INDEX" | "OPTION" => Some("EQUITY"),
+        "EQUITY" | "PREFERRED STOCK" | "PREFERRED" | "ETF" | "MUTUALFUND" | "MUTUAL FUND"
+        | "INDEX" | "OPTION" => Some("EQUITY"),
         // Fixed Income class: bonds, money market
         "BOND" | "MONEYMARKET" => Some("FIXED_INCOME"),
         // Cash class - assign to child category for drill-down (rollup will sum to CASH)
@@ -362,8 +364,13 @@ fn map_country_to_region(country: &str) -> Option<&'static str> {
         "south korea" | "korea" | "대한민국" | "taiwan" | "臺灣" => Some("R3030"),
 
         // Asia (R30) - other Asian countries
-        "singapore" | "india" | "भारत" | "indonesia" | "malaysia" | "thailand" | "vietnam"
-        | "philippines" => Some("R30"),
+        "singapore" | "sg" | "sgp" => Some("country_SG"),
+        "india" | "in" | "ind" | "भारत" => Some("country_IN"),
+        "indonesia" | "id" | "idn" => Some("country_ID"),
+        "malaysia" | "my" | "mys" => Some("country_MY"),
+        "thailand" | "th" | "tha" => Some("country_TH"),
+        "vietnam" | "vn" | "vnm" | "viet nam" => Some("country_VN"),
+        "philippines" | "ph" | "phl" | "philippine" => Some("country_PH"),
 
         // Oceania (R50)
         "new zealand" => Some("R50"),
@@ -790,6 +797,10 @@ mod tests {
             map_quote_type_to_instrument_type("EQUITY", None),
             Some("STOCK_COMMON")
         );
+        assert_eq!(
+            map_quote_type_to_instrument_type("PREFERRED STOCK", None),
+            Some("STOCK_PREFERRED")
+        );
         assert_eq!(map_quote_type_to_instrument_type("ETF", None), Some("ETF"));
         assert_eq!(
             map_quote_type_to_instrument_type("MUTUALFUND", None),
@@ -1050,9 +1061,12 @@ mod tests {
         // South American countries -> South America region (R2040)
         assert_eq!(map_country_to_region("Brazil"), Some("R2040"));
 
-        // Asian countries -> Asia region (R30)
-        assert_eq!(map_country_to_region("Singapore"), Some("R30"));
-        assert_eq!(map_country_to_region("India"), Some("R30"));
+        // Southeast / South Asia → specific country entries
+        assert_eq!(map_country_to_region("Singapore"), Some("country_SG"));
+        assert_eq!(map_country_to_region("India"), Some("country_IN"));
+        assert_eq!(map_country_to_region("Philippines"), Some("country_PH"));
+        assert_eq!(map_country_to_region("PH"), Some("country_PH"));
+        assert_eq!(map_country_to_region("PHL"), Some("country_PH"));
 
         // Unknown
         assert_eq!(map_country_to_region("Unknown Country"), None);

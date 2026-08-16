@@ -11,6 +11,11 @@ import {
   type DynamicRouteEntry,
 } from "@/addons/addons-runtime-context";
 import { AddonIframeRoute } from "@/addons/iframe/addon-iframe-route";
+import DividendsPage from "@/features/dividends/pages/dividends-page";
+import GoalDetailPage from "@/features/goals/pages/goal-detail-page";
+import GoalNewPage from "@/features/goals/pages/goal-new-page";
+import GoalRetirementGuidePage from "@/features/goals/pages/goal-retirement-guide-page";
+import GoalsDashboardPage from "@/features/goals/pages/goals-dashboard-page";
 import AuthCallbackPage from "@/features/wealthfolio-connect/pages/auth-callback-page";
 import ConnectPage from "@/features/wealthfolio-connect/pages/connect-page";
 import useNavigationEventListener from "@/hooks/use-navigation-event-listener";
@@ -25,8 +30,10 @@ import PortfolioInsightsPage from "@/pages/insights/portfolio-insights";
 import NotFoundPage from "@/pages/not-found";
 import PerformancePage from "@/pages/performance/performance-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
-import PortfoliosPage from "@/pages/settings/portfolios/portfolios-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
+import PortfoliosPage from "@/pages/settings/portfolios/portfolios-page";
+import SpendingBudgetPage from "./features/spending/pages/spending-budget-page";
+import SpendingInsightsPage from "./features/spending/pages/spending-insights-page";
 import AccountPage from "./pages/account/account-page";
 import AiAssistantPage from "./pages/ai-assistant/ai-assistant-page";
 import AssetProfilePage from "./pages/asset/asset-profile-page";
@@ -41,19 +48,13 @@ import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
 import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
-import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
-import ConnectSettingsPage from "./pages/settings/wealthfolio-connect/connect-settings-page";
-import SpendingInsightsPage from "./features/spending/pages/spending-insights-page";
-import SpendingBudgetPage from "./features/spending/pages/spending-budget-page";
-import SpendingSettingsPage from "./pages/settings/spending/spending-settings-page";
 import SpendingSettingsCategoriesPage from "./pages/settings/spending/categories/spending-categories-page";
 import SpendingSettingsEventsPage from "./pages/settings/spending/events/spending-events-page";
 import SpendingSettingsRulesPage from "./pages/settings/spending/rules/spending-rules-page";
 import SpendingSetupPage from "./pages/settings/spending/setup/spending-setup-page";
-import GoalsDashboardPage from "@/features/goals/pages/goals-dashboard-page";
-import GoalNewPage from "@/features/goals/pages/goal-new-page";
-import GoalDetailPage from "@/features/goals/pages/goal-detail-page";
-import GoalRetirementGuidePage from "@/features/goals/pages/goal-retirement-guide-page";
+import SpendingSettingsPage from "./pages/settings/spending/spending-settings-page";
+import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
+import ConnectSettingsPage from "./pages/settings/wealthfolio-connect/connect-settings-page";
 
 function NavigationEventBridge() {
   useNavigationEventListener();
@@ -106,6 +107,7 @@ export function AppRoutes() {
           <Route path="import" element={<ActivityImportPage />} />
           <Route path="accounts/:id" element={<AccountPage />} />
           <Route path="income" element={<IncomePage />} />
+          <Route path="dividends" element={<DividendsPage />} />
           <Route path="performance" element={<PerformancePage />} />
           <Route path="insights" element={<PortfolioInsightsPage />} />
           <Route path="health" element={<HealthPage />} />
