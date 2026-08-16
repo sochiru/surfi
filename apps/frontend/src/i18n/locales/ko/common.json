@@ -62,6 +62,7 @@
   "logout": "로그아웃",
   "login": "로그인",
   "income": "소득",
+  "dividends": "배당",
   "dashboard": "대시보드",
   "symbol": "심볼",
   "shares": "주식 수",
@@ -98,6 +99,7 @@
     "label_insights": "인사이트 보기",
     "label_holdings": "보유 종목 보기",
     "label_activities": "활동 보기",
+    "label_dividends": "배당 보기",
     "label_goals": "목표",
     "label_assistant": "AI 어시스턴트"
   },
@@ -188,6 +190,7 @@
     "manage_securities": "증권 관리",
     "manage_accounts": "계좌 관리",
     "manage_goals": "목표 관리",
+    "view_dividends": "배당 보기",
     "manage_contribution_limits": "납입 한도 관리",
     "benchmark_group_us_indices": "미국 시장 지수",
     "benchmark_group_european_indices": "유럽 지수",

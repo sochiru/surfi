@@ -62,6 +62,7 @@
   "logout": "Logout",
   "login": "Login",
   "income": "Income",
+  "dividends": "Dividends",
   "dashboard": "Dashboard",
   "symbol": "Symbol",
   "shares": "Shares",
@@ -98,6 +99,7 @@
     "label_insights": "View Insights",
     "label_holdings": "View Holdings",
     "label_activities": "View Activities",
+    "label_dividends": "View Dividends",
     "label_goals": "Goals",
     "label_assistant": "AI Assistant"
   },
@@ -188,6 +190,7 @@
     "manage_securities": "Manage Securities",
     "manage_accounts": "Manage Accounts",
     "manage_goals": "Manage Goals",
+    "view_dividends": "View Dividends",
     "manage_contribution_limits": "Manage Contribution Limits",
     "benchmark_group_us_indices": "US Market Indices",
     "benchmark_group_european_indices": "European Indices",

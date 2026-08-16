@@ -109,6 +109,7 @@ impl ProviderCapabilities {
                 features: vec![
                     "Manual sync".to_string(),
                     "Historical".to_string(),
+                    "Profiles".to_string(),
                     "Dividends".to_string(),
                 ],
             }),

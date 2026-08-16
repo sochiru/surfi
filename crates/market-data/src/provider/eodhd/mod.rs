@@ -1,12 +1,14 @@
 //! EODHD market data provider.
 //!
-//! End-of-day historical prices and dividend history via the EODHD APIs:
+//! End-of-day historical prices, dividend history, and company profiles:
 //! - `GET /api/eod/{symbol}` — daily OHLCV (and latest via a short window)
 //! - `GET /api/div/{symbol}` — cash dividend history (ex-date + value)
+//! - `GET /api/fundamentals/{symbol}` — sector, country, GICS, and identity
 //!
 //! Symbol format: `{TICKER}.{EXCHANGE}` (e.g. `SM.PSE`, `AAPL.US`).
 //! Docs: https://eodhd.com/financial-apis/api-for-historical-data-and-volumes
 //!       https://eodhd.com/financial-apis/api-splits-dividends
+//!       https://eodhd.com/financial-apis/stock-etfs-fundamental-data-feeds
 
 use std::str::FromStr;
 use std::time::Duration;
@@ -20,7 +22,7 @@ use serde::Deserialize;
 
 use crate::errors::MarketDataError;
 use crate::models::{
-    Coverage, DividendEvent, InstrumentKind, ProviderInstrument, Quote, QuoteContext,
+    AssetProfile, Coverage, DividendEvent, InstrumentKind, ProviderInstrument, Quote, QuoteContext,
 };
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 use crate::resolver::ResolverChain;
@@ -49,6 +51,118 @@ struct EodBar {
 struct DivBar {
     date: String,
     value: f64,
+}
+
+/// Filtered fundamentals payload (`filter=General,Highlights,Technicals`).
+#[derive(Debug, Deserialize, Default)]
+struct FundamentalsResponse {
+    #[serde(default, rename = "General")]
+    general: Option<GeneralSection>,
+    #[serde(default, rename = "Highlights")]
+    highlights: Option<HighlightsSection>,
+    #[serde(default, rename = "Technicals")]
+    technicals: Option<TechnicalsSection>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct GeneralSection {
+    #[serde(default, rename = "Code")]
+    code: Option<String>,
+    #[serde(default, rename = "Type")]
+    type_name: Option<String>,
+    #[serde(default, rename = "Name")]
+    name: Option<String>,
+    #[serde(default, rename = "Description")]
+    description: Option<String>,
+    #[serde(default, rename = "WebURL")]
+    web_url: Option<String>,
+    #[serde(default, rename = "Sector")]
+    sector: Option<String>,
+    #[serde(default, rename = "Industry")]
+    industry: Option<String>,
+    #[serde(default, rename = "GicSector")]
+    gic_sector: Option<String>,
+    #[serde(default, rename = "CountryISO")]
+    country_iso: Option<String>,
+    #[serde(default, rename = "CountryName")]
+    country_name: Option<String>,
+    #[serde(default, rename = "ISIN")]
+    isin: Option<String>,
+    #[serde(default, rename = "FullTimeEmployees", deserialize_with = "deserialize_opt_u64")]
+    employees: Option<u64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct HighlightsSection {
+    #[serde(default, rename = "MarketCapitalization", deserialize_with = "deserialize_opt_f64")]
+    market_cap: Option<f64>,
+    #[serde(default, rename = "PERatio", deserialize_with = "deserialize_opt_f64")]
+    pe_ratio: Option<f64>,
+    #[serde(default, rename = "DividendYield", deserialize_with = "deserialize_opt_f64")]
+    dividend_yield: Option<f64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct TechnicalsSection {
+    #[serde(default, rename = "52WeekHigh", deserialize_with = "deserialize_opt_f64")]
+    week_52_high: Option<f64>,
+    #[serde(default, rename = "52WeekLow", deserialize_with = "deserialize_opt_f64")]
+    week_52_low: Option<f64>,
+}
+
+fn deserialize_opt_f64<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<serde_json::Value>::deserialize(deserializer)?;
+    Ok(value.and_then(json_to_f64))
+}
+
+fn deserialize_opt_u64<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(deserialize_opt_f64(deserializer)?.map(|n| n as u64))
+}
+
+fn json_to_f64(value: serde_json::Value) -> Option<f64> {
+    match value {
+        serde_json::Value::Number(n) => n.as_f64(),
+        serde_json::Value::String(s) => {
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                trimmed.parse().ok()
+            }
+        }
+        _ => None,
+    }
+}
+
+fn nonempty(value: Option<String>) -> Option<String> {
+    value.and_then(|s| {
+        let trimmed = s.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
+}
+
+fn map_eodhd_type(type_name: Option<&str>) -> Option<String> {
+    let normalized = type_name?.trim().to_ascii_uppercase();
+    let quote_type = match normalized.as_str() {
+        "COMMON STOCK" | "STOCK" | "EQUITY" => "EQUITY",
+        "PREFERRED STOCK" | "PREFERRED" => "PREFERRED STOCK",
+        "ETF" => "ETF",
+        "FUND" | "MUTUAL FUND" | "MUTUALFUND" => "MUTUALFUND",
+        "INDEX" => "INDEX",
+        other if !other.is_empty() => other,
+        _ => return None,
+    };
+    Some(quote_type.to_string())
 }
 
 impl EodhdProvider {
@@ -279,6 +393,68 @@ impl EodhdProvider {
         events.sort_by_key(|d| d.date);
         Ok(events)
     }
+
+    async fn fetch_fundamentals(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
+        let encoded = urlencoding::encode(symbol);
+        let path = format!("/fundamentals/{}", encoded);
+        let text = self
+            .fetch(&path, &[("filter", "General,Highlights,Technicals")])
+            .await?;
+
+        if text.trim().is_empty() || text.trim() == "{}" || text.trim() == "[]" {
+            return Err(MarketDataError::SymbolNotFound(format!(
+                "No fundamentals for symbol: {}",
+                symbol
+            )));
+        }
+
+        let payload: FundamentalsResponse =
+            serde_json::from_str(&text).map_err(|e| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: format!("Failed to parse fundamentals response: {}", e),
+            })?;
+
+        Self::profile_from_fundamentals(payload, symbol)
+    }
+
+    fn profile_from_fundamentals(
+        payload: FundamentalsResponse,
+        symbol: &str,
+    ) -> Result<AssetProfile, MarketDataError> {
+        let general = payload.general.unwrap_or_default();
+        if nonempty(general.name.clone()).is_none() && nonempty(general.code.clone()).is_none() {
+            return Err(MarketDataError::SymbolNotFound(format!(
+                "No fundamentals for symbol: {}",
+                symbol
+            )));
+        }
+
+        let highlights = payload.highlights.unwrap_or_default();
+        let technicals = payload.technicals.unwrap_or_default();
+        let sector = nonempty(general.gic_sector).or_else(|| nonempty(general.sector));
+        let country = nonempty(general.country_iso).or_else(|| nonempty(general.country_name));
+
+        Ok(AssetProfile {
+            source: Some(PROVIDER_ID.to_string()),
+            name: nonempty(general.name),
+            quote_type: map_eodhd_type(general.type_name.as_deref()),
+            sector,
+            sectors: None,
+            asset_allocation: None,
+            industry: nonempty(general.industry),
+            website: nonempty(general.web_url),
+            description: nonempty(general.description),
+            country,
+            employees: general.employees,
+            market_cap: highlights.market_cap,
+            pe_ratio: highlights.pe_ratio,
+            dividend_yield: highlights.dividend_yield,
+            week_52_high: technicals.week_52_high,
+            week_52_low: technicals.week_52_low,
+            isin: nonempty(general.isin),
+            ..Default::default()
+        })
+    }
 }
 
 #[async_trait]
@@ -298,7 +474,7 @@ impl MarketDataProvider for EodhdProvider {
             supports_latest: true,
             supports_historical: true,
             supports_search: false,
-            supports_profile: false,
+            supports_profile: true,
             supports_dividends: true,
         }
     }
@@ -361,6 +537,11 @@ impl MarketDataProvider for EodhdProvider {
         let symbol = self.extract_symbol(&instrument)?;
         self.fetch_dividends(&symbol, start, end).await
     }
+
+    async fn get_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
+        debug!("Fetching profile for {} from EODHD", symbol);
+        self.fetch_fundamentals(symbol).await
+    }
 }
 
 #[cfg(test)]
@@ -378,7 +559,7 @@ mod tests {
         assert!(caps.supports_latest);
         assert!(caps.supports_dividends);
         assert!(!caps.supports_search);
-        assert!(!caps.supports_profile);
+        assert!(caps.supports_profile);
     }
 
     #[test]
@@ -421,5 +602,83 @@ mod tests {
         assert_eq!(bars.len(), 2);
         assert_eq!(bars[0].value, 0.23);
         assert_eq!(bars[1].date, "2023-05-12");
+    }
+
+    #[test]
+    fn test_map_eodhd_type() {
+        assert_eq!(map_eodhd_type(Some("Common Stock")).as_deref(), Some("EQUITY"));
+        assert_eq!(
+            map_eodhd_type(Some("Preferred Stock")).as_deref(),
+            Some("PREFERRED STOCK")
+        );
+        assert_eq!(map_eodhd_type(Some("ETF")).as_deref(), Some("ETF"));
+        assert_eq!(map_eodhd_type(Some("FUND")).as_deref(), Some("MUTUALFUND"));
+        assert_eq!(map_eodhd_type(Some("")).as_deref(), None);
+        assert_eq!(map_eodhd_type(None).as_deref(), None);
+    }
+
+    #[test]
+    fn test_profile_from_fundamentals_equity() {
+        let json = r#"{
+            "General": {
+                "Code": "ACEN",
+                "Type": "Common Stock",
+                "Name": "ACEN CORPORATION",
+                "Sector": "Utilities",
+                "Industry": "Utilities—Renewable",
+                "GicSector": "Utilities",
+                "CountryName": "Philippines",
+                "CountryISO": "PH",
+                "ISIN": "PHY1001H1023",
+                "Description": "ACEN Corporation is an energy company.",
+                "WebURL": "https://www.acenrenewables.com",
+                "FullTimeEmployees": 210
+            },
+            "Highlights": {
+                "MarketCapitalization": 150000000000,
+                "PERatio": "12.5",
+                "DividendYield": 0.02
+            },
+            "Technicals": {
+                "52WeekHigh": 5.5,
+                "52WeekLow": "3.1"
+            }
+        }"#;
+        let payload: FundamentalsResponse = serde_json::from_str(json).unwrap();
+        let profile = EodhdProvider::profile_from_fundamentals(payload, "ACEN.PSE").unwrap();
+        assert_eq!(profile.source.as_deref(), Some("EODHD"));
+        assert_eq!(profile.name.as_deref(), Some("ACEN CORPORATION"));
+        assert_eq!(profile.quote_type.as_deref(), Some("EQUITY"));
+        assert_eq!(profile.sector.as_deref(), Some("Utilities"));
+        assert_eq!(profile.country.as_deref(), Some("PH"));
+        assert_eq!(profile.isin.as_deref(), Some("PHY1001H1023"));
+        assert_eq!(profile.employees, Some(210));
+        assert_eq!(profile.pe_ratio, Some(12.5));
+        assert_eq!(profile.week_52_low, Some(3.1));
+    }
+
+    #[test]
+    fn test_profile_from_fundamentals_preferred() {
+        let json = r#"{
+            "General": {
+                "Code": "CEBCP",
+                "Type": "Preferred Stock",
+                "Name": "Cebu Air, Inc. Preferred",
+                "GicSector": "Industrials",
+                "CountryISO": "PH"
+            }
+        }"#;
+        let payload: FundamentalsResponse = serde_json::from_str(json).unwrap();
+        let profile = EodhdProvider::profile_from_fundamentals(payload, "CEBCP.PSE").unwrap();
+        assert_eq!(profile.quote_type.as_deref(), Some("PREFERRED STOCK"));
+        assert_eq!(profile.sector.as_deref(), Some("Industrials"));
+        assert_eq!(profile.country.as_deref(), Some("PH"));
+    }
+
+    #[test]
+    fn test_profile_from_fundamentals_empty_is_not_found() {
+        let payload: FundamentalsResponse = serde_json::from_str("{}").unwrap();
+        let err = EodhdProvider::profile_from_fundamentals(payload, "NOPE.PSE").unwrap_err();
+        assert!(matches!(err, MarketDataError::SymbolNotFound(_)));
     }
 }
