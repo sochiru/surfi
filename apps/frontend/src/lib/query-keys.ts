@@ -28,6 +28,9 @@ export const QueryKeys = {
   PORTFOLIO_ALLOCATIONS: "portfolioAllocations",
   HOLDINGS_BY_ALLOCATION: "holdingsByAllocation",
   INCOME_SUMMARY: "incomeSummary",
+  DIVIDEND_CALENDAR: "dividendCalendar",
+  DIVIDEND_SYNC_SETTINGS: "dividendSyncSettings",
+  ASSET_DIVIDENDS: "assetDividends",
   PORTFOLIO_SUMMARY: "portfolioSummary",
   QUOTE_HISTORY: "quoteHistory",
 

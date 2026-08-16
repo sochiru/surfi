@@ -405,6 +405,21 @@ async fn run_portfolio_job(
                     );
                 }
 
+                // Auto-reconcile dividends for opted-in accounts (market data only).
+                match context.dividend_sync_service().sync().await {
+                    Ok(result) if result.created > 0 || !result.errors.is_empty() => {
+                        info!(
+                            "Dividend sync after market data: created={}, errors={}",
+                            result.created,
+                            result.errors.len()
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!("Dividend sync after market data failed: {}", e);
+                    }
+                }
+
                 // Continue to portfolio calculation
                 run_portfolio_calculation(
                     app_handle,

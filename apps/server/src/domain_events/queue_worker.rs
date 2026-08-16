@@ -63,6 +63,7 @@ pub struct QueueWorkerDeps {
     /// Categorization rules service — auto-runs rules against newly-changed activities.
     pub categorization_rules_service:
         Arc<wealthfolio_spending::categorization_rules::CategorizationRulesService>,
+    pub dividend_sync_service: Arc<dyn wealthfolio_core::dividends::DividendSyncServiceTrait>,
 }
 
 /// Runs the event queue worker.
@@ -410,6 +411,20 @@ async fn run_portfolio_job(
                         "Failed to initialize FxService after market data sync: {}",
                         err
                     );
+                }
+                match deps.dividend_sync_service.sync().await {
+                    Ok(result) if result.created > 0 || !result.errors.is_empty() => {
+                        tracing::info!(
+                            "Dividend sync after market data: created={}, errors={} {:?}",
+                            result.created,
+                            result.errors.len(),
+                            result.errors
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(err) => {
+                        tracing::warn!("Dividend sync after market data failed: {}", err);
+                    }
                 }
             }
             Err(err) => {

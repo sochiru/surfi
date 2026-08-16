@@ -299,6 +299,10 @@ export interface ActivityCreate {
   subtype?: string | null;
   activityDate: string | Date;
   sourceGroupId?: string;
+  /** Origin system for auto-created / synced activities (e.g. MARKET_DATA_DIVIDEND). */
+  sourceSystem?: string;
+  /** Stable dedupe key; when set, bulk create skips duplicates. */
+  idempotencyKey?: string;
   asset?: AssetResolutionInput;
   /** @deprecated Use asset. */
   symbol?: AssetResolutionInput;

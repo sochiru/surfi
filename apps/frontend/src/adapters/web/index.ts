@@ -139,6 +139,23 @@ export {
   saveGoalPlan,
   updateGoal,
 } from "../shared/goals";
+export {
+  getDividendSyncSettings,
+  updateDividendSyncSettings,
+  syncDividends,
+  removeAutoDividends,
+  getDividendCalendarEvents,
+  getAssetDividendView,
+} from "../shared/dividends";
+export type {
+  DividendCalendarEvent,
+  DividendCalendarEventKind,
+  DividendSyncSettings,
+  AccountDividendSettings,
+  DividendSyncResult,
+  DividendSyncAccountResult,
+  AssetDividendView,
+} from "../shared/dividends";
 
 // Secrets Commands
 export {

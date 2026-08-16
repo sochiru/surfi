@@ -65,6 +65,7 @@
   "about": "Info",
   "logout": "Abmelden",
   "income": "Einkommen",
+  "dividends": "Dividenden",
   "dashboard": "Übersicht",
   "shares": "Stücke",
   "fee": "Gebühr",
@@ -99,6 +100,7 @@
     "label_insights": "Einblicke anzeigen",
     "label_holdings": "Bestände anzeigen",
     "label_activities": "Aktivitäten anzeigen",
+    "label_dividends": "Dividenden anzeigen",
     "label_goals": "Ziele",
     "label_assistant": "KI-Assistent"
   },
@@ -190,6 +192,7 @@
     "manage_securities": "Wertpapiere verwalten",
     "manage_accounts": "Konten verwalten",
     "manage_goals": "Ziele verwalten",
+    "view_dividends": "Dividenden anzeigen",
     "manage_contribution_limits": "Beitragsgrenzen verwalten",
     "benchmark_group_us_indices": "US-Marktindizes",
     "benchmark_group_european_indices": "Europäische Indizes",

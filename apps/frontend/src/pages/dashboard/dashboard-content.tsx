@@ -25,6 +25,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccountsSummary } from "./accounts-summary";
 import Balance from "./balance";
+import { DividendsCard } from "./dividends-card";
 import SavingGoals from "./goals";
 import TopHoldings from "./top-holdings";
 
@@ -285,6 +286,7 @@ export function DashboardContent() {
                 isLoading={isHoldingsLoading}
                 baseCurrency={baseCurrency}
               />
+              <DividendsCard />
               <SavingGoals />
             </div>
           </div>

@@ -134,6 +134,7 @@
     "performance": "Performance",
     "todays_return": "Today's return",
     "unrealized_pnl": "Unrealized P&L",
+    "market_value_gross_tooltip": "Gross market value (price × shares), before estimated selling costs. Brokers may show a lower net value and unrealized P&L.",
     "realized_pnl": "Realized P&L",
     "income": "Income",
     "fx_effect": "FX effect",
