@@ -1,6 +1,6 @@
 # Internationalization (i18n)
 
-Wealthfolio uses [i18next](https://www.i18next.com/) +
+SURfi uses [i18next](https://www.i18next.com/) +
 [react-i18next](https://react.i18next.com/).
 
 ## Layout

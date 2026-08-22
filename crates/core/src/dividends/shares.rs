@@ -11,8 +11,7 @@ pub struct TradeLikeActivity {
 /// Best-effort shares held at ex-date from BUY/SELL/SPLIT/TRANSFER history.
 /// Only activities strictly before the ex-date midnight UTC are counted.
 pub fn compute_shares_at_ex_date(activities: &[TradeLikeActivity], ex_date: NaiveDate) -> Decimal {
-    let ex_dt = Utc
-        .from_utc_datetime(&ex_date.and_hms_opt(0, 0, 0).unwrap_or_default());
+    let ex_dt = Utc.from_utc_datetime(&ex_date.and_hms_opt(0, 0, 0).unwrap_or_default());
     let mut shares = Decimal::ZERO;
 
     let mut ordered = activities.to_vec();
@@ -27,11 +26,9 @@ pub fn compute_shares_at_ex_date(activities: &[TradeLikeActivity], ex_date: Naiv
         match ty.as_str() {
             "BUY" | "TRANSFER_IN" => shares += qty,
             "SELL" | "TRANSFER_OUT" => shares -= qty,
-            "SPLIT" => {
-                // Treat quantity as a multiplier when it looks like one.
-                if qty > Decimal::ZERO && qty < Decimal::from(100) && qty != Decimal::ONE {
-                    shares *= qty;
-                }
+            // Treat quantity as a multiplier when it looks like one.
+            "SPLIT" if qty > Decimal::ZERO && qty < Decimal::from(100) && qty != Decimal::ONE => {
+                shares *= qty;
             }
             _ => {}
         }
@@ -78,7 +75,10 @@ mod tests {
         let feb = NaiveDate::parse_from_str("2024-02-01", "%Y-%m-%d").unwrap();
         let jun = NaiveDate::parse_from_str("2024-06-01", "%Y-%m-%d").unwrap();
         assert_eq!(compute_shares_at_ex_date(&trades, feb), Decimal::from(1000));
-        assert_eq!(compute_shares_at_ex_date(&trades, jun), Decimal::from(10000));
+        assert_eq!(
+            compute_shares_at_ex_date(&trades, jun),
+            Decimal::from(10000)
+        );
     }
 
     #[test]

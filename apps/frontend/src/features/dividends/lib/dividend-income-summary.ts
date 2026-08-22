@@ -136,9 +136,7 @@ export function buildDividendIncomeSummary(
     return point;
   });
 
-  const firstActive = rows.findIndex((row) =>
-    seriesKeys.some((symbol) => Number(row[symbol]) > 0),
-  );
+  const firstActive = rows.findIndex((row) => seriesKeys.some((symbol) => Number(row[symbol]) > 0));
   const trimmed = firstActive === -1 ? [] : rows.slice(firstActive);
 
   const chartConfig: ChartConfig = Object.fromEntries(

@@ -15,7 +15,7 @@ use wealthfolio_mcp::McpServerBuilder;
 
 use crate::{config::Config, main_lib::AppState};
 
-const INSTRUCTIONS: &str = "Read and write access to the user's Wealthfolio portfolio: accounts, \
+const INSTRUCTIONS: &str = "Read and write access to the user's SURfi portfolio: accounts, \
 holdings, valuations, performance, activities, income, goals, health, and classifications. \
 Write capabilities (drafting and committing activities, classification suggestions and commits) depend on the \
 scopes granted to the access token in use.";

@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::errors::Result;
-use crate::portfolio::snapshot::AccountStateSnapshot;
+use crate::portfolio::snapshot::{is_quantity_significant, AccountStateSnapshot};
 
 // ── Repository trait ──────────────────────────────────────────────────────────
 
@@ -592,7 +592,12 @@ pub fn check_lot_quantity_consistency(
             .get(asset_id.as_str())
             .copied()
             .unwrap_or(Decimal::ZERO);
-        if lot_qty != position.quantity {
+        // Snapshot positions persist quantity at DECIMAL_PRECISION (8 dp);
+        // lots keep full remaining_quantity * split_ratio. Exact equality
+        // therefore false-alarms on split remainders (e.g. 0.12729800 vs
+        // 0.127297997). QUANTITY_THRESHOLD is the same cutoff the calculator
+        // already uses for "this quantity is real".
+        if is_quantity_significant(&(lot_qty - position.quantity)) {
             // Name the account, the asset and the failure class, but never the
             // quantities themselves: holdings sizes are financial data and must
             // not reach the logs. The two classes are worth distinguishing

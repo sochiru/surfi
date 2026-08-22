@@ -83,9 +83,7 @@ export const backupDatabaseToPendingExport = (): Promise<PendingExport> =>
   Promise.reject(new Error("Pending backup exports are only supported in the Tauri app"));
 
 export const restoreDatabase = (_backupFilePath: string): Promise<void> =>
-  Promise.reject(
-    new Error("Restore in web mode requires stopping Wealthfolio and replacing app.db"),
-  );
+  Promise.reject(new Error("Restore in web mode requires stopping SURfi and replacing app.db"));
 
 // ============================================================================
 // App Commands

@@ -9,10 +9,7 @@ use wealthfolio_core::dividends::{
     AssetDividendView, DividendCalendarEvent, DividendSyncResult, DividendSyncSettings,
 };
 
-use crate::{
-    error::ApiResult,
-    main_lib::AppState,
-};
+use crate::{error::ApiResult, main_lib::AppState};
 
 async fn get_dividend_sync_settings(
     State(state): State<Arc<AppState>>,
@@ -32,9 +29,7 @@ async fn update_dividend_sync_settings(
     Ok(Json(updated))
 }
 
-async fn sync_dividends(
-    State(state): State<Arc<AppState>>,
-) -> ApiResult<Json<DividendSyncResult>> {
+async fn sync_dividends(State(state): State<Arc<AppState>>) -> ApiResult<Json<DividendSyncResult>> {
     let result = state.dividend_sync_service.sync().await?;
     Ok(Json(result))
 }

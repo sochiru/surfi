@@ -120,13 +120,12 @@ export function DividendCalendar({ events, isLoading }: Props) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <div className="text-muted-foreground mb-3 flex flex-wrap items-center gap-3 text-xs">
           <span className="inline-flex items-center gap-1">
             <span className={`h-2 w-2 rounded-full ${DOT_STYLES.posted}`} /> Recorded
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className={`h-2 w-2 rounded-full ${DOT_STYLES.past_unposted}`} /> Past, not
-            synced
+            <span className={`h-2 w-2 rounded-full ${DOT_STYLES.past_unposted}`} /> Past, not synced
           </span>
           <span className="inline-flex items-center gap-1">
             <span className={`h-2 w-2 rounded-full ${DOT_STYLES.upcoming_estimated}`} /> Upcoming
@@ -155,7 +154,7 @@ export function DividendCalendar({ events, isLoading }: Props) {
           </p>
         ) : null}
 
-        <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground">
+        <div className="text-muted-foreground grid grid-cols-7 gap-1 text-center text-xs font-medium">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
             <div key={d} className="py-1">
               {d}
@@ -172,9 +171,9 @@ export function DividendCalendar({ events, isLoading }: Props) {
             return (
               <div
                 key={key}
-                className="min-h-20 rounded-md border border-border/60 bg-card/40 p-1 text-left"
+                className="border-border/60 bg-card/40 min-h-20 rounded-md border p-1 text-left"
               >
-                <div className="mb-1 text-[10px] text-muted-foreground">{format(day, "d")}</div>
+                <div className="text-muted-foreground mb-1 text-[10px]">{format(day, "d")}</div>
                 <div className="flex flex-col gap-0.5">
                   {dayEvents.slice(0, 3).map((ev) => (
                     <Badge
@@ -188,7 +187,7 @@ export function DividendCalendar({ events, isLoading }: Props) {
                     </Badge>
                   ))}
                   {dayEvents.length > 3 ? (
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-muted-foreground text-[10px]">
                       +{dayEvents.length - 3}
                     </span>
                   ) : null}

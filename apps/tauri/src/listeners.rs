@@ -175,7 +175,9 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
                                 }
 
                                 match context.dividend_sync_service().sync().await {
-                                    Ok(result) if result.created > 0 || !result.errors.is_empty() => {
+                                    Ok(result)
+                                        if result.created > 0 || !result.errors.is_empty() =>
+                                    {
                                         info!(
                                             "Dividend sync after market data: created={}, errors={}",
                                             result.created,

@@ -110,8 +110,7 @@ mod tests {
             (date(2026, 5, 20), dec!(1.5)),
         ];
 
-        let projected =
-            project_future_dividends(&history, date(2026, 8, 16), date(2027, 8, 16));
+        let projected = project_future_dividends(&history, date(2026, 8, 16), date(2027, 8, 16));
 
         assert_eq!(projected.len(), 4);
         assert!(projected.iter().all(|p| p.per_share == dec!(1.5)));
@@ -127,7 +126,9 @@ mod tests {
             (date(2026, 5, 20), dec!(1.0)),
         ];
 
-        assert!(project_future_dividends(&history, date(2026, 8, 16), date(2027, 8, 16)).is_empty());
+        assert!(
+            project_future_dividends(&history, date(2026, 8, 16), date(2027, 8, 16)).is_empty()
+        );
     }
 
     #[test]
@@ -138,7 +139,9 @@ mod tests {
             (date(2022, 8, 20), dec!(1.0)),
         ];
 
-        assert!(project_future_dividends(&history, date(2026, 8, 16), date(2027, 8, 16)).is_empty());
+        assert!(
+            project_future_dividends(&history, date(2026, 8, 16), date(2027, 8, 16)).is_empty()
+        );
     }
 
     #[test]
@@ -150,8 +153,7 @@ mod tests {
             (date(2026, 5, 20), dec!(1.0)),
         ];
 
-        let projected =
-            project_future_dividends(&history, date(2026, 8, 16), date(2026, 12, 31));
+        let projected = project_future_dividends(&history, date(2026, 8, 16), date(2026, 12, 31));
 
         assert!(!projected.is_empty());
         assert_eq!(projected[0].per_share, dec!(1.0));

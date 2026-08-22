@@ -1,9 +1,6 @@
 import { invoke, logger } from "./platform";
 
-export type DividendCalendarEventKind =
-  | "posted"
-  | "past_unposted"
-  | "upcoming_estimated";
+export type DividendCalendarEventKind = "posted" | "past_unposted" | "upcoming_estimated";
 
 export interface DividendCalendarEvent {
   id: string;

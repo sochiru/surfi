@@ -530,7 +530,7 @@
     "italian": {
       "title": "Configuración de jubilación italiana (fondo pensione, TFR, INPS)",
       "portfolio_title": "Cartera de inversión (Golden Butterfly, All-Weather…)",
-      "portfolio_desc": "Esta es tu cartera principal, el valor que Wealthfolio sigue. Define aquí tus suposiciones de rentabilidad, el lastre de comisiones y la aportación mensual. Es el principal motor de acumulación de tu plan de jubilación.",
+      "portfolio_desc": "Esta es tu cartera principal, el valor que SURfi sigue. Define aquí tus suposiciones de rentabilidad, el lastre de comisiones y la aportación mensual. Es el principal motor de acumulación de tu plan de jubilación.",
       "fondo_title": "Fondo pensione integrativo (fondo de pensiones complementario)",
       "fondo_desc": "Usa Añadir fondo de pensiones. Introduce saldo, aportación, rentabilidad supuesta y edad de inicio de pagos. La estimación usa la tasa de pago configurada salvo que indiques un importe mensual. Los retiros cesan al agotarse el fondo; las rentas vitalicias se modelan hasta el horizonte del plan.",
       "inps_title": "Pensione INPS (pensión estatal — previdenza obbligatoria)",

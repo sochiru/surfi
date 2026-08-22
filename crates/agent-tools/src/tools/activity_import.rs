@@ -1,6 +1,6 @@
 //! CSV-import tools (MCP-only).
 //!
-//! These expose Wealthfolio's real import pipeline so an MCP agent can run
+//! These expose SURfi's real import pipeline so an MCP agent can run
 //! the same flow as the in-app import wizard: fetch the account's saved
 //! mapping, map the CSV into rows itself, preview them
 //! (`check_activities_import` — validation + duplicate detection), then
@@ -394,7 +394,7 @@ impl AgentTool for CommitActivityImport {
     }
 
     fn description(&self) -> &'static str {
-        "Import a batch of mapped activity rows through Wealthfolio's import pipeline as one import run. Duplicates are skipped unless a row sets forceImport=true. This MUTATES data — only call after previewing with prepare_activity_import and confirming with the user. Returns the import run id, a summary (imported/skipped/duplicates/assets created), and any failed rows."
+        "Import a batch of mapped activity rows through SURfi's import pipeline as one import run. Duplicates are skipped unless a row sets forceImport=true. This MUTATES data — only call after previewing with prepare_activity_import and confirming with the user. Returns the import run id, a summary (imported/skipped/duplicates/assets created), and any failed rows."
     }
 
     fn input_schema(&self) -> serde_json::Value {

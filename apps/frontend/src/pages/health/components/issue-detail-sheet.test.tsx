@@ -341,7 +341,7 @@ describe("IssueDetailSheet", () => {
       category: "DATA_CONSISTENCY",
       title: "2 transfer dates need review",
       message:
-        "Some transfers are unclear: Wealthfolio cannot tell if money moved between your own accounts or entered/left your portfolio.",
+        "Some transfers are unclear: SURfi cannot tell if money moved between your own accounts or entered/left your portfolio.",
       navigateAction: {
         route: "/activities",
         label: "Review Transactions",
@@ -522,7 +522,7 @@ describe("IssueDetailSheet", () => {
           code: "MISSING_MARKET_QUOTE",
           title: "No price found",
           explanation:
-            "Wealthfolio is missing the exact market price for this holding on the affected date.",
+            "SURfi is missing the exact market price for this holding on the affected date.",
           date: "2026-06-01",
           evidence: [
             {
@@ -550,7 +550,7 @@ describe("IssueDetailSheet", () => {
           code: "MISSING_MARKET_QUOTE",
           title: "No price found",
           explanation:
-            "Wealthfolio is missing the exact market price for this holding on the affected date.",
+            "SURfi is missing the exact market price for this holding on the affected date.",
           date: "2026-06-02",
           evidence: [
             {
@@ -578,7 +578,7 @@ describe("IssueDetailSheet", () => {
           code: "MISSING_MARKET_QUOTE",
           title: "No price found",
           explanation:
-            "Wealthfolio is missing the exact market price for this holding on the affected date.",
+            "SURfi is missing the exact market price for this holding on the affected date.",
           date: "2026-06-02",
           evidence: [
             {

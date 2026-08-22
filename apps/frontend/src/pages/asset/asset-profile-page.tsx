@@ -362,7 +362,9 @@ export const AssetProfilePage = () => {
   const accountParam = queryParams.get("account");
   const selectedAccountId = useMemo(() => {
     if (!showAccountScope || !accountParam || accountParam === ACCOUNT_SCOPE_ALL) return null;
-    return accountScopeOptions.some((option) => option.value === accountParam) ? accountParam : null;
+    return accountScopeOptions.some((option) => option.value === accountParam)
+      ? accountParam
+      : null;
   }, [accountParam, accountScopeOptions, showAccountScope]);
 
   const accountScopeValue = selectedAccountId ?? ACCOUNT_SCOPE_ALL;

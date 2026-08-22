@@ -94,6 +94,10 @@ vi.mock("./balance", () => ({
   ),
 }));
 
+vi.mock("./dividends-card", () => ({
+  DividendsCard: () => <div>dividends-card</div>,
+}));
+
 vi.mock("./goals", () => ({
   default: () => <div>saving-goals</div>,
 }));

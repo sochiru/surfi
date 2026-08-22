@@ -10,7 +10,7 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: Wealthfolio
+      PRODUCT_NAME: SURfi
       PRODUCT_BUNDLE_IDENTIFIER: com.teymz.wealthfolio
 targetTemplates:
   app:

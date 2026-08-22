@@ -820,7 +820,7 @@ impl DataConsistencyCheck {
                 Severity::Error,
                 "Transfer date needs review",
                 "transfer dates need review",
-                "Some transfers are unclear: Wealthfolio cannot tell if money moved between your own accounts or entered/left your portfolio. Review those transfers so returns are not overstated or understated.",
+                "Some transfers are unclear: SURfi cannot tell if money moved between your own accounts or entered/left your portfolio. Review those transfers so returns are not overstated or understated.",
             ));
         }
 
@@ -865,7 +865,7 @@ fn value_issue_copy(issues: &[&ConsistencyIssueInfo]) -> IssueCopy {
         return IssueCopy {
             title: "Price date needs review",
             plural_title: "price dates need review",
-            message: "Some trading days are missing exact market prices. Wealthfolio can carry forward the last available price, but syncing or adding the missing prices keeps daily values and returns accurate. If a date was a market holiday or the investment did not trade, dismiss this issue.",
+            message: "Some trading days are missing exact market prices. SURfi can carry forward the last available price, but syncing or adding the missing prices keeps daily values and returns accurate. If a date was a market holiday or the investment did not trade, dismiss this issue.",
         };
     }
 
@@ -873,7 +873,7 @@ fn value_issue_copy(issues: &[&ConsistencyIssueInfo]) -> IssueCopy {
         return IssueCopy {
             title: "Manual price date needs review",
             plural_title: "manual price dates need review",
-            message: "Some manual holdings are missing values on days they were held. Wealthfolio can carry forward the last value, but adding the missing dates keeps daily values and returns accurate. If a separate value is not needed for the date, dismiss this issue.",
+            message: "Some manual holdings are missing values on days they were held. SURfi can carry forward the last value, but adding the missing dates keeps daily values and returns accurate. If a separate value is not needed for the date, dismiss this issue.",
         };
     }
 
@@ -881,14 +881,14 @@ fn value_issue_copy(issues: &[&ConsistencyIssueInfo]) -> IssueCopy {
         return IssueCopy {
             title: "Exchange rate is missing",
             plural_title: "exchange rates are missing",
-            message: "Some holdings need exchange rates before Wealthfolio can convert them to your base currency.",
+            message: "Some holdings need exchange rates before SURfi can convert them to your base currency.",
         };
     }
 
     IssueCopy {
         title: "Holding value is missing",
         plural_title: "prices or values are missing",
-        message: "Some holdings are missing a market price, manual value, or exchange rate. Add the missing data so Wealthfolio can calculate their value and returns.",
+        message: "Some holdings are missing a market price, manual value, or exchange rate. Add the missing data so SURfi can calculate their value and returns.",
     }
 }
 
@@ -905,7 +905,7 @@ fn basis_issue_copy(issues: &[&ConsistencyIssueInfo]) -> IssueCopy {
         return IssueCopy {
             title: "Transaction is missing a purchase price",
             plural_title: "transactions are missing purchase prices",
-            message: "Some buys or transfer-ins are missing the price paid. Add the price to each transaction so Wealthfolio can calculate cost basis, gains/losses, and returns.",
+            message: "Some buys or transfer-ins are missing the price paid. Add the price to each transaction so SURfi can calculate cost basis, gains/losses, and returns.",
         };
     }
 
@@ -913,7 +913,7 @@ fn basis_issue_copy(issues: &[&ConsistencyIssueInfo]) -> IssueCopy {
         return IssueCopy {
             title: "Holding is missing cost basis",
             plural_title: "holdings are missing cost basis",
-            message: "Some holdings are missing what you paid for them. Add the cost basis so Wealthfolio can calculate gains/losses and returns.",
+            message: "Some holdings are missing what you paid for them. Add the cost basis so SURfi can calculate gains/losses and returns.",
         };
     }
 
@@ -1259,13 +1259,13 @@ fn valuation_diagnostic(issue: &ConsistencyIssueInfo) -> Option<HealthDiagnostic
     let (title, explanation) = match reason {
         ValuationIssueReason::MissingMarketQuote => (
             "No price found",
-            "Wealthfolio is missing the exact market price for this holding on the affected date. \
+            "SURfi is missing the exact market price for this holding on the affected date. \
              It can carry forward the last available price, but syncing or adding the exact price keeps daily returns accurate. \
              If this was a market holiday or the investment did not trade, dismiss this issue.",
         ),
         ValuationIssueReason::MissingManualValuation => (
             "No value entered",
-            "This manual holding has no value entered for the affected date. Wealthfolio can carry forward the last value, but adding this date keeps daily returns accurate. If a separate value is not needed for this date, dismiss this issue.",
+            "This manual holding has no value entered for the affected date. SURfi can carry forward the last value, but adding this date keeps daily returns accurate. If a separate value is not needed for this date, dismiss this issue.",
         ),
         ValuationIssueReason::MissingFxRate => (
             "No exchange rate",
@@ -1273,7 +1273,7 @@ fn valuation_diagnostic(issue: &ConsistencyIssueInfo) -> Option<HealthDiagnostic
         ),
         ValuationIssueReason::Unavailable => (
             "Account value is missing",
-            "This account could not be valued on the affected date. Wealthfolio hides returns for that period instead of showing a misleading number.",
+            "This account could not be valued on the affected date. SURfi hides returns for that period instead of showing a misleading number.",
         ),
         ValuationIssueReason::Unknown => (
             "Holding value needs review",
@@ -1281,12 +1281,12 @@ fn valuation_diagnostic(issue: &ConsistencyIssueInfo) -> Option<HealthDiagnostic
         ),
         ValuationIssueReason::IncompleteBasisActivity => (
             "Missing purchase price",
-            "This transaction has no price, so Wealthfolio cannot calculate what you paid or your gain/loss. \
+            "This transaction has no price, so SURfi cannot calculate what you paid or your gain/loss. \
              Add the price you paid. If the shares were free, record them as a Transfer In.",
         ),
         ValuationIssueReason::IncompleteBasisSnapshot => (
             "Missing cost basis",
-            "This holding has no cost basis, so Wealthfolio cannot calculate gain/loss. \
+            "This holding has no cost basis, so SURfi cannot calculate gain/loss. \
              Add what you paid in the holdings entry.",
         ),
     };

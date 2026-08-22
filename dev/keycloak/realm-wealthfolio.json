@@ -8,7 +8,7 @@
   "clients": [
     {
       "clientId": "wealthfolio",
-      "name": "Wealthfolio",
+      "name": "SURfi",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,

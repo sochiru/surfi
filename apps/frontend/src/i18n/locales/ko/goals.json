@@ -525,7 +525,7 @@
     "italian": {
       "title": "이탈리아 은퇴 설정(fondo pensione, TFR, INPS)",
       "portfolio_title": "투자 포트폴리오(Golden Butterfly, All-Weather 등)",
-      "portfolio_desc": "이는 Wealthfolio가 추적하는 값인 주요 포트폴리오입니다. 여기에서 수익률 가정, 수수료 부담, 월 납입액을 설정하세요. 은퇴 계획의 핵심적인 자산 축적 엔진입니다.",
+      "portfolio_desc": "이는 SURfi가 추적하는 값인 주요 포트폴리오입니다. 여기에서 수익률 가정, 수수료 부담, 월 납입액을 설정하세요. 은퇴 계획의 핵심적인 자산 축적 엔진입니다.",
       "fondo_title": "Fondo pensione integrativo(보충 연금 펀드)",
       "fondo_desc": "연금 펀드 추가에서 잔액, 납입액, 가정 수익률, 지급 시작 나이를 입력합니다. 월 금액을 입력하지 않으면 설정한 지급률로 추정합니다. 인출은 펀드 소진 시 중단되며 종신연금은 계획 기간까지 모델링됩니다.",
       "inps_title": "Pensione INPS(국가 연금 — previdenza obbligatoria)",

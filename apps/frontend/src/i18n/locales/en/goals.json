@@ -525,7 +525,7 @@
     "italian": {
       "title": "Italian retirement setup (fondo pensione, TFR, INPS)",
       "portfolio_title": "Investment portfolio (Golden Butterfly, All-Weather…)",
-      "portfolio_desc": "This is your main portfolio — the value Wealthfolio tracks. Set your return assumptions, fee drag, and monthly contribution here. It is the primary accumulation engine of your retirement plan.",
+      "portfolio_desc": "This is your main portfolio — the value SURfi tracks. Set your return assumptions, fee drag, and monthly contribution here. It is the primary accumulation engine of your retirement plan.",
       "fondo_title": "Fondo pensione integrativo (supplementary pension fund)",
       "fondo_desc": "Use Add pension fund. Enter its balance, contribution, assumed return, and payout start age. Estimated payout uses the configured payout rate unless you enter a monthly payout. Drawdown payments stop when the fund is depleted; annuity payments are modeled through the planning horizon.",
       "inps_title": "Pensione INPS (state pension — previdenza obbligatoria)",
