@@ -26,11 +26,9 @@ pub fn compute_shares_at_ex_date(activities: &[TradeLikeActivity], ex_date: Naiv
         match ty.as_str() {
             "BUY" | "TRANSFER_IN" => shares += qty,
             "SELL" | "TRANSFER_OUT" => shares -= qty,
-            "SPLIT" => {
-                // Treat quantity as a multiplier when it looks like one.
-                if qty > Decimal::ZERO && qty < Decimal::from(100) && qty != Decimal::ONE {
-                    shares *= qty;
-                }
+            // Treat quantity as a multiplier when it looks like one.
+            "SPLIT" if qty > Decimal::ZERO && qty < Decimal::from(100) && qty != Decimal::ONE => {
+                shares *= qty;
             }
             _ => {}
         }

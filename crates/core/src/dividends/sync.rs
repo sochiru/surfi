@@ -39,6 +39,9 @@ const PROJECTION_HORIZON_DAYS: i64 = 366;
 
 type FetchedDividends = HashMap<String, std::result::Result<Vec<DividendEvent>, String>>;
 
+/// (asset_id, mic, symbol, currency, preferred_provider)
+type HoldingSymbolParts = (String, Option<String>, String, String, Option<String>);
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetDividendView {
@@ -120,7 +123,7 @@ impl DividendSyncService {
     /// non-USD instrument would silently receive another company's dividend
     /// history (e.g. PSE `BPI` matching a US ticker).
     fn listing_is_ambiguous(mic: Option<&str>, currency: &str) -> bool {
-        mic.map_or(true, str::is_empty) && !currency.eq_ignore_ascii_case("USD")
+        mic.is_none_or(str::is_empty) && !currency.eq_ignore_ascii_case("USD")
     }
 
     fn fetch_key(symbol: &str, mic: Option<&str>, provider: Option<&str>) -> String {
@@ -193,10 +196,7 @@ impl DividendSyncService {
         .await
     }
 
-    /// asset_id, mic, symbol, currency, preferred_provider
-    fn holding_symbol(
-        holding: &Holding,
-    ) -> Option<(String, Option<String>, String, String, Option<String>)> {
+    fn holding_symbol(holding: &Holding) -> Option<HoldingSymbolParts> {
         if holding.holding_type != HoldingType::Security {
             return None;
         }

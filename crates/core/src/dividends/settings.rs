@@ -25,20 +25,11 @@ impl Default for AccountDividendSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DividendSyncSettings {
     pub global_enabled: bool,
     pub accounts: HashMap<String, AccountDividendSettings>,
-}
-
-impl Default for DividendSyncSettings {
-    fn default() -> Self {
-        Self {
-            global_enabled: false,
-            accounts: HashMap::new(),
-        }
-    }
 }
 
 impl DividendSyncSettings {
