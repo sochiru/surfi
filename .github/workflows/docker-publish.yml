@@ -5,9 +5,6 @@ name: Docker
 # on Railway (Rust + pnpm routinely OOMs / times out there).
 on:
   workflow_dispatch:
-  push:
-    branches: [main, feat/rebrand]
-    tags: ["v*.*.*"]
 
 concurrency:
   group: docker-publish-${{ github.ref }}
