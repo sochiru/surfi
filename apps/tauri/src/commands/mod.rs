@@ -15,6 +15,7 @@ pub mod device_enroll_service;
 #[cfg(feature = "device-sync")]
 pub mod device_sync;
 pub mod dividends;
+pub mod cash_interest;
 pub mod error;
 pub mod fire;
 pub mod goal;

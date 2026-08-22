@@ -517,6 +517,12 @@ pub fn run() {
             commands::dividends::remove_auto_dividends,
             commands::dividends::get_dividend_calendar_events,
             commands::dividends::get_asset_dividend_view,
+            // Cash interest accrual
+            commands::cash_interest::sync_cash_interest,
+            commands::cash_interest::sync_cash_interest_account,
+            commands::cash_interest::remove_auto_interest,
+            commands::cash_interest::get_mp2_rates,
+            commands::cash_interest::update_mp2_rates,
             // Portfolios (saved reporting scopes)
             commands::portfolios::get_portfolios,
             commands::portfolios::get_portfolio,

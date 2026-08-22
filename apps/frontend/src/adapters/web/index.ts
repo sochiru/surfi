@@ -156,6 +156,18 @@ export type {
   DividendSyncAccountResult,
   AssetDividendView,
 } from "../shared/dividends";
+export {
+  syncCashInterest,
+  syncCashInterestAccount,
+  removeAutoInterest,
+  getMp2Rates,
+  updateMp2Rates,
+} from "../shared/cash-interest";
+export type {
+  CashInterestSyncResult,
+  CashInterestSyncAccountResult,
+  Mp2DividendRates,
+} from "../shared/cash-interest";
 
 // Secrets Commands
 export {
