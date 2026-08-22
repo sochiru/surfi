@@ -88,25 +88,45 @@ struct GeneralSection {
     country_name: Option<String>,
     #[serde(default, rename = "ISIN")]
     isin: Option<String>,
-    #[serde(default, rename = "FullTimeEmployees", deserialize_with = "deserialize_opt_u64")]
+    #[serde(
+        default,
+        rename = "FullTimeEmployees",
+        deserialize_with = "deserialize_opt_u64"
+    )]
     employees: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, Default)]
 struct HighlightsSection {
-    #[serde(default, rename = "MarketCapitalization", deserialize_with = "deserialize_opt_f64")]
+    #[serde(
+        default,
+        rename = "MarketCapitalization",
+        deserialize_with = "deserialize_opt_f64"
+    )]
     market_cap: Option<f64>,
     #[serde(default, rename = "PERatio", deserialize_with = "deserialize_opt_f64")]
     pe_ratio: Option<f64>,
-    #[serde(default, rename = "DividendYield", deserialize_with = "deserialize_opt_f64")]
+    #[serde(
+        default,
+        rename = "DividendYield",
+        deserialize_with = "deserialize_opt_f64"
+    )]
     dividend_yield: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, Default)]
 struct TechnicalsSection {
-    #[serde(default, rename = "52WeekHigh", deserialize_with = "deserialize_opt_f64")]
+    #[serde(
+        default,
+        rename = "52WeekHigh",
+        deserialize_with = "deserialize_opt_f64"
+    )]
     week_52_high: Option<f64>,
-    #[serde(default, rename = "52WeekLow", deserialize_with = "deserialize_opt_f64")]
+    #[serde(
+        default,
+        rename = "52WeekLow",
+        deserialize_with = "deserialize_opt_f64"
+    )]
     week_52_low: Option<f64>,
 }
 
@@ -175,17 +195,13 @@ impl EodhdProvider {
         Self { client, api_key }
     }
 
-    async fn fetch(
-        &self,
-        path: &str,
-        params: &[(&str, &str)],
-    ) -> Result<String, MarketDataError> {
+    async fn fetch(&self, path: &str, params: &[(&str, &str)]) -> Result<String, MarketDataError> {
         let url = format!("{}{}", BASE_URL, path);
 
-        let mut request = self.client.get(&url).query(&[
-            ("api_token", self.api_key.as_str()),
-            ("fmt", "json"),
-        ]);
+        let mut request = self
+            .client
+            .get(&url)
+            .query(&[("api_token", self.api_key.as_str()), ("fmt", "json")]);
 
         for (key, value) in params {
             request = request.query(&[(*key, *value)]);
@@ -285,12 +301,11 @@ impl EodhdProvider {
 
     fn quote_from_bar(bar: &EodBar, currency: &str) -> Result<Quote, MarketDataError> {
         let timestamp = Self::parse_date_midnight(&bar.date)?;
-        let close = Self::decimal_from_f64(bar.close).ok_or_else(|| {
-            MarketDataError::ProviderError {
+        let close =
+            Self::decimal_from_f64(bar.close).ok_or_else(|| MarketDataError::ProviderError {
                 provider: PROVIDER_ID.to_string(),
                 message: format!("Invalid close for {}", bar.date),
-            }
-        })?;
+            })?;
 
         Ok(Quote {
             timestamp,
@@ -606,7 +621,10 @@ mod tests {
 
     #[test]
     fn test_map_eodhd_type() {
-        assert_eq!(map_eodhd_type(Some("Common Stock")).as_deref(), Some("EQUITY"));
+        assert_eq!(
+            map_eodhd_type(Some("Common Stock")).as_deref(),
+            Some("EQUITY")
+        );
         assert_eq!(
             map_eodhd_type(Some("Preferred Stock")).as_deref(),
             Some("PREFERRED STOCK")

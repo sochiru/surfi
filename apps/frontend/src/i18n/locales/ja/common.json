@@ -1,5 +1,5 @@
 {
-  "app_name": "Wealthfolio",
+  "app_name": "SURfi",
   "welcome": "ようこそ",
   "loading": "読み込み中...",
   "error": "エラー",
@@ -296,7 +296,7 @@
     "calculation_note": "計算メモ",
     "calculation_notes": "計算メモ({{count}})",
     "backend_unavailable": "バックエンドに接続できません",
-    "backend_load_error": "Wealthfolioはバックエンドから設定を読み込めませんでした。",
+    "backend_load_error": "SURfiはバックエンドから設定を読み込めませんでした。",
     "new_update_available": "新しいアップデートがあります",
     "close_dialog": "ダイアログを閉じる",
     "screenshot_alt": "スクリーンショット{{number}}",

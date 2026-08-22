@@ -15,7 +15,14 @@ import { ActivityStatus, ActivityType } from "@/lib/constants";
 import { generateId } from "@/lib/id";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
-import type { AccountScope, ActivityDetails, AssetKind, AssetLotView, Holding, Quote } from "@/lib/types";
+import type {
+  AccountScope,
+  ActivityDetails,
+  AssetKind,
+  AssetLotView,
+  Holding,
+  Quote,
+} from "@/lib/types";
 import { normalizeCurrency } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthfolio/ui";
@@ -197,20 +204,19 @@ function AssetHealthBanner({
         ? {
             title: dateLabel ? `Add a price for ${dateLabel}` : "Manual prices need review",
             description: dateLabel
-              ? "Wealthfolio is carrying forward the last price. Add this date only if it needs its own value."
+              ? "SURfi is carrying forward the last price. Add this date only if it needs its own value."
               : "Review the missing dates. Add prices that need their own value; carried-forward prices are still used between entries.",
           }
         : {
             title: dateLabel ? `Price missing for ${dateLabel}` : "Price history needs review",
             description: dateLabel
-              ? "Wealthfolio is carrying forward the last available price. Refetch prices if this was a trading day."
+              ? "SURfi is carrying forward the last available price. Refetch prices if this was a trading day."
               : "Refetch provider history to restore missing or stale prices. Carried-forward prices are used until exact prices are available.",
           }
       : context === "basis"
         ? {
             title: "Cost basis needs review",
-            description:
-              "Update what you paid for this holding so Wealthfolio can calculate gain/loss.",
+            description: "Update what you paid for this holding so SURfi can calculate gain/loss.",
           }
         : {
             title: "Transactions need review",
@@ -342,7 +348,9 @@ export const AssetProfilePage = () => {
   const accountParam = queryParams.get("account");
   const selectedAccountId = useMemo(() => {
     if (!showAccountScope || !accountParam || accountParam === ACCOUNT_SCOPE_ALL) return null;
-    return accountScopeOptions.some((option) => option.value === accountParam) ? accountParam : null;
+    return accountScopeOptions.some((option) => option.value === accountParam)
+      ? accountParam
+      : null;
   }, [accountParam, accountScopeOptions, showAccountScope]);
 
   const accountScopeValue = selectedAccountId ?? ACCOUNT_SCOPE_ALL;

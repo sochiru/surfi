@@ -53,7 +53,12 @@ export function DividendIncomeOverviewCard({
       fallbackCurrency={baseCurrency}
       compact
       headerAction={
-        <Button asChild variant="ghost" size="sm" className="text-muted-foreground h-8 px-2 text-xs">
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground h-8 px-2 text-xs"
+        >
           <Link to="/dividends">View dividends</Link>
         </Button>
       }

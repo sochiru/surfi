@@ -97,7 +97,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
 
         env:
-          # Wealthfolio Connect (set variables to enable; omit to build without Connect)
+          # SURfi Connect (set variables to enable; omit to build without Connect)
           CONNECT_AUTH_URL: ${{ vars.CONNECT_AUTH_URL }}
           CONNECT_AUTH_PUBLISHABLE_KEY: ${{ vars.CONNECT_AUTH_PUBLISHABLE_KEY }}
           CONNECT_API_URL: ${{ vars.CONNECT_API_URL }}
@@ -113,7 +113,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }} # This only works if the workflow triggers on new tags.
-          releaseName: "Wealthfolio v__VERSION__" # tauri-action replaces \_\_VERSION\_\_ with the app version.
+          releaseName: "SURfi v__VERSION__" # tauri-action replaces \_\_VERSION\_\_ with the app version.
           releaseBody: "See the assets to download and install this version."
           releaseDraft: true
           prerelease: false

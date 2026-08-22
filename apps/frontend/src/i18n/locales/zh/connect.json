@@ -50,7 +50,7 @@
     "userFallback": "用户",
     "active": "活跃",
     "signOut": "退出登录",
-    "signOutTitle": "退出 Wealthfolio Connect?",
+    "signOutTitle": "退出 SURfi Connect?",
     "signOutMessage": "您需要重新登录才能访问已同步的券商账户。您的本地数据不会受到影响。",
     "signOutConfirm": "退出登录",
     "signingOut": "正在退出登录..."
@@ -199,7 +199,7 @@
   },
   "serviceUnavailable": {
     "title": "服务暂时不可用",
-    "description": "我们连接 Wealthfolio Connect 时遇到问题。这通常是暂时的,应该很快就会恢复。",
+    "description": "我们连接 SURfi Connect 时遇到问题。这通常是暂时的,应该很快就会恢复。",
     "retrying": "正在重试...",
     "tryAgain": "重试"
   },
@@ -209,7 +209,7 @@
     "button": "升级"
   },
   "privacy": {
-    "footnote": "Wealthfolio Connect 不会存储您的券商凭据或财务数据。所有内容均通过聚合服务商安全同步到您的本地数据库。设备同步采用端到端加密。<privacyLink>了解更多</privacyLink>"
+    "footnote": "SURfi Connect 不会存储您的券商凭据或财务数据。所有内容均通过聚合服务商安全同步到您的本地数据库。设备同步采用端到端加密。<privacyLink>了解更多</privacyLink>"
   },
   "providers": {
     "continueWithGoogle": "使用 Google 继续",

@@ -73,13 +73,9 @@ export default function AboutSettingsPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
-          <img
-            src="/logo.svg"
-            alt={t("settings:about_logo_alt")}
-            className="h-12 w-12 rounded-md shadow"
-          />
+          <img src="/logo.png" alt={t("settings:about_logo_alt")} className="h-12 w-12" />
           <div className="flex flex-col">
-            <CardTitle className="text-xl">Wealthfolio</CardTitle>
+            <CardTitle className="font-brand text-xl">SURfi</CardTitle>
             <CardDescription>
               {t("settings:about_version", { version: version || "N/A" })}
             </CardDescription>
@@ -88,6 +84,7 @@ export default function AboutSettingsPage() {
         <CardContent className="space-y-6">
           <div className="space-y-4">
             <p className="text-muted-foreground text-sm">{t("settings:about_tagline")}</p>
+            <p className="text-muted-foreground text-xs">{t("settings:about_fork_notice")}</p>
             <div className="flex flex-wrap items-center gap-2">
               {!isMobile && (
                 <Button size="sm" onClick={handleCheckForUpdates} disabled={isCheckingUpdate}>

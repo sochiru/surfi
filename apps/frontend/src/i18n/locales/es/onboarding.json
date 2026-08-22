@@ -75,7 +75,7 @@
   },
   "connect": {
     "optional": "Opcional",
-    "title": "Wealthfolio Connect",
+    "title": "SURfi Connect",
     "subtitle": "Sincroniza automáticamente tus brókeres manteniendo tus datos privados.",
     "learnMore": "Más información sobre Connect",
     "features": {

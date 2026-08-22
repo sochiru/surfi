@@ -32,10 +32,7 @@ pub const MARKET_DATA_PROVIDER_IDS: [&str; 11] = [
 /// Providers that must not run on the background periodic sync (strict API quotas).
 /// Manual Sync / targeted refresh still fetches them.
 pub fn is_manual_sync_only_provider(provider_id: &str) -> bool {
-    matches!(
-        provider_id,
-        DATA_SOURCE_TRADINGVIEW | DATA_SOURCE_EODHD
-    )
+    matches!(provider_id, DATA_SOURCE_TRADINGVIEW | DATA_SOURCE_EODHD)
 }
 
 /// Default number of days of history to fetch for new symbols when no activity date exists.

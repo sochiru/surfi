@@ -51,10 +51,7 @@ export function DividendsCard() {
               {ytd ? "YTD dividends" : "All-time dividends"}
             </div>
             <div className="text-2xl font-semibold">
-              <AmountDisplay
-                value={dividendIncome}
-                currency={summary?.currency ?? baseCurrency}
-              />
+              <AmountDisplay value={dividendIncome} currency={summary?.currency ?? baseCurrency} />
             </div>
           </div>
 

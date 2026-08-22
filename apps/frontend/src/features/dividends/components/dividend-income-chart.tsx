@@ -19,10 +19,7 @@ import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholde
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import type { DividendCalendarEvent } from "@/adapters";
 import type { Holding } from "@/lib/types";
-import {
-  buildDividendIncomeSummary,
-  formatYieldPct,
-} from "../lib/dividend-income-summary";
+import { buildDividendIncomeSummary, formatYieldPct } from "../lib/dividend-income-summary";
 
 interface Props {
   events: DividendCalendarEvent[];
@@ -79,11 +76,7 @@ export function DividendIncomeChart({
   return (
     <Card>
       <CardHeader
-        className={
-          compact
-            ? "flex flex-row items-start justify-between space-y-0 pb-2"
-            : undefined
-        }
+        className={compact ? "flex flex-row items-start justify-between space-y-0 pb-2" : undefined}
       >
         <div className="min-w-0 space-y-1">
           <CardTitle className={compact ? "text-base" : "text-lg"}>Dividend income</CardTitle>
@@ -111,27 +104,21 @@ export function DividendIncomeChart({
         >
           <div>
             <div className="text-muted-foreground text-xs">YTD · year to date</div>
-            <div
-              className={`font-semibold tabular-nums ${compact ? "text-lg" : "text-2xl"}`}
-            >
+            <div className={`font-semibold tabular-nums ${compact ? "text-lg" : "text-2xl"}`}>
               <AmountDisplay value={ytd} currency={currency} />
             </div>
             {!compact ? <p className="text-muted-foreground text-xs">Jan 1 → today</p> : null}
           </div>
           <div>
             <div className="text-muted-foreground text-xs">52-week</div>
-            <div
-              className={`font-semibold tabular-nums ${compact ? "text-lg" : "text-2xl"}`}
-            >
+            <div className={`font-semibold tabular-nums ${compact ? "text-lg" : "text-2xl"}`}>
               <AmountDisplay value={week52} currency={currency} />
             </div>
             {!compact ? <p className="text-muted-foreground text-xs">Last 52 weeks</p> : null}
           </div>
           <div>
             <div className="text-muted-foreground text-xs">52-week yield</div>
-            <div
-              className={`font-semibold tabular-nums ${compact ? "text-lg" : "text-2xl"}`}
-            >
+            <div className={`font-semibold tabular-nums ${compact ? "text-lg" : "text-2xl"}`}>
               {formatYieldPct(week52Yield)}
             </div>
             {!compact ? (
@@ -148,9 +135,7 @@ export function DividendIncomeChart({
           </div>
           <div>
             <div className="text-muted-foreground text-xs">YTD yield</div>
-            <div
-              className={`font-semibold tabular-nums ${compact ? "text-lg" : "text-2xl"}`}
-            >
+            <div className={`font-semibold tabular-nums ${compact ? "text-lg" : "text-2xl"}`}>
               {formatYieldPct(ytdYield)}
             </div>
             {!compact ? <p className="text-muted-foreground text-xs">Not annualized</p> : null}
@@ -190,8 +175,8 @@ export function DividendIncomeChart({
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    labelFormatter={(value) =>
-                      format(parseISO(`${String(value)}-01`), "MMMM yyyy")
+                    labelFormatter={(label: unknown) =>
+                      typeof label === "string" ? format(parseISO(`${label}-01`), "MMMM yyyy") : ""
                     }
                   />
                 }

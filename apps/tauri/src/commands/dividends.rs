@@ -44,9 +44,7 @@ pub async fn sync_dividends(
 }
 
 #[tauri::command]
-pub async fn remove_auto_dividends(
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<usize, String> {
+pub async fn remove_auto_dividends(state: State<'_, Arc<ServiceContext>>) -> Result<usize, String> {
     debug!("Removing auto-created dividends...");
     state
         .dividend_sync_service()

@@ -38,7 +38,7 @@
       }
     }
   },
-  "productName": "Wealthfolio",
+  "productName": "SURfi",
   "mainBinaryName": "Wealthfolio",
   "version": "3.7.0",
   "identifier": "com.teymz.wealthfolio",
@@ -73,7 +73,7 @@
         "theme": "Light",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "title": "Wealthfolio",
+        "title": "SURfi",
         "width": 1440,
         "height": 960
       }

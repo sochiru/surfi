@@ -690,7 +690,7 @@ export function AppLauncher() {
 
               return (
                 <CommandItem
-                  key={`${action.href}-${displayText}` ?? index}
+                  key={`${action.href}-${displayText}-${index}`}
                   value={searchValue}
                   keywords={action.keywords ?? []}
                   disabled={action.disabled}

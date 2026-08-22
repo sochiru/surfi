@@ -75,7 +75,7 @@
   },
   "connect": {
     "optional": "任意",
-    "title": "Wealthfolio Connect",
+    "title": "SURfi Connect",
     "subtitle": "データのプライバシーを守りながら、証券会社を自動で同期します。",
     "learnMore": "Connectについて詳しく見る",
     "features": {

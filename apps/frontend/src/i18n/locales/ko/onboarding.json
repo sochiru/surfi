@@ -75,7 +75,7 @@
   },
   "connect": {
     "optional": "선택사항",
-    "title": "Wealthfolio Connect",
+    "title": "SURfi Connect",
     "subtitle": "데이터를 비공개로 유지하면서 증권사를 자동으로 동기화하세요.",
     "learnMore": "Connect에 대해 자세히 알아보기",
     "features": {

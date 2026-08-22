@@ -1,5 +1,5 @@
 {
-  "app_name": "Wealthfolio",
+  "app_name": "SURfi",
   "welcome": "환영합니다",
   "loading": "로딩 중...",
   "error": "오류",
@@ -296,7 +296,7 @@
     "calculation_note": "계산 참고사항",
     "calculation_notes": "계산 참고사항 ({{count}}개)",
     "backend_unavailable": "백엔드를 사용할 수 없음",
-    "backend_load_error": "Wealthfolio가 백엔드에서 설정을 불러올 수 없습니다.",
+    "backend_load_error": "SURfi가 백엔드에서 설정을 불러올 수 없습니다.",
     "new_update_available": "새 업데이트 사용 가능",
     "close_dialog": "대화상자 닫기",
     "screenshot_alt": "스크린샷 {{number}}",
