@@ -30,6 +30,7 @@ export const QueryKeys = {
   INCOME_SUMMARY: "incomeSummary",
   DIVIDEND_CALENDAR: "dividendCalendar",
   DIVIDEND_SYNC_SETTINGS: "dividendSyncSettings",
+  MP2_RATES: "mp2Rates",
   ASSET_DIVIDENDS: "assetDividends",
   PORTFOLIO_SUMMARY: "portfolioSummary",
   QUOTE_HISTORY: "quoteHistory",

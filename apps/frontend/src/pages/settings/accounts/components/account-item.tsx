@@ -6,6 +6,13 @@ import type { Account, AccountType, Platform } from "@/lib/types";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AccountOperations } from "./account-operations";
+import { getProductType, type CashProductType } from "@/lib/cash-product-meta";
+
+const productBadgeLabels: Record<CashProductType, string> = {
+  HYSA: "HYSA",
+  HYSA_GOAL: "Goal",
+  PAGIBIG_MP2: "MP2",
+};
 
 // Map account types to icons and colors for visual distinction
 const accountTypeConfig: Record<AccountType, { icon: Icon; bgClass: string; iconClass: string }> = {
@@ -57,6 +64,7 @@ export function AccountItem({
     iconClass: "text-muted-foreground",
   };
   const IconComponent = typeConfig.icon;
+  const productType = getProductType(account.meta);
 
   return (
     <div className="flex items-center justify-between p-4">
@@ -86,6 +94,11 @@ export function AccountItem({
               {account.name}
             </Link>
             {isSynced && <Icons.CloudSync2 className="text-muted-foreground h-3.5 w-3.5" />}
+            {productType && (
+              <span className="bg-muted rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide">
+                {productBadgeLabels[productType]}
+              </span>
+            )}
           </div>
           <div className="text-muted-foreground flex items-center gap-1.5 text-sm">
             <span>{account.currency}</span>

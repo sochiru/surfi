@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 
 import { AppLayout } from "@/pages/layouts/app-layout";
 import { OnboardingLayout } from "@/pages/layouts/onboarding-layout";
@@ -52,6 +52,7 @@ import SpendingSettingsCategoriesPage from "./pages/settings/spending/categories
 import SpendingSettingsEventsPage from "./pages/settings/spending/events/spending-events-page";
 import SpendingSettingsRulesPage from "./pages/settings/spending/rules/spending-rules-page";
 import SpendingSetupPage from "./pages/settings/spending/setup/spending-setup-page";
+import Mp2SettingsPage from "./pages/settings/mp2/mp2-settings-page";
 import SpendingSettingsPage from "./pages/settings/spending/spending-settings-page";
 import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
 import ConnectSettingsPage from "./pages/settings/wealthfolio-connect/connect-settings-page";
@@ -108,6 +109,8 @@ export function AppRoutes() {
           <Route path="accounts/:id" element={<AccountPage />} />
           <Route path="income" element={<IncomePage />} />
           <Route path="dividends" element={<DividendsPage />} />
+          <Route path="mp2" element={<Navigate to="/holdings?tab=cash" replace />} />
+          <Route path="mp2/:accountId" element={<Mp2AccountRedirect />} />
           <Route path="performance" element={<PerformancePage />} />
           <Route path="insights" element={<PortfolioInsightsPage />} />
           <Route path="health" element={<HealthPage />} />
@@ -140,6 +143,7 @@ export function AppRoutes() {
             <Route path="about" element={<AboutSettingsPage />} />
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
+            <Route path="mp2" element={<Mp2SettingsPage />} />
             <Route path="spending" element={<SpendingSettingsPage />} />
             <Route path="spending/categories" element={<SpendingSettingsCategoriesPage />} />
             <Route path="spending/events" element={<SpendingSettingsEventsPage />} />
@@ -159,4 +163,10 @@ export function AppRoutes() {
       </Routes>
     </BrowserRouter>
   );
+}
+
+/** MP2 moved onto the holdings cash tab; keep old deep links working. */
+function Mp2AccountRedirect() {
+  const { accountId } = useParams();
+  return <Navigate to={`/accounts/${accountId}`} replace />;
 }

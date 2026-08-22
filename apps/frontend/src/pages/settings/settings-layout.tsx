@@ -57,6 +57,12 @@ export default function SettingsLayout() {
             subtitle: t("settings:nav.subtitles.spending"),
             icon: <Icons.Wallet className="size-5" />,
           },
+          {
+            title: "Pag-IBIG MP2",
+            href: "mp2",
+            subtitle: "Declared dividend rates",
+            icon: <Icons.PiggyBank className="size-5" />,
+          },
         ],
       },
       {
