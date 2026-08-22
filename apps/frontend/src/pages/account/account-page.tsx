@@ -69,6 +69,8 @@ import { MobileActivityForm } from "@/pages/activity/components/mobile-forms/mob
 import { useActivityActionDialogs } from "@/pages/activity/hooks/use-activity-action-dialogs";
 import { useActivitySearch } from "@/pages/activity/hooks/use-activity-search";
 import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
+import { CashProductPanel } from "@/features/mp2/components/cash-product-panel";
+import { isCashProductAccount } from "@/lib/cash-product-meta";
 import { HoldingsEditMode } from "@/pages/holdings/components/holdings-edit-mode";
 import { useCalculatePerformanceHistory } from "@/pages/performance/hooks/use-performance-data";
 import { useQuery } from "@tanstack/react-query";
@@ -991,6 +993,11 @@ const AccountPage = () => {
         </div>
       </PageHeader>
       <PageContent>
+        {account && isCashProductAccount(account.meta) ? (
+          <div className="mb-4 space-y-4">
+            <CashProductPanel account={account} />
+          </div>
+        ) : null}
         {hasHoldings && !isHoldingsLoading ? (
           <>
             <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">

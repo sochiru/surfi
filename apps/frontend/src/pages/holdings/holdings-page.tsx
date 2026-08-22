@@ -20,6 +20,7 @@ import {
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import {
   AccountPurpose,
+  AccountType,
   HOLDING_CATEGORY_FILTERS,
   apiKindToAlternativeAssetKind,
 } from "@/lib/constants";
@@ -37,6 +38,11 @@ import { HoldingsTable } from "./components/holdings-table";
 import { HoldingsTableMobile } from "./components/holdings-table-mobile";
 import { AlternativeHoldingsTable } from "./components/alternative-holdings-table";
 import { AlternativeHoldingsListMobile } from "./components/alternative-holdings-list-mobile";
+import { CashHoldingsTable } from "./components/cash-holdings-table";
+import { CashHoldingsListMobile } from "./components/cash-holdings-list-mobile";
+import { accountIdsForScope, buildCashHoldingRows, type CashHoldingRow } from "./lib/cash-holdings";
+import { useMp2Rates } from "@/features/mp2/hooks/use-mp2-rates";
+import { useLatestValuations } from "@/hooks/use-latest-valuations";
 import { HoldingsEditMode } from "./components/holdings-edit-mode";
 import {
   AlternativeAssetQuickAddModal,
@@ -78,6 +84,28 @@ export const HoldingsPage = () => {
   const { data: portfolios = [] } = usePortfolios();
   const { data: alternativeHoldings, isLoading: isAlternativeHoldingsLoading } =
     useAlternativeHoldings();
+  const { data: mp2Rates } = useMp2Rates();
+
+  // Cash never appears on the investments tab, so it gets its own view. Balances
+  // come from per-account valuations because the holdings list merges cash
+  // across accounts whenever more than one account is in scope.
+  const scopedCashAccounts = useMemo(() => {
+    const cash = (accounts ?? []).filter((a) => a.accountType === AccountType.CASH);
+    const scopeIds = accountIdsForScope(accountFilter, portfolios);
+    return scopeIds ? cash.filter((a) => scopeIds.includes(a.id)) : cash;
+  }, [accounts, accountFilter, portfolios]);
+
+  const { latestValuations, isLoading: isValuationsLoading } = useLatestValuations(
+    scopedCashAccounts.map((a) => a.id),
+  );
+  const cashHoldings = useMemo(
+    () => buildCashHoldingRows(scopedCashAccounts, latestValuations ?? [], mp2Rates),
+    [scopedCashAccounts, latestValuations, mp2Rates],
+  );
+  const openCashAccount = useCallback(
+    (row: CashHoldingRow) => navigate(`/accounts/${row.accountId}`),
+    [navigate],
+  );
 
   // Mobile filter state
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -567,6 +595,44 @@ export const HoldingsPage = () => {
     </>
   );
 
+  // Cash & fixed income content
+  const isCashLoading = isAccountsLoading || isValuationsLoading;
+  const cashContent = (
+    <>
+      {!isCashLoading && cashHoldings.length === 0 ? (
+        <div className="flex items-center justify-center py-16">
+          <EmptyPlaceholder
+            icon={<Icons.PiggyBank className="text-muted-foreground h-10 w-10" />}
+            title="No cash accounts yet"
+            description="Track savings, Pag-IBIG MP2 and other fixed-income products alongside your investments."
+          >
+            <Button size="default" onClick={() => navigate("/settings/accounts")}>
+              <Icons.Plus className="mr-2 h-4 w-4" />
+              Add cash account
+            </Button>
+          </EmptyPlaceholder>
+        </div>
+      ) : (
+        <>
+          <div className="hidden md:block">
+            <CashHoldingsTable
+              holdings={cashHoldings}
+              isLoading={isCashLoading}
+              onRowClick={openCashAccount}
+            />
+          </div>
+          <div className="block md:hidden">
+            <CashHoldingsListMobile
+              holdings={cashHoldings}
+              isLoading={isCashLoading}
+              onRowClick={openCashAccount}
+            />
+          </div>
+        </>
+      )}
+    </>
+  );
+
   // Action palette groups
   const actionPaletteGroups: ActionPaletteGroup[] = useMemo(
     () => [
@@ -660,6 +726,13 @@ export const HoldingsPage = () => {
         actions: sharedActions,
       },
       {
+        value: "cash",
+        label: "Cash",
+        icon: Icons.PiggyBank,
+        content: cashContent,
+        actions: sharedActions,
+      },
+      {
         value: "assets",
         label: t("holdings:assets"),
         icon: Icons.Wallet,
@@ -674,7 +747,7 @@ export const HoldingsPage = () => {
         actions: sharedActions,
       },
     ],
-    [investmentsContent, assetsContent, liabilitiesContent, sharedActions, t],
+    [investmentsContent, cashContent, assetsContent, liabilitiesContent, sharedActions, t],
   );
 
   // Determine defaultKind for modal - explicit state takes precedence, then fall back to current tab

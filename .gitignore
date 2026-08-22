@@ -63,6 +63,7 @@ apps/tauri/db/*
 
 # Rust/Cargo
 target/
+.cargo-target/
 **/*.rs.bk
 # Workspace members share the root Cargo.lock
 apps/server/Cargo.lock

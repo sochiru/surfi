@@ -461,6 +461,13 @@ pub async fn initialize_context(
             base_currency.clone(),
         ));
 
+    let interest_accrual_service: Arc<dyn wealthfolio_core::interest::InterestAccrualServiceTrait> =
+        Arc::new(wealthfolio_core::interest::InterestAccrualService::new(
+            account_service.clone(),
+            activity_service.clone(),
+            settings_service.clone(),
+        ));
+
     let allocation_service = Arc::new(
         AllocationService::new(holdings_service.clone(), taxonomy_service.clone())
             .with_account_service(account_service.clone()),
@@ -666,6 +673,7 @@ pub async fn initialize_context(
             spending_analytics_service,
             spending_insight_service,
             dividend_sync_service,
+            interest_accrual_service,
         },
         event_receiver,
         sync_outbox_wake_receiver,

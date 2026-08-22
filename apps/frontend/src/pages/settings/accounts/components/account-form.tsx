@@ -49,40 +49,22 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 
 import { useAccountMutations } from "./use-account-mutations";
+import { CashProductFields } from "@/features/mp2/components/cash-product-fields";
+import type { CashProductType } from "@/lib/cash-product-meta";
+import {
+  defaultCashProduct,
+  getProductType,
+  parseAccountMeta,
+  setCashCategoryInMeta,
+  setProductInMeta,
+} from "@/lib/cash-product-meta";
 
 const CASH_ALLOCATION_DEFAULT_VALUE = "__default__";
 const CASH_FIXED_INCOME_CATEGORY_ID = "FIXED_INCOME";
-
-function getCashCategoryFromMeta(meta?: string | null): string | null {
-  if (!meta) return null;
-  try {
-    const parsed = JSON.parse(meta) as Record<string, unknown>;
-    const allocation = parsed.allocation as Record<string, unknown> | undefined;
-    return (allocation?.cashCategoryId as string) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function setCashCategoryInMeta(meta: string | null | undefined, categoryId: string | null): string {
-  let parsed: Record<string, unknown> = {};
-  if (meta) {
-    try {
-      parsed = JSON.parse(meta) as Record<string, unknown>;
-    } catch {
-      // ignore
-    }
-  }
-  if (categoryId) {
-    parsed.allocation = { cashCategoryId: categoryId };
-  } else {
-    delete parsed.allocation;
-  }
-  return JSON.stringify(parsed);
-}
+const CASH_PRODUCT_NONE = "__none__";
 
 function getSelectableCashCategoryFromMeta(meta?: string | null): string {
-  const categoryId = getCashCategoryFromMeta(meta);
+  const categoryId = parseAccountMeta(meta).allocation?.cashCategoryId;
   return categoryId === CASH_FIXED_INCOME_CATEGORY_ID
     ? CASH_FIXED_INCOME_CATEGORY_ID
     : CASH_ALLOCATION_DEFAULT_VALUE;
@@ -149,6 +131,10 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
   const currentAccountType = form.watch("accountType");
   const isCreditCardAccount = currentAccountType === AccountType.CREDIT_CARD;
   const isCashAccount = currentAccountType === AccountType.CASH;
+  const cashMeta = form.watch("meta");
+  const cashProductType = getProductType(cashMeta);
+  const isFixedIncome =
+    getSelectableCashCategoryFromMeta(cashMeta) === CASH_FIXED_INCOME_CATEGORY_ID;
 
   const { data: assetClassesTaxonomy } = useTaxonomy(isCashAccount ? "asset_classes" : null);
   const fixedIncomeCategoryName = useMemo(() => {
@@ -347,7 +333,10 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                     onValueChange={(v) => {
                       if (!v) return;
                       const categoryId = v === CASH_ALLOCATION_DEFAULT_VALUE ? null : v;
-                      const updatedMeta = setCashCategoryInMeta(form.getValues("meta"), categoryId);
+                      let updatedMeta = setCashCategoryInMeta(form.getValues("meta"), categoryId);
+                      if (!categoryId) {
+                        updatedMeta = setProductInMeta(updatedMeta, null);
+                      }
                       form.setValue("meta", updatedMeta, { shouldDirty: true });
                     }}
                     className="bg-muted grid h-11 grid-cols-2 rounded-lg p-1"
@@ -365,6 +354,62 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                       {fixedIncomeCategoryName}
                     </ToggleGroupItem>
                   </ToggleGroup>
+                </div>
+              )}
+
+              {isCashAccount && isFixedIncome && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium">Fixed-income product</label>
+                    <p className="text-muted-foreground text-xs">
+                      Configure auto-generated interest or dividends for this account.
+                    </p>
+                  </div>
+                  <ToggleGroup
+                    type="single"
+                    aria-label="Fixed income product type"
+                    value={cashProductType ?? CASH_PRODUCT_NONE}
+                    onValueChange={(value) => {
+                      if (!value) return;
+                      const existing = parseAccountMeta(cashMeta).product;
+                      const next =
+                        value === CASH_PRODUCT_NONE
+                          ? null
+                          : existing?.type === value
+                            ? existing
+                            : defaultCashProduct(value as CashProductType);
+                      form.setValue("meta", setProductInMeta(cashMeta, next), {
+                        shouldDirty: true,
+                      });
+                    }}
+                    className="bg-muted grid h-11 grid-cols-4 rounded-lg p-1"
+                  >
+                    <ToggleGroupItem
+                      value={CASH_PRODUCT_NONE}
+                      className={cashClassificationItemClassName}
+                    >
+                      None
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="HYSA" className={cashClassificationItemClassName}>
+                      HYSA
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="HYSA_GOAL" className={cashClassificationItemClassName}>
+                      Goal pot
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="PAGIBIG_MP2"
+                      className={cashClassificationItemClassName}
+                    >
+                      MP2
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                  {cashProductType && (
+                    <CashProductFields
+                      meta={cashMeta}
+                      productKind={cashProductType}
+                      onMetaChange={(meta) => form.setValue("meta", meta, { shouldDirty: true })}
+                    />
+                  )}
                 </div>
               )}
             </div>

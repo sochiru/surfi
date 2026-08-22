@@ -91,6 +91,11 @@ export const COMMANDS: CommandMap = {
   remove_auto_dividends: { method: "DELETE", path: "/dividends/auto" },
   get_dividend_calendar_events: { method: "GET", path: "/dividends/calendar" },
   get_asset_dividend_view: { method: "GET", path: "/dividends/assets" },
+  sync_cash_interest: { method: "POST", path: "/cash-interest/sync" },
+  sync_cash_interest_account: { method: "POST", path: "/cash-interest/sync" },
+  remove_auto_interest: { method: "DELETE", path: "/cash-interest/auto" },
+  get_mp2_rates: { method: "GET", path: "/cash-interest/mp2-rates" },
+  update_mp2_rates: { method: "PUT", path: "/cash-interest/mp2-rates" },
   // Retirement plan simulations
   calculate_retirement_projection: { method: "POST", path: "/goals/retirement/projection" },
   run_retirement_monte_carlo: { method: "POST", path: "/goals/retirement/monte-carlo" },
@@ -813,6 +818,16 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "get_asset_dividend_view": {
       const { assetId } = payload as { assetId: string };
       url += `/${encodeURIComponent(assetId)}`;
+      break;
+    }
+    case "sync_cash_interest_account": {
+      const { accountId } = payload as { accountId: string };
+      url += `/${encodeURIComponent(accountId)}`;
+      break;
+    }
+    case "update_mp2_rates": {
+      const { rates } = payload as { rates: Record<string, unknown> };
+      body = JSON.stringify(rates);
       break;
     }
     // Retirement plan simulation commands

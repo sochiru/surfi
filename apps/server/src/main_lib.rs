@@ -141,6 +141,7 @@ pub struct AppState {
     /// Whether agent tool calls are audited (from `Config::mcp_audit_enabled`).
     pub mcp_audit_enabled: bool,
     pub dividend_sync_service: Arc<dyn wealthfolio_core::dividends::DividendSyncServiceTrait>,
+    pub interest_accrual_service: Arc<dyn wealthfolio_core::interest::InterestAccrualServiceTrait>,
 }
 
 pub fn init_tracing() {
@@ -571,6 +572,13 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             base_currency.clone(),
         ));
 
+    let interest_accrual_service: Arc<dyn wealthfolio_core::interest::InterestAccrualServiceTrait> =
+        Arc::new(wealthfolio_core::interest::InterestAccrualService::new(
+            account_service.clone(),
+            activity_service.clone(),
+            settings_service.clone(),
+        ));
+
     // Spending: events + event_types
     let event_types_repo: Arc<dyn wealthfolio_spending::events::EventTypesRepositoryTrait> =
         Arc::new(
@@ -901,6 +909,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         mcp_enabled: config.mcp_enabled,
         mcp_audit_enabled: config.mcp_audit_enabled,
         dividend_sync_service,
+        interest_accrual_service,
     });
 
     #[cfg(feature = "device-sync")]
