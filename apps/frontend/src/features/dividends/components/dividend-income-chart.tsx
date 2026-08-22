@@ -175,7 +175,9 @@ export function DividendIncomeChart({
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    labelFormatter={(value) => format(parseISO(`${String(value)}-01`), "MMMM yyyy")}
+                    labelFormatter={(label: unknown) =>
+                      typeof label === "string" ? format(parseISO(`${label}-01`), "MMMM yyyy") : ""
+                    }
                   />
                 }
               />

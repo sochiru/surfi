@@ -296,7 +296,7 @@ impl TradingViewProvider {
         }
 
         if !quotes.is_empty() {
-            quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            quotes.sort_by_key(|a| a.timestamp);
             return Ok(quotes);
         }
 
@@ -384,7 +384,7 @@ impl TradingViewProvider {
             });
         }
 
-        quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        quotes.sort_by_key(|a| a.timestamp);
 
         if quotes.is_empty() {
             return Err(MarketDataError::NoDataForRange);
