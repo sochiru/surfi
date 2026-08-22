@@ -5,10 +5,10 @@ use std::collections::{HashMap, HashSet};
 
 use super::cash::CashLedgerEvent;
 use super::model::{build_idempotency_key, build_payout_idempotency_key};
-use super::settings::Mp2DividendRates;
 use super::product::{
     is_year_end, yield_start_date, CashProduct, CashProductType, CreditFrequency,
 };
+use super::settings::Mp2DividendRates;
 
 const MONTHS_PER_YEAR: u32 = 12;
 
@@ -196,10 +196,7 @@ pub fn plan_interest(
             cash_delta: e.signed_cash_delta(),
         })
         .collect();
-    let removed_ids: HashSet<String> = removals
-        .iter()
-        .map(|r| r.activity_id.clone())
-        .collect();
+    let removed_ids: HashSet<String> = removals.iter().map(|r| r.activity_id.clone()).collect();
 
     let ctx = PostContext {
         account_id,
@@ -247,8 +244,7 @@ pub fn plan_interest(
             if !removed_ids.contains(event.id.as_str()) {
                 acc.running += event.signed_cash_delta();
                 if month_weighted && is_contribution(event, &interest_dates) {
-                    weighted_contributions +=
-                        event.signed_cash_delta() * month_weight(day.month());
+                    weighted_contributions += event.signed_cash_delta() * month_weight(day.month());
                 }
             }
             event_idx += 1;
@@ -393,9 +389,9 @@ fn reconcile(
 
 #[cfg(test)]
 mod tests {
+    use super::super::product::{CashProductType, YieldConfig, DAY_COUNT_ACTUAL_360};
     use super::*;
     use crate::activities::ACTIVITY_TYPE_DEPOSIT;
-    use super::super::product::{CashProductType, YieldConfig, DAY_COUNT_ACTUAL_360};
     use rust_decimal_macros::dec;
 
     /// A product paired with the app-wide rate table it should be planned against.
@@ -513,7 +509,10 @@ mod tests {
             .filter(|p| p.kind == PlannedKind::Interest)
             .collect();
         assert_eq!(interest.len(), 2);
-        assert_eq!(interest[0].date, NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
+        assert_eq!(
+            interest[0].date,
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap()
+        );
         assert_eq!(interest[0].amount, dec!(1.00));
     }
 
@@ -627,7 +626,10 @@ mod tests {
             .collect();
         // January's interest lands on Feb 1; February's is not due until Mar 1.
         assert_eq!(interest.len(), 1);
-        assert_eq!(interest[0].date, NaiveDate::from_ymd_opt(2024, 2, 1).unwrap());
+        assert_eq!(
+            interest[0].date,
+            NaiveDate::from_ymd_opt(2024, 2, 1).unwrap()
+        );
         // 31 earning days: the Jan 1 deposit earns from Jan 1.
         assert_eq!(interest[0].amount, dec!(31.00));
     }
@@ -666,15 +668,21 @@ mod tests {
             .filter(|p| p.kind == PlannedKind::Interest)
             .collect();
         assert_eq!(interest.len(), 1);
-        assert_eq!(interest[0].date, NaiveDate::from_ymd_opt(2024, 12, 31).unwrap());
-        assert!(planned.creates.iter().all(|p| p.kind != PlannedKind::Payout));
+        assert_eq!(
+            interest[0].date,
+            NaiveDate::from_ymd_opt(2024, 12, 31).unwrap()
+        );
+        assert!(planned
+            .creates
+            .iter()
+            .all(|p| p.kind != PlannedKind::Payout));
         // 365 days * 1.00 but Jan 1 doesn't earn, and compounding daily internally in accum
         // accum is simple sum of daily on SOD without adding generated interest until post.
         // For yearly compounding=true, we only add to running on Dec 31, so intra-year SOD
         // does not include accrued interest. That's correct for MP2 (annual credit).
         assert_eq!(interest[0].amount, dec!(365.00)); // 365 days Jan 2-Dec 31? 365 days in 2024 leap?
-        // 2024 is leap. Jan 1 deposit, earn Jan 2 through Dec 31 = 365 days (2024 has 366 days, minus Jan 1).
-        // 366 - 1 = 365. Yes.
+                                                      // 2024 is leap. Jan 1 deposit, earn Jan 2 through Dec 31 = 365 days (2024 has 366 days, minus Jan 1).
+                                                      // 366 - 1 = 365. Yes.
     }
 
     #[test]
@@ -891,7 +899,10 @@ mod tests {
             .creates
             .iter()
             .all(|p| p.date != NaiveDate::from_ymd_opt(2024, 12, 31).unwrap()));
-        assert!(planned.amendments.iter().all(|a| a.activity_id != "auto-2024"));
+        assert!(planned
+            .amendments
+            .iter()
+            .all(|a| a.activity_id != "auto-2024"));
     }
 
     #[test]

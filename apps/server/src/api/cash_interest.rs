@@ -9,7 +9,9 @@ use wealthfolio_core::interest::{CashInterestSyncResult, Mp2DividendRates};
 
 use crate::{error::ApiResult, main_lib::AppState};
 
-async fn sync_cash_interest(State(state): State<Arc<AppState>>) -> ApiResult<Json<CashInterestSyncResult>> {
+async fn sync_cash_interest(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<CashInterestSyncResult>> {
     let result = state.interest_accrual_service.sync().await?;
     Ok(Json(result))
 }
@@ -39,7 +41,10 @@ async fn update_mp2_rates(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<Mp2DividendRates>,
 ) -> ApiResult<Json<Mp2DividendRates>> {
-    state.interest_accrual_service.set_mp2_rates(&payload).await?;
+    state
+        .interest_accrual_service
+        .set_mp2_rates(&payload)
+        .await?;
     Ok(Json(payload))
 }
 

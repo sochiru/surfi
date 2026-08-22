@@ -39,6 +39,7 @@ mod ai_providers;
 mod allocation_targets;
 mod alternative_assets;
 mod assets;
+mod cash_interest;
 #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
 pub mod connect;
 mod custom_providers;
@@ -49,7 +50,6 @@ mod device_sync;
 #[cfg(feature = "device-sync")]
 pub(crate) mod device_sync_engine;
 mod dividends;
-mod cash_interest;
 mod exchange_rates;
 mod goals;
 mod health;
