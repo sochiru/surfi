@@ -85,12 +85,18 @@ ENV CONNECT_API_URL=${CONNECT_API_URL}
 # Run as non-root. chown /data BEFORE the VOLUME directive so named volumes
 # inherit ownership on first creation. Existing volumes from older images
 # need a one-time chown — see docs/self-host/README.md.
-RUN addgroup -S -g 1000 wealthfolio \
+RUN apk add --no-cache su-exec \
+ && addgroup -S -g 1000 wealthfolio \
  && adduser -S -u 1000 -G wealthfolio -H -s /sbin/nologin wealthfolio \
  && mkdir -p /data \
  && chown -R wealthfolio:wealthfolio /data
-USER 1000:1000
+
+# Entrypoint starts as root only long enough to chown a root-owned bind mount,
+# then drops to 1000:1000. Keeping USER root here is what makes that possible.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Persistence: mount /data (Railway Volume or compose named volume). No Dockerfile VOLUME — Railway rejects it.
 EXPOSE 8088
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["/usr/local/bin/wealthfolio-server"]
