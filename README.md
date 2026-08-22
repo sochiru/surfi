@@ -35,8 +35,8 @@
 ## Introduction
 
 **SURfi** is a modified, self-hosted web build based on Wealthfolio (AGPL-3.0).
-The original project is an open-source, private portfolio tracker — investments, net
-worth, spending, and simulations. All your data is stored locally on your
+The original project is an open-source, private portfolio tracker — investments,
+net worth, spending, and simulations. All your data is stored locally on your
 device: no cloud database, no account required, free forever.
 
 For automatic brokerage syncing (30+ institutions, read-only) and encrypted
