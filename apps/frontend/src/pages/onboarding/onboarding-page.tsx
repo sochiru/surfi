@@ -79,11 +79,7 @@ const OnboardingPage = () => {
       <header className="flex-none px-4 pt-8 sm:px-6 sm:pt-12">
         <div className="flex flex-col items-center">
           {/* Logo */}
-          <img
-            alt="SURfi"
-            className="mb-3 h-16 w-16 sm:h-20 sm:w-20"
-            src="/logo.png"
-          />
+          <img alt="SURfi" className="mb-3 h-16 w-16 sm:h-20 sm:w-20" src="/logo.png" />
 
           {/* Progress indicators */}
           <div className="flex gap-2">

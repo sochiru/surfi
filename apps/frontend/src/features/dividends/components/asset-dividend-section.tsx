@@ -1,9 +1,5 @@
 import { useMemo } from "react";
-import {
-  getAssetDividendView,
-  getAssetHoldings,
-  type DividendCalendarEvent,
-} from "@/adapters";
+import { getAssetDividendView, getAssetHoldings, type DividendCalendarEvent } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
 import {
@@ -160,8 +156,7 @@ export function AssetDividendSection({ assetId, accountId = null }: Props) {
 
     // Classic quote yield proxy: annualized DPS / last price, using TTM cash / shares as DPS.
     const trailingDps = quantity > 0 ? ttm / quantity : null;
-    const quoteYield =
-      trailingDps != null && priceNum > 0 ? trailingDps / priceNum : null;
+    const quoteYield = trailingDps != null && priceNum > 0 ? trailingDps / priceNum : null;
 
     const projected = totals.projectedYearEnd;
     const projectedYieldOnMv = mv > 0 ? projected / mv : null;
@@ -188,7 +183,12 @@ export function AssetDividendSection({ assetId, accountId = null }: Props) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="text-lg">Dividends</CardTitle>
-        <Button asChild variant="ghost" size="sm" className="text-muted-foreground h-8 px-2 text-xs">
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground h-8 px-2 text-xs"
+        >
           <Link to="/dividends">View all</Link>
         </Button>
       </CardHeader>
@@ -237,7 +237,10 @@ export function AssetDividendSection({ assetId, accountId = null }: Props) {
                   {metrics.upcomingRemaining > 0 ? (
                     <>
                       +
-                      <AmountDisplay value={metrics.upcomingRemaining} currency={incomeCurrency} />{" "}
+                      <AmountDisplay
+                        value={metrics.upcomingRemaining}
+                        currency={incomeCurrency}
+                      />{" "}
                       upcoming
                     </>
                   ) : (

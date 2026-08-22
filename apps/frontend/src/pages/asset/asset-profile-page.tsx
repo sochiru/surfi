@@ -15,7 +15,14 @@ import { ActivityStatus, ActivityType } from "@/lib/constants";
 import { generateId } from "@/lib/id";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
-import type { AccountScope, ActivityDetails, AssetKind, AssetLotView, Holding, Quote } from "@/lib/types";
+import type {
+  AccountScope,
+  ActivityDetails,
+  AssetKind,
+  AssetLotView,
+  Holding,
+  Quote,
+} from "@/lib/types";
 import { normalizeCurrency } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthfolio/ui";
@@ -209,8 +216,7 @@ function AssetHealthBanner({
       : context === "basis"
         ? {
             title: "Cost basis needs review",
-            description:
-              "Update what you paid for this holding so SURfi can calculate gain/loss.",
+            description: "Update what you paid for this holding so SURfi can calculate gain/loss.",
           }
         : {
             title: "Transactions need review",
@@ -342,7 +348,9 @@ export const AssetProfilePage = () => {
   const accountParam = queryParams.get("account");
   const selectedAccountId = useMemo(() => {
     if (!showAccountScope || !accountParam || accountParam === ACCOUNT_SCOPE_ALL) return null;
-    return accountScopeOptions.some((option) => option.value === accountParam) ? accountParam : null;
+    return accountScopeOptions.some((option) => option.value === accountParam)
+      ? accountParam
+      : null;
   }, [accountParam, accountScopeOptions, showAccountScope]);
 
   const accountScopeValue = selectedAccountId ?? ACCOUNT_SCOPE_ALL;

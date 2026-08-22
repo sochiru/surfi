@@ -56,10 +56,7 @@ impl DividendSyncSettings {
     }
 
     pub fn account_settings(&self, account_id: &str) -> AccountDividendSettings {
-        self.accounts
-            .get(account_id)
-            .cloned()
-            .unwrap_or_default()
+        self.accounts.get(account_id).cloned().unwrap_or_default()
     }
 }
 

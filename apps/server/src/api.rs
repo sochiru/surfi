@@ -44,11 +44,11 @@ pub mod connect;
 mod custom_providers;
 mod data_exports;
 mod database_backups;
-mod dividends;
 #[cfg(feature = "device-sync")]
 mod device_sync;
 #[cfg(feature = "device-sync")]
 pub(crate) mod device_sync_engine;
+mod dividends;
 mod exchange_rates;
 mod goals;
 mod health;

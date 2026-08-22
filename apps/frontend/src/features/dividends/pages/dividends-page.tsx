@@ -168,8 +168,7 @@ export default function DividendsPage() {
   });
 
   const accounts = useMemo(() => accountsQuery.data ?? [], [accountsQuery.data]);
-  const busy =
-    syncMutation.isPending || removeMutation.isPending || persistSettings.isPending;
+  const busy = syncMutation.isPending || removeMutation.isPending || persistSettings.isPending;
 
   const upcomingEstimate = useMemo(() => {
     return filteredEvents
@@ -334,11 +333,7 @@ export default function DividendsPage() {
         <DividendIncomeChart
           events={filteredEvents}
           holdings={holdingsQuery.data ?? []}
-          isLoading={
-            calendarQuery.isLoading ||
-            calendarQuery.isFetching ||
-            holdingsQuery.isLoading
-          }
+          isLoading={calendarQuery.isLoading || calendarQuery.isFetching || holdingsQuery.isLoading}
           fallbackCurrency={appSettings?.baseCurrency}
         />
 

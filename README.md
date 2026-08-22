@@ -1,31 +1,14 @@
 <div align="center">
-  <a href="https://github.com/wealthfolio/wealthfolio">
-    <img src="apps/frontend/public/logo.svg" alt="Logo" width="80" height="80">
-  </a>
-
-  <h3 align="center">Wealthfolio</h3>
-
+  <img src="apps/frontend/public/logo.png" alt="SURfi logo" width="80" height="80">
+  <h3 align="center">SURfi</h3>
   <p align="center">
-    The open-source, private portfolio tracker — investments, net worth, spending, and simulations.
+    A personal fork of
+    <a href="https://github.com/wealthfolio/wealthfolio">Wealthfolio</a>
+    for self-hosted web use.
     <br />
-    Local-first: your data lives on your device.
+    Not affiliated with or endorsed by the official Wealthfolio project.
     <br />
-    <br />
-    <a href="https://wealthfolio.app?utm_source=github&utm_medium=readme">Website</a>
-    ·
-    <a href="https://discord.gg/WDMCY6aPWK">Discord</a>
-    ·
-    <a href="https://x.com/intent/follow?screen_name=WealthfolioApp">Twitter</a>
-    ·
-    <a href="https://github.com/wealthfolio/wealthfolio/releases">Releases</a>
-  </p>
-
-  <p align="center">
-    <a href="https://wealthfolio.app/download?utm_source=github&utm_medium=readme&utm_campaign=cta"><strong>⬇️&nbsp;&nbsp;Download for macOS · Windows · Linux</strong></a>
-    &nbsp;·&nbsp;
-    <a href="https://apps.apple.com/us/app/wealthfolio-private-finance/id6732888445">📱&nbsp;iOS&nbsp;App</a>
-    &nbsp;·&nbsp;
-    <a href="https://wealthfolio.app/docs/guide/self-hosting/docker?utm_source=github&utm_medium=readme">🐳&nbsp;Docker</a>
+    Wealthfolio is a trademark of Teymz Inc.
   </p>
 </div>
 <div align="center">
@@ -51,7 +34,8 @@
 
 ## Introduction
 
-**Wealthfolio** is an open-source, private portfolio tracker — investments, net
+**SURfi** is a modified, self-hosted web build based on Wealthfolio (AGPL-3.0).
+The original project is an open-source, private portfolio tracker — investments, net
 worth, spending, and simulations. All your data is stored locally on your
 device: no cloud database, no account required, free forever.
 
@@ -846,4 +830,4 @@ licensed under AGPL-3.0; trademarks are not granted under that license.
 
 ## [![Star History Chart](https://api.star-history.com/svg?repos=wealthfolio/wealthfolio&type=Timeline)](https://star-history.com/#wealthfolio/wealthfolio&Date)
 
-Enjoy managing your wealth with **Wealthfolio**! 🚀
+Enjoy managing your wealth with **SURfi**.

@@ -64,11 +64,7 @@ impl TradingViewProvider {
             request = request.query(&[(k, v)]);
         }
 
-        debug!(
-            "TradingView request: {} query_count={}",
-            path,
-            query.len()
-        );
+        debug!("TradingView request: {} query_count={}", path, query.len());
 
         let response = request.send().await.map_err(|e| {
             if e.is_timeout() {
@@ -108,10 +104,13 @@ impl TradingViewProvider {
             });
         }
 
-        let text = response.text().await.map_err(|e| MarketDataError::ProviderError {
-            provider: PROVIDER_ID.to_string(),
-            message: format!("Failed to read response body: {}", e),
-        })?;
+        let text = response
+            .text()
+            .await
+            .map_err(|e| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: format!("Failed to read response body: {}", e),
+            })?;
 
         serde_json::from_str::<Value>(&text).map_err(|e| MarketDataError::ProviderError {
             provider: PROVIDER_ID.to_string(),
@@ -177,10 +176,12 @@ impl TradingViewProvider {
     /// Quote and profile fields live under `response.data.data` for RapidAPI; older flat shapes are accepted.
     fn resolve_quote_body(root: &Value) -> Result<&Value, MarketDataError> {
         Self::expect_api_success(root)?;
-        let outer = root.get("data").ok_or_else(|| MarketDataError::ProviderError {
-            provider: PROVIDER_ID.to_string(),
-            message: "TradingView quote response missing data".to_string(),
-        })?;
+        let outer = root
+            .get("data")
+            .ok_or_else(|| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: "TradingView quote response missing data".to_string(),
+            })?;
         if let Some(inner) = outer.get("data") {
             if inner.get("lp").is_some()
                 || inner.get("open_price").is_some()
@@ -201,10 +202,11 @@ impl TradingViewProvider {
     /// Inner object for `/api/price`: `symbol`, `history`, `current`, `info`, or legacy candle arrays.
     fn resolve_price_body(root: &Value) -> Result<&Value, MarketDataError> {
         Self::expect_api_success(root)?;
-        root.get("data").ok_or_else(|| MarketDataError::ProviderError {
-            provider: PROVIDER_ID.to_string(),
-            message: "TradingView price response missing data".to_string(),
-        })
+        root.get("data")
+            .ok_or_else(|| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: "TradingView price response missing data".to_string(),
+            })
     }
 
     fn decimal_from_json(v: &Value) -> Option<Decimal> {
@@ -356,9 +358,7 @@ impl TradingViewProvider {
                 .or_else(|| l[i].as_i64().map(|x| x as f64))
                 .and_then(|n| Decimal::try_from(n).ok());
 
-            let close_f = c[i]
-                .as_f64()
-                .or_else(|| c[i].as_i64().map(|x| x as f64));
+            let close_f = c[i].as_f64().or_else(|| c[i].as_i64().map(|x| x as f64));
             let Some(close_f) = close_f else {
                 continue;
             };
@@ -427,7 +427,10 @@ impl TradingViewProvider {
         let source = PROVIDER_ID.to_string();
 
         // TradingView payload shape isn't 100% guaranteed; be defensive.
-        let sector = payload.get("sector").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let sector = payload
+            .get("sector")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
         let industry = payload
             .get("industry")
             .and_then(|v| v.as_str())
@@ -460,7 +463,10 @@ impl TradingViewProvider {
         let employees = payload
             .get("employees")
             .or_else(|| payload.get("employee_total"))
-            .and_then(|v| v.as_u64().or_else(|| v.as_i64().and_then(|i| i.try_into().ok())));
+            .and_then(|v| {
+                v.as_u64()
+                    .or_else(|| v.as_i64().and_then(|i| i.try_into().ok()))
+            });
 
         let quote_type = payload
             .get("quote_type")
@@ -574,7 +580,9 @@ impl MarketDataProvider for TradingViewProvider {
             None => None,
         }
         .and_then(|n| Decimal::try_from(n).ok())
-        .ok_or_else(|| MarketDataError::SymbolNotFound(format!("No latest price for {}", symbol)))?;
+        .ok_or_else(|| {
+            MarketDataError::SymbolNotFound(format!("No latest price for {}", symbol))
+        })?;
 
         let timestamp = payload
             .get("lp_time")
@@ -640,9 +648,7 @@ impl MarketDataProvider for TradingViewProvider {
         let range_days = range_days.max(1);
         let fallback_currency = self.get_currency(context);
 
-        let root = self
-            .fetch_historical_payload(&symbol, range_days)
-            .await?;
+        let root = self.fetch_historical_payload(&symbol, range_days).await?;
         let data = Self::resolve_price_body(&root)?;
         Self::parse_historical_from_price_data(data, fallback_currency.as_str())
     }
@@ -713,12 +719,10 @@ mod tests {
             ],
             "info": { "currency_code": "PHP" }
         });
-        let quotes =
-            TradingViewProvider::parse_historical_from_price_data(&data, "USD").unwrap();
+        let quotes = TradingViewProvider::parse_historical_from_price_data(&data, "USD").unwrap();
         assert_eq!(quotes.len(), 2);
         assert_eq!(quotes[0].close, rust_decimal_macros::dec!(3.35));
         assert_eq!(quotes[1].volume, Some(rust_decimal_macros::dec!(1000)));
         assert_eq!(quotes[0].currency, "PHP");
     }
 }
-

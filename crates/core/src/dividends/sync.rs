@@ -9,13 +9,13 @@ use std::sync::Arc;
 
 use super::model::{
     build_idempotency_key, is_auto_dividend_key, is_auto_dividend_source, round_amount_str,
-    DividendCalendarEvent, DividendCalendarEventKind, DividendSyncAccountResult, DividendSyncResult,
-    SOURCE_SYSTEM,
+    DividendCalendarEvent, DividendCalendarEventKind, DividendSyncAccountResult,
+    DividendSyncResult, SOURCE_SYSTEM,
 };
+use super::projection::project_future_dividends;
 use super::settings::{
     default_tax_for_currency_or_mic, DividendSyncSettings, PSE_MIC, SETTINGS_KEY,
 };
-use super::projection::project_future_dividends;
 use super::shares::{compute_shares_at_ex_date, TradeLikeActivity};
 use crate::accounts::{AccountServiceTrait, TrackingMode};
 use crate::activities::{
@@ -53,7 +53,8 @@ pub struct AssetDividendView {
 #[async_trait]
 pub trait DividendSyncServiceTrait: Send + Sync {
     fn get_settings(&self) -> Result<DividendSyncSettings>;
-    async fn update_settings(&self, settings: DividendSyncSettings) -> Result<DividendSyncSettings>;
+    async fn update_settings(&self, settings: DividendSyncSettings)
+        -> Result<DividendSyncSettings>;
     async fn sync(&self) -> Result<DividendSyncResult>;
     async fn remove_auto_created(&self) -> Result<usize>;
     async fn build_calendar_events(&self) -> Result<Vec<DividendCalendarEvent>>;
@@ -132,7 +133,9 @@ impl DividendSyncService {
     }
 
     fn ex_date_from_unix(secs: i64) -> Option<NaiveDate> {
-        Utc.timestamp_opt(secs, 0).single().map(|dt| dt.date_naive())
+        Utc.timestamp_opt(secs, 0)
+            .single()
+            .map(|dt| dt.date_naive())
     }
 
     async fn fetch_dividends(
@@ -270,7 +273,10 @@ impl DividendSyncService {
     }
 
     /// Idempotency keys plus `asset_id:yyyy-mm-dd` date guards (covers legacy addon keys).
-    fn existing_dividend_guards(&self, account_id: &str) -> Result<(HashSet<String>, HashSet<String>)> {
+    fn existing_dividend_guards(
+        &self,
+        account_id: &str,
+    ) -> Result<(HashSet<String>, HashSet<String>)> {
         let mut keys = HashSet::new();
         let mut dated = HashSet::new();
         for a in self.activities.get_activities_by_account_id(account_id)? {
@@ -402,8 +408,7 @@ impl DividendSyncServiceTrait for DividendSyncService {
                 self.existing_dividend_guards(&account.id)?;
 
             for holding in holdings {
-                let Some((asset_id, mic, symbol, ccy, asset_pref)) =
-                    Self::holding_symbol(&holding)
+                let Some((asset_id, mic, symbol, ccy, asset_pref)) = Self::holding_symbol(&holding)
                 else {
                     continue;
                 };
@@ -622,13 +627,11 @@ impl DividendSyncServiceTrait for DividendSyncService {
                     currency: a.currency.clone(),
                     kind: DividendCalendarEventKind::Posted,
                     activity_id: Some(a.id.clone()),
-                    notes: Some(
-                        if is_auto_dividend_source(a.source_system.as_deref()) {
-                            "Auto-created".into()
-                        } else {
-                            "Recorded activity".into()
-                        },
-                    ),
+                    notes: Some(if is_auto_dividend_source(a.source_system.as_deref()) {
+                        "Auto-created".into()
+                    } else {
+                        "Recorded activity".into()
+                    }),
                 });
             }
 
@@ -649,8 +652,7 @@ impl DividendSyncServiceTrait for DividendSyncService {
             }
 
             for holding in &holdings {
-                let Some((asset_id, mic, symbol, ccy, asset_pref)) =
-                    Self::holding_symbol(holding)
+                let Some((asset_id, mic, symbol, ccy, asset_pref)) = Self::holding_symbol(holding)
                 else {
                     continue;
                 };
@@ -751,10 +753,7 @@ impl DividendSyncServiceTrait for DividendSyncService {
                     now + chrono::Duration::days(PROJECTION_HORIZON_DAYS),
                 ) {
                     events.push(DividendCalendarEvent {
-                        id: format!(
-                            "projected-{}-{}-{}",
-                            account.id, symbol, projected.ex_date
-                        ),
+                        id: format!("projected-{}-{}-{}", account.id, symbol, projected.ex_date),
                         date: projected.ex_date.format("%Y-%m-%d").to_string(),
                         symbol: symbol.clone(),
                         account_id: account.id.clone(),

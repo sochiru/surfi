@@ -310,6 +310,7 @@
   "about_app_name": "SURfi",
   "about_version": "Version {{version}}",
   "about_tagline": "A beautiful, simple, and secure personal finance and investment tracker that helps you take control of your wealth.",
+  "about_fork_notice": "Forked from Wealthfolio (https://wealthfolio.app/). Wealthfolio is a trademark of Teymz Inc. SURfi is not affiliated with or endorsed by the official project.",
   "about_check_update_button": "Check for Update",
   "about_website_button": "Website",
   "about_docs_button": "Docs",

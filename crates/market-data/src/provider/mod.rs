@@ -27,10 +27,10 @@ pub mod boerse_frankfurt;
 pub mod eodhd;
 pub mod finnhub;
 pub mod fixture;
-pub mod tradingview;
 pub mod marketdata_app;
 pub mod metal_price_api;
 pub mod openfigi;
+pub mod tradingview;
 pub mod us_treasury_calc;
 pub mod yahoo;
 
