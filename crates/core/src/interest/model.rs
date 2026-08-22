@@ -15,5 +15,7 @@ pub fn is_auto_interest_source(source_system: Option<&str>) -> bool {
 }
 
 pub fn is_auto_interest_key(key: Option<&str>) -> bool {
-    key.is_some_and(|k| k.starts_with(IDEMPOTENCY_PREFIX) || k.starts_with(IDEMPOTENCY_PAYOUT_INFIX))
+    key.is_some_and(|k| {
+        k.starts_with(IDEMPOTENCY_PREFIX) || k.starts_with(IDEMPOTENCY_PAYOUT_INFIX)
+    })
 }

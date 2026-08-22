@@ -11,12 +11,12 @@ use super::cash::CashLedgerEvent;
 use super::model::{is_auto_interest_key, is_auto_interest_source, SOURCE_SYSTEM};
 use super::settings::{Mp2DividendRates, SETTINGS_KEY};
 use crate::accounts::{account_types, AccountServiceTrait};
-use crate::settings::SettingsServiceTrait;
 use crate::activities::{
     ActivityBulkMutationRequest, ActivityServiceTrait, ActivityStatus, ActivityUpdate, NewActivity,
     ACTIVITY_TYPE_INTEREST, ACTIVITY_TYPE_WITHDRAWAL,
 };
 use crate::errors::Result;
+use crate::settings::SettingsServiceTrait;
 use crate::utils::time_utils::{activity_date_in_tz, parse_user_timezone_or_default};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
