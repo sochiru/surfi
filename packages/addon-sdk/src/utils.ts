@@ -50,7 +50,7 @@ export function validateManifest(manifest: AddonManifest): AddonValidationResult
       }
       if (!Object.prototype.hasOwnProperty.call(HOST_DEPENDENCIES, name)) {
         warnings.push(
-          `Host dependency ${name} is not provided by Wealthfolio and should be bundled`,
+          `Host dependency ${name} is not provided by SURfi and should be bundled`,
         );
       }
     });

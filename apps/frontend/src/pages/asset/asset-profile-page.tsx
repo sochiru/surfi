@@ -197,20 +197,20 @@ function AssetHealthBanner({
         ? {
             title: dateLabel ? `Add a price for ${dateLabel}` : "Manual prices need review",
             description: dateLabel
-              ? "Wealthfolio is carrying forward the last price. Add this date only if it needs its own value."
+              ? "SURfi is carrying forward the last price. Add this date only if it needs its own value."
               : "Review the missing dates. Add prices that need their own value; carried-forward prices are still used between entries.",
           }
         : {
             title: dateLabel ? `Price missing for ${dateLabel}` : "Price history needs review",
             description: dateLabel
-              ? "Wealthfolio is carrying forward the last available price. Refetch prices if this was a trading day."
+              ? "SURfi is carrying forward the last available price. Refetch prices if this was a trading day."
               : "Refetch provider history to restore missing or stale prices. Carried-forward prices are used until exact prices are available.",
           }
       : context === "basis"
         ? {
             title: "Cost basis needs review",
             description:
-              "Update what you paid for this holding so Wealthfolio can calculate gain/loss.",
+              "Update what you paid for this holding so SURfi can calculate gain/loss.",
           }
         : {
             title: "Transactions need review",

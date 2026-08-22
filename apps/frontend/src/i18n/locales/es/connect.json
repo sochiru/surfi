@@ -50,7 +50,7 @@
     "userFallback": "Usuario",
     "active": "Activo",
     "signOut": "Cerrar sesión",
-    "signOutTitle": "¿Cerrar sesión en Wealthfolio Connect?",
+    "signOutTitle": "¿Cerrar sesión en SURfi Connect?",
     "signOutMessage": "Deberás iniciar sesión de nuevo para acceder a tus cuentas de corredores sincronizadas. Tus datos locales no se verán afectados.",
     "signOutConfirm": "Cerrar sesión",
     "signingOut": "Cerrando sesión..."
@@ -199,7 +199,7 @@
   },
   "serviceUnavailable": {
     "title": "Servicio temporalmente no disponible",
-    "description": "Tenemos problemas para conectarnos a Wealthfolio Connect. Esto suele ser temporal y debería resolverse en breve.",
+    "description": "Tenemos problemas para conectarnos a SURfi Connect. Esto suele ser temporal y debería resolverse en breve.",
     "retrying": "Reintentando...",
     "tryAgain": "Intentar de nuevo"
   },
@@ -209,7 +209,7 @@
     "button": "Mejorar"
   },
   "privacy": {
-    "footnote": "Wealthfolio Connect no almacena las credenciales de tu corredor ni tus datos financieros. Todo se sincroniza de forma segura a través de un agregador hacia tu base de datos local. La sincronización de dispositivos utiliza cifrado de extremo a extremo. <privacyLink>Más información</privacyLink>"
+    "footnote": "SURfi Connect no almacena las credenciales de tu corredor ni tus datos financieros. Todo se sincroniza de forma segura a través de un agregador hacia tu base de datos local. La sincronización de dispositivos utiliza cifrado de extremo a extremo. <privacyLink>Más información</privacyLink>"
   },
   "providers": {
     "continueWithGoogle": "Continuar con Google",

@@ -75,13 +75,13 @@ export function LoginPage() {
           <CardHeader className="space-y-4 text-center">
             <div className="flex justify-center">
               <img
-                src="/logo-vantage.png"
+                src="/logo.png"
                 alt={t("auth:login.logoAlt")}
                 className="h-16 w-16 sm:h-20 sm:w-20"
               />
             </div>
             <div className="space-y-2">
-              <CardTitle>Wealthfolio</CardTitle>
+              <CardTitle className="font-brand">SURfi</CardTitle>
               <CardDescription>{t("auth:login.description")}</CardDescription>
             </div>
           </CardHeader>

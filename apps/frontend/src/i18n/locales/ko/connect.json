@@ -50,7 +50,7 @@
     "userFallback": "사용자",
     "active": "활성",
     "signOut": "로그아웃",
-    "signOutTitle": "Wealthfolio Connect에서 로그아웃할까요?",
+    "signOutTitle": "SURfi Connect에서 로그아웃할까요?",
     "signOutMessage": "동기화된 증권사 계좌에 접근하려면 다시 로그인해야 합니다. 로컬 데이터에는 영향이 없습니다.",
     "signOutConfirm": "로그아웃",
     "signingOut": "로그아웃 중..."
@@ -199,7 +199,7 @@
   },
   "serviceUnavailable": {
     "title": "서비스를 일시적으로 사용할 수 없습니다",
-    "description": "Wealthfolio Connect에 연결하는 데 문제가 발생했습니다. 일시적인 문제이며 곧 해결될 것입니다.",
+    "description": "SURfi Connect에 연결하는 데 문제가 발생했습니다. 일시적인 문제이며 곧 해결될 것입니다.",
     "retrying": "재시도 중...",
     "tryAgain": "다시 시도"
   },
@@ -209,7 +209,7 @@
     "button": "업그레이드"
   },
   "privacy": {
-    "footnote": "Wealthfolio Connect는 증권사 자격 증명이나 금융 데이터를 저장하지 않습니다. 모든 데이터는 애그리게이터를 통해 안전하게 로컬 데이터베이스로 동기화됩니다. 기기 동기화는 종단 간 암호화를 사용합니다. <privacyLink>자세히 알아보기</privacyLink>"
+    "footnote": "SURfi Connect는 증권사 자격 증명이나 금융 데이터를 저장하지 않습니다. 모든 데이터는 애그리게이터를 통해 안전하게 로컬 데이터베이스로 동기화됩니다. 기기 동기화는 종단 간 암호화를 사용합니다. <privacyLink>자세히 알아보기</privacyLink>"
   },
   "providers": {
     "continueWithGoogle": "Google로 계속하기",

@@ -775,7 +775,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
 
     // Device enroll service for E2EE sync
     let cloud_api_url = crate::features::cloud_api_base_url().unwrap_or_default();
-    let device_display_name = "Wealthfolio Server".to_string();
+    let device_display_name = "SURfi Server".to_string();
     let app_version = Some(env!("CARGO_PKG_VERSION").to_string());
     let device_enroll_service = Arc::new(DeviceEnrollService::new(
         secret_store.clone(),

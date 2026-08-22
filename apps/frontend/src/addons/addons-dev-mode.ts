@@ -48,7 +48,7 @@ export function shouldReloadDevelopmentAddon(
 export function getDevelopmentRuntimePackageError(status: number, detail: string): string {
   if (status === 404 || status === 405) {
     return (
-      "Development server does not support Wealthfolio 3.7 runtime packages. " +
+      "Development server does not support SURfi 3.7 runtime packages. " +
       "Upgrade @wealthfolio/addon-dev-tools to version 3.7.0 or newer."
     );
   }

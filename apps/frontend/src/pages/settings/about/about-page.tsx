@@ -74,12 +74,12 @@ export default function AboutSettingsPage() {
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
           <img
-            src="/logo.svg"
+            src="/logo.png"
             alt={t("settings:about_logo_alt")}
-            className="h-12 w-12 rounded-md shadow"
+            className="h-12 w-12"
           />
           <div className="flex flex-col">
-            <CardTitle className="text-xl">Wealthfolio</CardTitle>
+            <CardTitle className="font-brand text-xl">SURfi</CardTitle>
             <CardDescription>
               {t("settings:about_version", { version: version || "N/A" })}
             </CardDescription>

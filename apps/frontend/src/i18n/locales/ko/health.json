@@ -179,7 +179,7 @@
     "retry": "다시 시도"
   },
   "sheet": {
-    "groupedPriceMessage": "Wealthfolio가 이 날짜들에 이월된 가격을 사용하고 있습니다. 실제 거래일의 가격을 다시 가져오거나 추가하세요. 해당 날짜가 휴장일이었다면 문제를 무시하세요.",
+    "groupedPriceMessage": "SURfi가 이 날짜들에 이월된 가격을 사용하고 있습니다. 실제 거래일의 가격을 다시 가져오거나 추가하세요. 해당 날짜가 휴장일이었다면 문제를 무시하세요.",
     "pricesByInvestment": "투자 자산별 가격",
     "pricesByInvestmentHint": "투자 자산을 열어 가격을 다시 가져오거나 추가하세요. 해당 날짜가 휴장일이었다면 문제를 무시하세요.",
     "priceHistoryNeedsReview": "가격 기록 검토 필요",

@@ -150,11 +150,11 @@ mod tests {
             "wealthfolio-assistant-v1": {
                 "id": "wealthfolio-assistant-v1",
                 "version": "1.0.0",
-                "name": "Wealthfolio Assistant",
+                "name": "SURfi Assistant",
                 "description": "Default assistant",
                 "isDefault": true,
                 "sections": {
-                    "system": { "content": "You are Wealthfolio Assistant." },
+                    "system": { "content": "You are SURfi Assistant." },
                     "portfolioDomain": { "content": "Portfolio data access." },
                     "toolUsage": { "content": "Use tools wisely." },
                     "adviceGuardrails": { "content": "Not financial advice." }
@@ -192,7 +192,7 @@ mod tests {
         let config = ChatRunConfig::default();
         let prompt = service.build_system_prompt(&config).unwrap();
 
-        assert!(prompt.contains("Wealthfolio Assistant"));
+        assert!(prompt.contains("SURfi Assistant"));
         assert!(prompt.contains("Portfolio data access"));
         assert!(prompt.contains("Use tools wisely"));
         assert!(prompt.contains("Not financial advice"));
@@ -216,6 +216,6 @@ mod tests {
 
         // Should fall back to default template
         let prompt = service.build_system_prompt(&config).unwrap();
-        assert!(prompt.contains("Wealthfolio Assistant"));
+        assert!(prompt.contains("SURfi Assistant"));
     }
 }

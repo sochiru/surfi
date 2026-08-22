@@ -50,7 +50,7 @@
     "userFallback": "Utilisateur",
     "active": "Actif",
     "signOut": "Se déconnecter",
-    "signOutTitle": "Se déconnecter de Wealthfolio Connect ?",
+    "signOutTitle": "Se déconnecter de SURfi Connect ?",
     "signOutMessage": "Vous devrez vous reconnecter pour accéder à vos comptes de courtier synchronisés. Vos données locales ne seront pas affectées.",
     "signOutConfirm": "Se déconnecter",
     "signingOut": "Déconnexion..."
@@ -199,7 +199,7 @@
   },
   "serviceUnavailable": {
     "title": "Service temporairement indisponible",
-    "description": "Nous rencontrons des difficultés pour nous connecter à Wealthfolio Connect. Cela est généralement temporaire et devrait se résoudre rapidement.",
+    "description": "Nous rencontrons des difficultés pour nous connecter à SURfi Connect. Cela est généralement temporaire et devrait se résoudre rapidement.",
     "retrying": "Nouvelle tentative...",
     "tryAgain": "Réessayer"
   },
@@ -209,7 +209,7 @@
     "button": "Mettre à niveau"
   },
   "privacy": {
-    "footnote": "Wealthfolio Connect ne stocke pas vos identifiants de courtier ni vos données financières. Tout se synchronise en toute sécurité via un agrégateur vers votre base de données locale. La synchronisation des appareils utilise un chiffrement de bout en bout. <privacyLink>En savoir plus</privacyLink>"
+    "footnote": "SURfi Connect ne stocke pas vos identifiants de courtier ni vos données financières. Tout se synchronise en toute sécurité via un agrégateur vers votre base de données locale. La synchronisation des appareils utilise un chiffrement de bout en bout. <privacyLink>En savoir plus</privacyLink>"
   },
   "providers": {
     "continueWithGoogle": "Continuer avec Google",

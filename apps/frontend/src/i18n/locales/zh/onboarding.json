@@ -75,7 +75,7 @@
   },
   "connect": {
     "optional": "可选",
-    "title": "Wealthfolio Connect",
+    "title": "SURfi Connect",
     "subtitle": "自动同步您的券商，同时保护您的数据隐私。",
     "learnMore": "了解有关 Connect 的更多信息",
     "features": {

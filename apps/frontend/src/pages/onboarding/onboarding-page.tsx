@@ -80,9 +80,9 @@ const OnboardingPage = () => {
         <div className="flex flex-col items-center">
           {/* Logo */}
           <img
-            alt="Wealthfolio"
+            alt="SURfi"
             className="mb-3 h-16 w-16 sm:h-20 sm:w-20"
-            src="/logo-vantage.png"
+            src="/logo.png"
           />
 
           {/* Progress indicators */}

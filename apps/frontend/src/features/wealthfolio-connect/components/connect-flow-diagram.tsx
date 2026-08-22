@@ -47,9 +47,10 @@ export function ConnectFlowDiagram() {
             y="100"
             textAnchor="middle"
             className="fill-[#504f4f] dark:fill-white/50"
+            fontFamily="Space Mono, ui-monospace, monospace"
             fontSize="12"
           >
-            Wealthfolio
+            SURfi
           </text>
           <text
             x="90"

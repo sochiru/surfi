@@ -50,7 +50,7 @@
     "userFallback": "ユーザー",
     "active": "有効",
     "signOut": "サインアウト",
-    "signOutTitle": "Wealthfolio Connectからサインアウトしますか?",
+    "signOutTitle": "SURfi Connectからサインアウトしますか?",
     "signOutMessage": "同期済みの証券口座にアクセスするには、再度サインインが必要です。ローカルのデータには影響しません。",
     "signOutConfirm": "サインアウト",
     "signingOut": "サインアウトしています..."
@@ -199,7 +199,7 @@
   },
   "serviceUnavailable": {
     "title": "サービスを一時的にご利用いただけません",
-    "description": "Wealthfolio Connectに接続できません。一時的な問題のため、しばらくすると解消される見込みです。",
+    "description": "SURfi Connectに接続できません。一時的な問題のため、しばらくすると解消される見込みです。",
     "retrying": "再試行しています...",
     "tryAgain": "再試行"
   },
@@ -209,7 +209,7 @@
     "button": "アップグレード"
   },
   "privacy": {
-    "footnote": "Wealthfolio Connectは証券会社のログイン情報や金融データを保存しません。すべてのデータはアグリゲーター経由で安全にローカルデータベースへ同期されます。デバイス同期にはエンドツーエンド暗号化を使用しています。<privacyLink>詳しく見る</privacyLink>"
+    "footnote": "SURfi Connectは証券会社のログイン情報や金融データを保存しません。すべてのデータはアグリゲーター経由で安全にローカルデータベースへ同期されます。デバイス同期にはエンドツーエンド暗号化を使用しています。<privacyLink>詳しく見る</privacyLink>"
   },
   "providers": {
     "continueWithGoogle": "Googleで続ける",

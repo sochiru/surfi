@@ -1,6 +1,6 @@
 import { isWeb } from "@/adapters";
-import { isAppleDevice } from "@/lib/device-utils";
 import { useAuth } from "@/context/auth-context";
+import { isAppleDevice } from "@/lib/device-utils";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -54,7 +54,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                 >
                   <Link to="/">
                     <img
-                      className={`h-10 w-10 rounded-full bg-transparent shadow-lg transition-transform duration-700 ease-in-out [transform-style:preserve-3d] hover:[transform:rotateY(-180deg)] ${
+                      className={`h-10 w-10 bg-transparent shadow-none transition-transform duration-700 ease-in-out [transform-style:preserve-3d] hover:[transform:rotateY(-180deg)] ${
                         collapsed ? "[transform:rotateY(180deg)]" : ""
                       }`}
                       aria-hidden="true"
@@ -64,14 +64,14 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
 
                   <span
                     className={cn(
-                      "text-md text-foreground/90 ml-2 font-serif text-xl font-bold transition-opacity delay-100 duration-300 ease-in-out",
+                      "text-md text-foreground/90 ml-2 font-brand text-xl font-bold transition-opacity delay-100 duration-300 ease-in-out",
                       {
                         "sr-only opacity-0": collapsed,
                         "block opacity-100": !collapsed,
                       },
                     )}
                   >
-                    Wealthfolio
+                    SURfi
                   </span>
                 </div>
 
@@ -261,7 +261,8 @@ function NavItem({ item, collapsed, className, ...props }: NavItemProps) {
       variant={isActive ? "secondary" : "ghost"}
       asChild
       className={cn(
-        "text-foreground [&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
+        "[&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
+        isActive ? "text-secondary-foreground" : "text-foreground",
         collapsed ? "justify-center" : "justify-start",
         className,
       )}
@@ -307,7 +308,8 @@ function AddonsMenu({ addons, collapsed, onSetPinned }: AddonsMenuProps) {
         <Button
           variant={hasActiveAddon ? "secondary" : "ghost"}
           className={cn(
-            "text-foreground [&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
+            "[&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
+            hasActiveAddon ? "text-secondary-foreground" : "text-foreground",
             collapsed ? "justify-center" : "justify-start",
           )}
         >
@@ -342,7 +344,7 @@ function AddonsMenu({ addons, collapsed, onSetPinned }: AddonsMenuProps) {
               key={addon.id ?? addon.href}
               className={cn(
                 "hover:bg-accent focus-within:bg-accent group flex h-12 items-center rounded-sm transition-colors",
-                isActive && "bg-secondary",
+                isActive && "bg-secondary text-secondary-foreground",
               )}
             >
               <DropdownMenuItem

@@ -50,7 +50,7 @@
     "userFallback": "Benutzer",
     "active": "Aktiv",
     "signOut": "Abmelden",
-    "signOutTitle": "Von Wealthfolio Connect abmelden?",
+    "signOutTitle": "Von SURfi Connect abmelden?",
     "signOutMessage": "Sie müssen sich erneut anmelden, um auf Ihre synchronisierten Broker-Konten zuzugreifen. Ihre lokalen Daten sind nicht betroffen.",
     "signOutConfirm": "Abmelden",
     "signingOut": "Abmeldung..."
@@ -199,7 +199,7 @@
   },
   "serviceUnavailable": {
     "title": "Dienst vorübergehend nicht verfügbar",
-    "description": "Beim Verbinden mit Wealthfolio Connect ist ein Problem aufgetreten. Dies ist in der Regel vorübergehend und sollte sich in Kürze beheben.",
+    "description": "Beim Verbinden mit SURfi Connect ist ein Problem aufgetreten. Dies ist in der Regel vorübergehend und sollte sich in Kürze beheben.",
     "retrying": "Erneuter Versuch...",
     "tryAgain": "Erneut versuchen"
   },
@@ -209,7 +209,7 @@
     "button": "Upgrade"
   },
   "privacy": {
-    "footnote": "Wealthfolio Connect speichert weder Ihre Broker-Zugangsdaten noch Ihre Finanzdaten. Alles wird sicher über einen Aggregator mit Ihrer lokalen Datenbank synchronisiert. Die Gerätesynchronisierung verwendet Ende-zu-Ende-Verschlüsselung. <privacyLink>Mehr erfahren</privacyLink>"
+    "footnote": "SURfi Connect speichert weder Ihre Broker-Zugangsdaten noch Ihre Finanzdaten. Alles wird sicher über einen Aggregator mit Ihrer lokalen Datenbank synchronisiert. Die Gerätesynchronisierung verwendet Ende-zu-Ende-Verschlüsselung. <privacyLink>Mehr erfahren</privacyLink>"
   },
   "providers": {
     "continueWithGoogle": "Mit Google fortfahren",

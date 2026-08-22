@@ -511,7 +511,7 @@
     "italian": {
       "title": "イタリアの退職設定(fondo pensione、TFR、INPS)",
       "portfolio_title": "投資ポートフォリオ(Golden Butterfly、All-Weatherなど)",
-      "portfolio_desc": "これはWealthfolioが追跡するメインのポートフォリオです。リターンの前提、手数料負担、毎月の積立額をここで設定します。老後プランにおける主要な資産形成エンジンです。",
+      "portfolio_desc": "これはSURfiが追跡するメインのポートフォリオです。リターンの前提、手数料負担、毎月の積立額をここで設定します。老後プランにおける主要な資産形成エンジンです。",
       "fondo_title": "Fondo pensione integrativo(補完的年金基金)",
       "fondo_desc": "「年金基金を追加」を使用します。現在のファンド残高、毎月の拠出額、期待ファンドリターン、受取開始年齢を入力します。プランナーは将来残高を推定し、毎月の受取額を入力しない場合は、受取開始年齢から予想残高の3.5%/年を受取額として推定します。",
       "inps_title": "Pensione INPS(公的年金 — previdenza obbligatoria)",

@@ -84,7 +84,7 @@ export const backupDatabaseToPendingExport = (): Promise<PendingExport> =>
 
 export const restoreDatabase = (_backupFilePath: string): Promise<void> =>
   Promise.reject(
-    new Error("Restore in web mode requires stopping Wealthfolio and replacing app.db"),
+    new Error("Restore in web mode requires stopping SURfi and replacing app.db"),
   );
 
 // ============================================================================
