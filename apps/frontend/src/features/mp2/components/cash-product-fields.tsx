@@ -4,6 +4,7 @@ import type {
   DayCount,
   MonthlyCreditTiming,
   ProductConfig,
+  RatePeriod,
   RateTier,
 } from "@/lib/cash-product-meta";
 import {
@@ -13,8 +14,10 @@ import {
   defaultMp2Product,
   headlineApy,
   parseAccountMeta,
+  sanitizeRateSchedule,
   sanitizeRateTiers,
   setProductInMeta,
+  todayIsoDate,
 } from "@/lib/cash-product-meta";
 import { Button, Input, Label, Switch } from "@wealthfolio/ui";
 import {
@@ -117,10 +120,12 @@ function RateTierEditor({
   tiers,
   fallbackApy,
   onChange,
+  testIdPrefix = "",
 }: {
   tiers: RateTier[] | undefined;
   fallbackApy: number;
   onChange: (tiers: RateTier[] | undefined, headline: number) => void;
+  testIdPrefix?: string;
 }) {
   const rows = sanitizeRateTiers(tiers);
 
@@ -147,7 +152,7 @@ function RateTierEditor({
           type="button"
           variant="outline"
           size="sm"
-          data-testid="button-add-rate-tier"
+          data-testid={`${testIdPrefix}button-add-rate-tier`}
           onClick={() =>
             commit([
               ...rows,
@@ -170,11 +175,11 @@ function RateTierEditor({
             <div key={`${tier.upTo ?? "uncapped"}-${index}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
               <div>
                 {index === 0 ? (
-                  <Label htmlFor={`rate-tier-up-to-${index}`}>Up to (optional)</Label>
+                  <Label htmlFor={`${testIdPrefix}rate-tier-up-to-${index}`}>Up to (optional)</Label>
                 ) : null}
                 <Input
-                  id={`rate-tier-up-to-${index}`}
-                  data-testid={`input-rate-tier-up-to-${index}`}
+                  id={`${testIdPrefix}rate-tier-up-to-${index}`}
+                  data-testid={`input-${testIdPrefix}rate-tier-up-to-${index}`}
                   type="number"
                   placeholder="Uncapped"
                   value={tier.upTo ?? ""}
@@ -190,10 +195,12 @@ function RateTierEditor({
                 />
               </div>
               <div>
-                {index === 0 ? <Label htmlFor={`rate-tier-apy-${index}`}>APY (%)</Label> : null}
+                {index === 0 ? (
+                  <Label htmlFor={`${testIdPrefix}rate-tier-apy-${index}`}>APY (%)</Label>
+                ) : null}
                 <PercentInput
-                  id={`rate-tier-apy-${index}`}
-                  testId={`input-rate-tier-apy-${index}`}
+                  id={`${testIdPrefix}rate-tier-apy-${index}`}
+                  testId={`input-${testIdPrefix}rate-tier-apy-${index}`}
                   value={tier.apy}
                   onChange={(apy) => {
                     const next = [...rows];
@@ -207,7 +214,7 @@ function RateTierEditor({
                 variant="ghost"
                 size="sm"
                 className={index === 0 ? "mt-6" : ""}
-                data-testid={`button-remove-rate-tier-${index}`}
+                data-testid={`button-${testIdPrefix}remove-rate-tier-${index}`}
                 aria-label={`Remove rate band ${index + 1}`}
                 onClick={() => commit(rows.filter((_, rowIndex) => rowIndex !== index))}
               >
@@ -217,6 +224,102 @@ function RateTierEditor({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function RateScheduleEditor({
+  periods,
+  fallback,
+  onChange,
+}: {
+  periods: RatePeriod[] | undefined;
+  fallback: { apy: number; rateTiers?: RateTier[] };
+  onChange: (periods: RatePeriod[] | undefined) => void;
+}) {
+  const rows = sanitizeRateSchedule(periods);
+
+  const commit = (next: RatePeriod[]) => {
+    const sanitized = sanitizeRateSchedule(next);
+    onChange(sanitized.length ? sanitized : undefined);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium">Rate periods</p>
+          <p className="text-muted-foreground text-xs">
+            Use this when a promo starts mid-month. Keep 3% in the default bands, then add a period
+            from Aug 4 at 10% on the first ₱100,000. Days before that stay on the default.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="button-add-rate-period"
+          onClick={() =>
+            commit([
+              ...rows,
+              {
+                from: todayIsoDate(),
+                apy: fallback.apy,
+                rateTiers: fallback.rateTiers,
+              },
+            ])
+          }
+        >
+          Add period
+        </Button>
+      </div>
+      {rows.map((period, index) => (
+        <div
+          key={`${period.from}-${index}`}
+          className="border-border space-y-2 rounded-lg border p-3"
+        >
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Label htmlFor={`rate-period-from-${index}`}>Starts on</Label>
+              <Input
+                id={`rate-period-from-${index}`}
+                data-testid={`input-rate-period-from-${index}`}
+                type="date"
+                value={period.from}
+                onChange={(event) => {
+                  const next = [...rows];
+                  next[index] = { ...period, from: event.target.value };
+                  commit(next);
+                }}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              data-testid={`button-remove-rate-period-${index}`}
+              aria-label={`Remove rate period ${index + 1}`}
+              onClick={() => commit(rows.filter((_, rowIndex) => rowIndex !== index))}
+            >
+              Remove
+            </Button>
+          </div>
+          <RateTierEditor
+            tiers={period.rateTiers}
+            fallbackApy={period.apy}
+            testIdPrefix={`rate-period-${index}-`}
+            onChange={(rateTiers, headline) => {
+              const next = [...rows];
+              next[index] = {
+                ...period,
+                apy: headline,
+                rateTiers,
+              };
+              commit(next);
+            }}
+          />
+        </div>
+      ))}
     </div>
   );
 }
@@ -319,6 +422,14 @@ export function CashProductFields({
           tiers={product.yield.rateTiers}
           fallbackApy={product.yield.apy}
           onChange={(rateTiers, headline) => updateYield({ rateTiers, apy: headline })}
+        />
+      )}
+
+      {!isMp2 && (
+        <RateScheduleEditor
+          periods={product.yield.rateSchedule}
+          fallback={{ apy: product.yield.apy, rateTiers: product.yield.rateTiers }}
+          onChange={(rateSchedule) => updateYield({ rateSchedule })}
         />
       )}
 

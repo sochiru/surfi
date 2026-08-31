@@ -11,16 +11,28 @@ export interface RateTier {
   apy: number;
 }
 
+/** Dated APY window. Inclusive `from`; later periods replace it. */
+export interface RatePeriod {
+  from: string;
+  apy: number;
+  rateTiers?: RateTier[];
+}
+
 export interface YieldConfig {
   enabled: boolean;
   /**
    * Assumed rate, used for any year the provider has not declared yet.
    * Declared MP2 rates are app-wide — see `features/mp2/lib/dividend-rates`.
-   * Flat rate when `rateTiers` is empty.
+   * Flat rate when `rateTiers` is empty. Fallback for days before any schedule period.
    */
   apy: number;
   /** Marginal APY bands. Empty/omitted means the single `apy` applies to the full balance. */
   rateTiers?: RateTier[];
+  /**
+   * Promo / mission windows. The latest `from` on or before a day wins.
+   * Days before the first period keep `apy` / `rateTiers`.
+   */
+  rateSchedule?: RatePeriod[];
   creditFrequency: CreditFrequency;
   /** Date used for monthly credits. Defaults to the first day of the next month. */
   monthlyCreditTiming?: MonthlyCreditTiming;
@@ -231,17 +243,65 @@ export function sanitizeRateTiers(tiers: RateTier[] | undefined): RateTier[] {
   return unique;
 }
 
-export function headlineApy(yieldConfig: YieldConfig): number {
-  const tiers = sanitizeRateTiers(yieldConfig.rateTiers);
-  if (!tiers.length) return yieldConfig.apy;
+export function sanitizeRateSchedule(periods: RatePeriod[] | undefined): RatePeriod[] {
+  if (!periods?.length) return [];
+  const normalized = periods
+    .filter((period) => /^\d{4}-\d{2}-\d{2}$/.test(period.from))
+    .map((period) => ({
+      from: period.from,
+      apy: Math.max(0, period.apy),
+      rateTiers: sanitizeRateTiers(period.rateTiers),
+    }))
+    .sort((a, b) => a.from.localeCompare(b.from));
+  const unique: RatePeriod[] = [];
+  for (const period of normalized) {
+    const last = unique[unique.length - 1];
+    if (last && last.from === period.from) {
+      unique[unique.length - 1] = {
+        from: period.from,
+        apy: period.apy,
+        rateTiers: period.rateTiers.length ? period.rateTiers : undefined,
+      };
+    } else {
+      unique.push({
+        from: period.from,
+        apy: period.apy,
+        rateTiers: period.rateTiers.length ? period.rateTiers : undefined,
+      });
+    }
+  }
+  return unique;
+}
+
+export function yieldSnapshotOn(
+  yieldConfig: YieldConfig,
+  date = todayIsoDate(),
+): Pick<YieldConfig, "apy" | "rateTiers"> {
+  const schedule = sanitizeRateSchedule(yieldConfig.rateSchedule);
+  let chosen: RatePeriod | undefined;
+  for (const period of schedule) {
+    if (period.from <= date) chosen = period;
+  }
+  if (!chosen) return { apy: yieldConfig.apy, rateTiers: yieldConfig.rateTiers };
+  return {
+    apy: chosen.apy,
+    rateTiers: chosen.rateTiers?.length ? chosen.rateTiers : undefined,
+  };
+}
+
+export function headlineApy(yieldConfig: YieldConfig, date?: string): number {
+  const snapshot = yieldSnapshotOn(yieldConfig, date);
+  const tiers = sanitizeRateTiers(snapshot.rateTiers);
+  if (!tiers.length) return snapshot.apy;
   return Math.max(...tiers.map((tier) => tier.apy), 0);
 }
 
-export function effectiveApy(yieldConfig: YieldConfig, balance: number): number {
+export function effectiveApy(yieldConfig: YieldConfig, balance: number, date?: string): number {
+  const snapshot = yieldSnapshotOn(yieldConfig, date);
   const minimum = yieldConfig.minimumBalance ?? 0;
   if (balance <= 0 || balance < minimum) return 0;
-  const tiers = sanitizeRateTiers(yieldConfig.rateTiers);
-  if (!tiers.length) return yieldConfig.apy;
+  const tiers = sanitizeRateTiers(snapshot.rateTiers);
+  if (!tiers.length) return snapshot.apy;
   let previous = 0;
   let weighted = 0;
   for (const tier of tiers) {

@@ -56,6 +56,7 @@ import {
   holdingsImportHasAssets,
 } from "./utils/asset-review-utils";
 import { ACTIVITY_SKIP, isFieldMapped, primaryHeader } from "./utils/draft-utils";
+import { accountIdFromCsvValue } from "./utils/csv-account";
 import { findMappedActivityType, validateTickerSymbol } from "./utils/validation-utils";
 import {
   activityTypeAllowedForImportProfile,
@@ -137,7 +138,6 @@ function useStepValidation(
             return false;
           }
 
-          const validAccountIds = new Set((accounts ?? []).map((account) => account.id));
           for (const row of parsedRows) {
             const rawAccount = row[accountHeaderIndex]?.trim();
             if (!rawAccount) {
@@ -146,7 +146,7 @@ function useStepValidation(
               }
               continue;
             }
-            if (!validAccountIds.has(rawAccount) && !mapping.accountMappings?.[rawAccount]) {
+            if (!accountIdFromCsvValue(rawAccount, accounts ?? [], mapping.accountMappings)) {
               return false;
             }
           }
@@ -528,7 +528,7 @@ function ImportWizardContent() {
           state.accountId,
           validAccountIds,
           accountTypeById,
-          { importProfile },
+          { importProfile, accounts: accounts ?? [] },
         );
         dispatch(setDraftActivities(drafts));
         dispatch({ type: "SET_ASSET_PREVIEW_ITEMS", payload: [] });

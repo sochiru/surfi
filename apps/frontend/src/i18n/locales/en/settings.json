@@ -281,7 +281,7 @@
   "export_type_accounts": "Accounts",
   "export_type_accounts_description": "Your financial accounts",
   "export_type_activities": "Activities",
-  "export_type_activities_description": "Detailed transaction history and logs",
+  "export_type_activities_description": "Import-ready transaction CSV (and a full JSON dump). Re-import via Activities → Import.",
   "export_type_goals": "Goals",
   "export_type_goals_description": "Financial objectives and progress tracking",
   "export_type_portfolio_history": "Portfolio History",

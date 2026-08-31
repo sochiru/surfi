@@ -3,8 +3,10 @@ import {
   effectiveApy,
   headlineApy,
   parseAccountMeta,
+  sanitizeRateSchedule,
   sanitizeRateTiers,
   setCatalogSelectionInMeta,
+  yieldSnapshotOn,
 } from "./cash-product-meta";
 
 describe("sanitizeRateTiers", () => {
@@ -63,6 +65,48 @@ describe("effectiveApy", () => {
         4_000,
       ),
     ).toBe(0);
+  });
+});
+
+describe("rate schedule", () => {
+  const maya = {
+    enabled: true,
+    apy: 0.03,
+    creditFrequency: "daily" as const,
+    rateTiers: [
+      { upTo: 100_000, apy: 0.03 },
+      { apy: 0.03 },
+    ],
+    rateSchedule: [
+      {
+        from: "2026-08-04",
+        apy: 0.1,
+        rateTiers: [
+          { upTo: 100_000, apy: 0.1 },
+          { apy: 0.03 },
+        ],
+      },
+    ],
+  };
+
+  it("keeps the default bands until a period starts", () => {
+    expect(yieldSnapshotOn(maya, "2026-08-03").apy).toBe(0.03);
+    expect(effectiveApy(maya, 100_000, "2026-08-03")).toBeCloseTo(0.03);
+    expect(effectiveApy(maya, 100_000, "2026-08-04")).toBeCloseTo(0.1);
+    expect(headlineApy(maya, "2026-08-04")).toBe(0.1);
+  });
+
+  it("collapses duplicate start dates to the last row", () => {
+    expect(
+      sanitizeRateSchedule([
+        { from: "2026-08-04", apy: 0.1 },
+        { from: "2026-08-01", apy: 0.03 },
+        { from: "2026-08-04", apy: 0.08 },
+      ]),
+    ).toEqual([
+      { from: "2026-08-01", apy: 0.03 },
+      { from: "2026-08-04", apy: 0.08 },
+    ]);
   });
 });
 

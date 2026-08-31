@@ -23,7 +23,7 @@
     },
     {
       "src": "/logo.png",
-      "sizes": "413x411",
+      "sizes": "512x512",
       "type": "image/png"
     }
   ]

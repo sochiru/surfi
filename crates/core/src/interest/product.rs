@@ -49,6 +49,18 @@ pub struct RateTier {
     pub apy: Decimal,
 }
 
+/// APY (and optional bands) that apply from `from` until the next period.
+/// Days before every period use the account's default `apy` / `rate_tiers`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RatePeriod {
+    pub from: String,
+    #[serde(default)]
+    pub apy: Decimal,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rate_tiers: Vec<RateTier>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct YieldConfig {
@@ -62,6 +74,10 @@ pub struct YieldConfig {
     /// Marginal APY bands. Empty means the single `apy` applies to the full balance.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rate_tiers: Vec<RateTier>,
+    /// Dated promo windows (Maya mission boosts, campaign start mid-month).
+    /// Latest `from` on or before a day wins; earlier days keep the default bands.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rate_schedule: Vec<RatePeriod>,
     #[serde(default)]
     pub credit_frequency: CreditFrequency,
     #[serde(default)]
@@ -97,8 +113,40 @@ impl YieldConfig {
 
     /// Sorted unique bands; empty stored tiers collapse to a single uncapped `apy` row.
     pub fn normalized_rate_tiers(&self) -> Vec<RateTier> {
-        let mut tiers: Vec<RateTier> = self
-            .rate_tiers
+        Self::normalize_tiers(self.apy, &self.rate_tiers)
+    }
+
+    pub fn has_positive_rate(&self) -> bool {
+        self.apy > Decimal::ZERO
+            || self.rate_tiers.iter().any(|tier| tier.apy > Decimal::ZERO)
+            || self.rate_schedule.iter().any(|period| {
+                period.apy > Decimal::ZERO
+                    || period.rate_tiers.iter().any(|tier| tier.apy > Decimal::ZERO)
+            })
+    }
+
+    /// Default bands, unless a schedule period has started on or before `date`.
+    pub fn rate_snapshot_on(&self, date: NaiveDate) -> (Decimal, Vec<RateTier>) {
+        let period = self
+            .rate_schedule
+            .iter()
+            .filter_map(|period| {
+                parse_ymd(&period.from).map(|from| (from, period))
+            })
+            .filter(|(from, _)| *from <= date)
+            .max_by_key(|(from, _)| *from)
+            .map(|(_, period)| period);
+        match period {
+            Some(period) => (
+                period.apy.max(Decimal::ZERO),
+                Self::normalize_tiers(period.apy, &period.rate_tiers),
+            ),
+            None => (self.apy.max(Decimal::ZERO), self.normalized_rate_tiers()),
+        }
+    }
+
+    fn normalize_tiers(apy: Decimal, rate_tiers: &[RateTier]) -> Vec<RateTier> {
+        let mut tiers: Vec<RateTier> = rate_tiers
             .iter()
             .map(|tier| RateTier {
                 up_to: tier.up_to.filter(|limit| *limit > Decimal::ZERO),
@@ -108,7 +156,7 @@ impl YieldConfig {
         if tiers.is_empty() {
             return vec![RateTier {
                 up_to: None,
-                apy: self.apy.max(Decimal::ZERO),
+                apy: apy.max(Decimal::ZERO),
             }];
         }
         tiers.sort_by(|a, b| match (a.up_to, b.up_to) {
@@ -333,6 +381,7 @@ mod tests {
             minimum_balance: Decimal::ZERO,
             day_count: None,
             start_date: None,
+            rate_schedule: vec![],
         };
         let tiers = yield_cfg.normalized_rate_tiers();
         assert_eq!(tiers.len(), 1);
@@ -365,10 +414,44 @@ mod tests {
             minimum_balance: Decimal::ZERO,
             day_count: None,
             start_date: None,
+            rate_schedule: vec![],
         };
         let tiers = yield_cfg.normalized_rate_tiers();
         assert_eq!(tiers[0].up_to, Some(dec!(20000)));
         assert_eq!(tiers[0].apy, dec!(0.041));
         assert_eq!(tiers[1].up_to, Some(dec!(100000)));
+    }
+
+    #[test]
+    fn rate_snapshot_uses_the_latest_started_period() {
+        let yield_cfg = YieldConfig {
+            enabled: true,
+            apy: dec!(0.03),
+            rate_tiers: vec![],
+            rate_schedule: vec![
+                RatePeriod {
+                    from: "2024-08-04".into(),
+                    apy: dec!(0.10),
+                    rate_tiers: vec![],
+                },
+                RatePeriod {
+                    from: "2024-09-01".into(),
+                    apy: dec!(0.03),
+                    rate_tiers: vec![],
+                },
+            ],
+            credit_frequency: CreditFrequency::Daily,
+            monthly_credit_timing: MonthlyCreditTiming::NextMonthStart,
+            withholding_tax_rate: Decimal::ZERO,
+            minimum_balance: Decimal::ZERO,
+            day_count: None,
+            start_date: None,
+        };
+        let (aug3, _) = yield_cfg.rate_snapshot_on(parse_ymd("2024-08-03").unwrap());
+        let (aug4, _) = yield_cfg.rate_snapshot_on(parse_ymd("2024-08-04").unwrap());
+        let (sep, _) = yield_cfg.rate_snapshot_on(parse_ymd("2024-09-01").unwrap());
+        assert_eq!(aug3, dec!(0.03));
+        assert_eq!(aug4, dec!(0.10));
+        assert_eq!(sep, dec!(0.03));
     }
 }

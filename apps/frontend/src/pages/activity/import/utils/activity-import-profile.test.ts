@@ -129,6 +129,22 @@ describe("activity import profiles", () => {
     expect(profile).toBe(getActivityImportProfileForAccountType(AccountType.CREDIT_CARD));
   });
 
+  it("infers a profile from a unique CSV account name without an explicit mapping", () => {
+    const profile = getActivityImportProfileForImportContext({
+      accounts: [
+        { id: "brokerage-1", name: "Brokerage", accountType: AccountType.SECURITIES },
+        { id: "maya-1", name: "Maya Savings", accountType: AccountType.CASH },
+      ],
+      headers: ["date", "account", "activityType", "amount"],
+      parsedRows: [["2024-01-15", "Maya Savings", "DEPOSIT", "1000"]],
+      fieldMappings: {
+        [ImportFormat.ACCOUNT]: "account",
+      },
+    });
+
+    expect(profile).toBe(getActivityImportProfileForAccountType(AccountType.CASH));
+  });
+
   it("keeps transaction defaults when merging an old template for a credit card account", () => {
     const profile = getActivityImportProfileForAccountType(AccountType.CREDIT_CARD);
     const merged = mergeActivityMappingsForImportProfile(

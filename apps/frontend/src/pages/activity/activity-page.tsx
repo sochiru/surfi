@@ -17,6 +17,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import { Account, AccountScope, ActivityDetails } from "@/lib/types";
 import { formatDateISO } from "@/lib/utils";
 import { AlternativeAssetQuickAddModal } from "@/pages/asset/alternative-assets";
+import { useExportData } from "@/pages/settings/exports/use-export-data";
 import { useQuery } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import { Button, Icons, Page, PageContent, PageHeader } from "@wealthfolio/ui";
@@ -107,6 +108,10 @@ const ActivityPage = () => {
     duplicateActivity: handleDuplicate,
   } = useActivityActionDialogs();
   const navigate = useNavigate();
+  const { exportData, isExporting } = useExportData();
+  const exportActivitiesCsv = useCallback(() => {
+    void exportData({ format: "CSV", data: "activities" });
+  }, [exportData]);
   const [searchParams, setSearchParams] = useSearchParams();
   const activityUrlFilterKey = searchParams.toString();
   const activityUrlFilters = useMemo(
@@ -554,6 +559,12 @@ const ActivityPage = () => {
             onClick: () => navigate("/import"),
           },
           {
+            icon: Icons.Download,
+            label: t("activity:export_activities"),
+            testId: "export-activities-action",
+            onClick: exportActivitiesCsv,
+          },
+          {
             icon: Icons.Holdings,
             label: t("activity:page.transfer_holdings"),
             testId: "transfer-holdings-action",
@@ -568,7 +579,7 @@ const ActivityPage = () => {
         ],
       },
     ],
-    [handleEdit, navigate, t],
+    [exportActivitiesCsv, handleEdit, navigate, t],
   );
 
   const investmentActions = (
@@ -596,6 +607,16 @@ const ActivityPage = () => {
             <Icons.Import className="size-4" />
           </Link>
         </Button>
+        <Button
+          size="icon"
+          title={t("activity:export_activities")}
+          variant="outline"
+          data-testid="button-export-activities"
+          onClick={exportActivitiesCsv}
+          disabled={isExporting}
+        >
+          <Icons.Download className="size-4" />
+        </Button>
         <Button size="icon" title={t("common:add")} onClick={() => handleEdit(undefined)}>
           <Icons.Plus className="size-4" />
         </Button>
@@ -619,10 +640,16 @@ const ActivityPage = () => {
             testId: "import-activities-action",
             onClick: () => navigate("/import"),
           },
+          {
+            icon: Icons.Download,
+            label: t("activity:export_activities"),
+            testId: "export-activities-action",
+            onClick: exportActivitiesCsv,
+          },
         ],
       },
     ],
-    [navigate, t],
+    [exportActivitiesCsv, navigate, t],
   );
 
   const spendingActions = (
@@ -664,6 +691,16 @@ const ActivityPage = () => {
           <Link to={"/import"}>
             <Icons.Import className="size-4" />
           </Link>
+        </Button>
+        <Button
+          size="icon"
+          title={t("activity:export_activities")}
+          variant="outline"
+          data-testid="button-export-activities"
+          onClick={exportActivitiesCsv}
+          disabled={isExporting}
+        >
+          <Icons.Download className="size-4" />
         </Button>
         <Button
           size="icon"

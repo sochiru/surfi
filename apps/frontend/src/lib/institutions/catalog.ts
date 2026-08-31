@@ -63,7 +63,8 @@ export const INSTITUTIONS: CatalogInstitution[] = [
         id: "maya-savings",
         institutionId: "maya",
         name: "Maya Savings",
-        description: "3% base on the full balance, plus an editable boost on the first ₱100,000.",
+        description:
+          "3% on the full balance, plus an editable boost on the first ₱100,000. If a mission unlocks 10% mid-month, add a rate period from that day so Aug 1–3 can stay at 3%.",
         productKind: "HYSA",
         defaultCurrency: "PHP",
         defaultGroup: "Maya",

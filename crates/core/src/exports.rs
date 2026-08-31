@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate};
 use rust_decimal::Decimal;
 use serde::de::{MapAccess, Visitor};
 use serde::Deserializer;
@@ -6,6 +6,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::fmt;
 
+use crate::activities::{is_cash_symbol, ActivityDetails};
 use crate::assets::AssetKind;
 use crate::errors::{Error, Result, ValidationError};
 use crate::portfolio::holdings::{HoldingListItem, HoldingType, MonetaryValue};
@@ -304,6 +305,85 @@ pub fn format_holding_list_records(
     }
 }
 
+/// CSV uses the activity import template so another instance can re-import it.
+/// JSON keeps the full `ActivityDetails` dump.
+pub fn format_activity_records(
+    records: &[ActivityDetails],
+    format: ExportFileFormat,
+) -> Result<Option<Vec<u8>>> {
+    match format {
+        ExportFileFormat::Csv => {
+            let mut rows = records
+                .iter()
+                .map(ActivityImportCsvRow::from)
+                .collect::<Vec<_>>();
+            rows.sort_by(|left, right| left.date.cmp(&right.date).then(left.account.cmp(&right.account)));
+            format_records(&rows, format)
+        }
+        ExportFileFormat::Json => format_records(records, format),
+    }
+}
+
+/// Columns match `/sample-import.csv` plus `account` and `comment` for round-trip import.
+#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityImportCsvRow {
+    pub date: String,
+    pub account: String,
+    pub symbol: String,
+    pub instrument_type: String,
+    pub quantity: String,
+    pub activity_type: String,
+    pub unit_price: String,
+    pub currency: String,
+    pub fee: String,
+    pub tax: String,
+    pub amount: String,
+    pub fx_rate: String,
+    pub subtype: String,
+    pub comment: String,
+}
+
+impl From<&ActivityDetails> for ActivityImportCsvRow {
+    fn from(activity: &ActivityDetails) -> Self {
+        Self {
+            date: activity_export_date(&activity.date),
+            account: activity.account_name.clone(),
+            symbol: export_symbol(&activity.asset_symbol),
+            instrument_type: activity.instrument_type.clone().unwrap_or_default(),
+            quantity: activity.quantity.clone().unwrap_or_default(),
+            activity_type: activity.activity_type.clone(),
+            unit_price: activity.unit_price.clone().unwrap_or_default(),
+            currency: activity.currency.clone(),
+            fee: activity.fee.clone().unwrap_or_default(),
+            tax: activity.tax.clone().unwrap_or_default(),
+            amount: activity.amount.clone().unwrap_or_default(),
+            fx_rate: activity.fx_rate.clone().unwrap_or_default(),
+            subtype: activity.subtype.clone().unwrap_or_default(),
+            comment: activity.comment.clone().unwrap_or_default(),
+        }
+    }
+}
+
+fn activity_export_date(raw: &str) -> String {
+    if let Ok(parsed) = DateTime::parse_from_rfc3339(raw) {
+        return parsed.date_naive().format("%Y-%m-%d").to_string();
+    }
+    if let Ok(parsed) = NaiveDate::parse_from_str(raw.trim(), "%Y-%m-%d") {
+        return parsed.format("%Y-%m-%d").to_string();
+    }
+    raw.chars().take(10).collect()
+}
+
+fn export_symbol(symbol: &str) -> String {
+    let trimmed = symbol.trim();
+    if trimmed.is_empty() || is_cash_symbol(trimmed) {
+        String::new()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 fn records_to_csv<T: Serialize>(records: &[T]) -> Result<String> {
     let rows = records_to_object_rows(records)?;
     if rows.is_empty() {
@@ -594,5 +674,95 @@ mod tests {
         let content = format_records(&rows, ExportFileFormat::Json).unwrap();
 
         assert!(content.is_none());
+    }
+
+    fn sample_activity(
+        date: &str,
+        account_name: &str,
+        symbol: &str,
+        activity_type: &str,
+        amount: Option<&str>,
+    ) -> crate::activities::ActivityDetails {
+        crate::activities::ActivityDetails {
+            id: format!("{date}-{symbol}-{activity_type}"),
+            account_id: "acc-1".into(),
+            asset_id: symbol.into(),
+            activity_type: activity_type.into(),
+            subtype: None,
+            status: crate::activities::ActivityStatus::Posted,
+            date: date.into(),
+            quantity: Some("10".into()),
+            unit_price: Some("185.50".into()),
+            currency: "USD".into(),
+            fee: Some("4.95".into()),
+            tax: Some("0".into()),
+            amount: amount.map(str::to_string),
+            needs_review: false,
+            comment: Some("note".into()),
+            fx_rate: None,
+            created_at: date.into(),
+            updated_at: date.into(),
+            account_name: account_name.into(),
+            account_currency: "USD".into(),
+            asset_symbol: symbol.into(),
+            asset_name: None,
+            exchange_mic: None,
+            asset_pricing_mode: "MARKET".into(),
+            instrument_type: Some("EQUITY".into()),
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+            is_user_modified: false,
+            metadata: None,
+        }
+    }
+
+    #[test]
+    fn activity_csv_matches_the_import_template() {
+        let mut records = vec![
+            sample_activity(
+                "2024-06-01T12:00:00Z",
+                "Brokerage",
+                "AAPL",
+                "BUY",
+                None,
+            ),
+            sample_activity(
+                "2024-01-15T00:00:00Z",
+                "Maya Savings",
+                "$CASH-USD",
+                "DEPOSIT",
+                Some("1000.00"),
+            ),
+        ];
+        records[1].instrument_type = None;
+        records[1].quantity = None;
+        records[1].unit_price = None;
+
+        let csv = String::from_utf8(
+            format_activity_records(&records, ExportFileFormat::Csv)
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        let json = String::from_utf8(
+            format_activity_records(&records, ExportFileFormat::Json)
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+
+        assert!(csv.starts_with(
+            "\"date\",\"account\",\"symbol\",\"instrumentType\",\"quantity\",\"activityType\",\"unitPrice\",\"currency\",\"fee\",\"tax\",\"amount\",\"fxRate\",\"subtype\",\"comment\""
+        ));
+        assert!(csv.contains("\"2024-01-15\",\"Maya Savings\",\"\",\"\""));
+        assert!(csv.contains("\"2024-06-01\",\"Brokerage\",\"AAPL\""));
+        assert!(csv.contains("\"DEPOSIT\""));
+        assert!(json.contains("\"assetSymbol\": \"AAPL\""));
+        assert!(!csv.contains("assetSymbol"));
+        let first_data_line = csv.lines().nth(1).unwrap();
+        assert!(first_data_line.contains("2024-01-15"));
     }
 }

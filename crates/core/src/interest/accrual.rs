@@ -171,17 +171,10 @@ pub fn daily_interest_for_yield(
     date: NaiveDate,
 ) -> Decimal {
     let basis = yield_cfg.day_count_basis(date);
-    if yield_cfg.rate_tiers.is_empty() {
-        return daily_interest(
-            closing_cash,
-            yield_cfg.apy,
-            basis,
-            yield_cfg.minimum_balance,
-        );
-    }
+    let (_, tiers) = yield_cfg.rate_snapshot_on(date);
     daily_interest_with_tiers(
         closing_cash,
-        &yield_cfg.normalized_rate_tiers(),
+        &tiers,
         basis,
         yield_cfg.minimum_balance,
     )
@@ -194,7 +187,7 @@ pub fn blended_apy_for_yield(
     date: NaiveDate,
 ) -> Decimal {
     if closing_cash <= Decimal::ZERO {
-        return yield_cfg.apy;
+        return yield_cfg.rate_snapshot_on(date).0;
     }
     let daily = daily_interest_for_yield(closing_cash, yield_cfg, date);
     daily * Decimal::from(yield_cfg.day_count_basis(date)) / closing_cash
@@ -243,7 +236,7 @@ pub fn plan_interest(
     let Some(yield_cfg) = product.yield_config.as_ref() else {
         return InterestPlan::default();
     };
-    if !yield_cfg.enabled || (yield_cfg.apy <= Decimal::ZERO && rates.is_empty()) {
+    if !yield_cfg.enabled || (!yield_cfg.has_positive_rate() && rates.is_empty()) {
         return InterestPlan::default();
     }
 
@@ -485,7 +478,8 @@ fn reconcile(
 #[cfg(test)]
 mod tests {
     use super::super::product::{
-        CashProductType, YieldConfig, DAY_COUNT_ACTUAL_360, DAY_COUNT_ACTUAL_ACTUAL,
+        CashProductType, RatePeriod, RateTier, YieldConfig, DAY_COUNT_ACTUAL_360,
+        DAY_COUNT_ACTUAL_ACTUAL,
     };
     use super::*;
     use crate::activities::ACTIVITY_TYPE_DEPOSIT;
@@ -521,6 +515,7 @@ mod tests {
                     minimum_balance: Decimal::ZERO,
                     day_count: Some("actual_365".into()),
                     start_date: Some("2024-01-01".into()),
+                    rate_schedule: vec![],
                 }),
                 target_amount: None,
                 first_contribution_date: Some("2024-01-01".into()),
@@ -585,6 +580,7 @@ mod tests {
                     minimum_balance: Decimal::ZERO,
                     day_count: Some("actual_365".into()),
                     start_date: Some("2024-01-01".into()),
+                    rate_schedule: vec![],
                 }),
                 target_amount: None,
                 first_contribution_date: Some("2024-01-01".into()),
@@ -1345,5 +1341,69 @@ mod tests {
         // 31 days × (100,000 × 5.6% / 365)
         assert_eq!(credit.amount, round_money(dec!(5600) / Decimal::from(365) * Decimal::from(31)));
         assert_eq!(credit.tax, round_money(credit.amount * dec!(0.20)));
+    }
+
+    #[test]
+    fn a_mid_month_promo_keeps_the_base_rate_on_earlier_days() {
+        let mut setup = hysa(CreditFrequency::Daily, false);
+        if let Some(y) = setup.product.yield_config.as_mut() {
+            y.apy = dec!(0.03);
+            y.rate_tiers = vec![
+                RateTier {
+                    up_to: Some(dec!(100000)),
+                    apy: dec!(0.03),
+                },
+                RateTier {
+                    up_to: None,
+                    apy: dec!(0.03),
+                },
+            ];
+            y.rate_schedule = vec![RatePeriod {
+                from: "2024-08-04".into(),
+                apy: dec!(0.10),
+                rate_tiers: vec![
+                    RateTier {
+                        up_to: Some(dec!(100000)),
+                        apy: dec!(0.10),
+                    },
+                    RateTier {
+                        up_to: None,
+                        apy: dec!(0.03),
+                    },
+                ],
+            }];
+            y.start_date = Some("2024-08-01".into());
+        }
+        let yield_cfg = setup.product.yield_config.as_ref().unwrap();
+        let balance = dec!(100000);
+        let aug1 = NaiveDate::from_ymd_opt(2024, 8, 1).unwrap();
+        let aug4 = NaiveDate::from_ymd_opt(2024, 8, 4).unwrap();
+        let before = daily_interest_for_yield(balance, yield_cfg, aug1);
+        let after = daily_interest_for_yield(balance, yield_cfg, aug4);
+        assert_eq!(
+            round_money(before),
+            round_money(balance * dec!(0.03) / Decimal::from(365))
+        );
+        assert_eq!(
+            round_money(after),
+            round_money(balance * dec!(0.10) / Decimal::from(365))
+        );
+
+        let planned = plan(
+            "acc",
+            &setup,
+            &[deposit("2024-08-01", balance)],
+            NaiveDate::from_ymd_opt(2024, 8, 4).unwrap(),
+        );
+        let interest: Vec<_> = planned
+            .creates
+            .into_iter()
+            .filter(|row| row.kind == PlannedKind::Interest)
+            .collect();
+        assert_eq!(interest.len(), 4);
+        assert_eq!(interest[0].date, aug1);
+        assert_eq!(interest[0].amount, round_money(before));
+        assert_eq!(interest[3].date, aug4);
+        assert_eq!(interest[3].amount, round_money(after));
     }
 }
