@@ -7,6 +7,7 @@ use super::cash::CashLedgerEvent;
 use super::model::{build_idempotency_key, build_payout_idempotency_key};
 use super::product::{
     is_year_end, yield_start_date, CashProduct, CashProductType, CreditFrequency,
+    MonthlyCreditTiming,
 };
 use super::settings::Mp2DividendRates;
 
@@ -85,15 +86,27 @@ impl InterestPlan {
     }
 }
 
-/// Whether the product's schedule credits interest on `date`. Monthly products pay
-/// on the first of the following month, so only the 1st ever carries a credit.
-fn is_credit_date(date: NaiveDate, month_weighted: bool, frequency: CreditFrequency) -> bool {
+fn is_month_end(date: NaiveDate) -> bool {
+    date.succ_opt()
+        .map_or(true, |next| next.month() != date.month())
+}
+
+/// Whether the product's schedule credits interest on `date`.
+fn is_credit_date(
+    date: NaiveDate,
+    month_weighted: bool,
+    frequency: CreditFrequency,
+    monthly_timing: MonthlyCreditTiming,
+) -> bool {
     if month_weighted {
         return is_year_end(date);
     }
     match frequency {
         CreditFrequency::Daily => true,
-        CreditFrequency::Monthly => date.day() == 1,
+        CreditFrequency::Monthly => match monthly_timing {
+            MonthlyCreditTiming::MonthEnd => is_month_end(date),
+            MonthlyCreditTiming::NextMonthStart => date.day() == 1,
+        },
         CreditFrequency::Yearly => is_year_end(date),
     }
 }
@@ -189,7 +202,12 @@ pub fn plan_interest(
         .filter(|e| {
             e.is_amendable()
                 && (override_dates.contains(&e.date)
-                    || !is_credit_date(e.date, month_weighted, yield_cfg.credit_frequency))
+                    || !is_credit_date(
+                        e.date,
+                        month_weighted,
+                        yield_cfg.credit_frequency,
+                        yield_cfg.monthly_credit_timing,
+                    ))
         })
         .map(|e| PlannedRemoval {
             activity_id: e.id.clone(),
@@ -221,7 +239,6 @@ pub fn plan_interest(
         .map(|e| e.date)
         .collect();
 
-    let basis = yield_cfg.day_count_basis();
     let minimum_balance = yield_cfg.minimum_balance;
     let walk_from = first_event.map(|d| d.min(start)).unwrap_or(start);
     let mut acc = PlanAccumulator::with_removals(removals);
@@ -269,10 +286,8 @@ pub fn plan_interest(
                     try_post(&ctx, &mut acc, day, base * rate, rate, estimated);
                 }
             } else {
-                // Banks credit a month's interest on the first day of the next month.
-                // Flushing before today's accrual lets the credit start earning the
-                // day it lands, which is how a compounding account behaves.
                 if yield_cfg.credit_frequency == CreditFrequency::Monthly
+                    && yield_cfg.monthly_credit_timing == MonthlyCreditTiming::NextMonthStart
                     && day.day() == 1
                     && month_accum > Decimal::ZERO
                 {
@@ -282,13 +297,24 @@ pub fn plan_interest(
 
                 // Interest is earned on the day's closing balance, so a deposit
                 // earns from the day it lands rather than the day after.
-                let daily = daily_interest(acc.running, rate, basis, minimum_balance);
+                let daily = daily_interest(
+                    acc.running,
+                    rate,
+                    yield_cfg.day_count_basis(day),
+                    minimum_balance,
+                );
                 match yield_cfg.credit_frequency {
                     CreditFrequency::Daily => {
                         try_post(&ctx, &mut acc, day, daily, rate, estimated);
                     }
                     CreditFrequency::Monthly => {
                         month_accum += daily;
+                        if yield_cfg.monthly_credit_timing == MonthlyCreditTiming::MonthEnd
+                            && is_month_end(day)
+                        {
+                            try_post(&ctx, &mut acc, day, month_accum, rate, estimated);
+                            month_accum = Decimal::ZERO;
+                        }
                     }
                     CreditFrequency::Yearly => {
                         year_accum += daily;
@@ -389,7 +415,9 @@ fn reconcile(
 
 #[cfg(test)]
 mod tests {
-    use super::super::product::{CashProductType, YieldConfig, DAY_COUNT_ACTUAL_360};
+    use super::super::product::{
+        CashProductType, YieldConfig, DAY_COUNT_ACTUAL_360, DAY_COUNT_ACTUAL_ACTUAL,
+    };
     use super::*;
     use crate::activities::ACTIVITY_TYPE_DEPOSIT;
     use rust_decimal_macros::dec;
@@ -418,6 +446,7 @@ mod tests {
                     enabled: true,
                     apy: dec!(0.365),
                     credit_frequency: freq,
+                    monthly_credit_timing: MonthlyCreditTiming::NextMonthStart,
                     withholding_tax_rate: Decimal::ZERO,
                     minimum_balance: Decimal::ZERO,
                     day_count: Some("actual_365".into()),
@@ -480,6 +509,7 @@ mod tests {
                     enabled: true,
                     apy,
                     credit_frequency: CreditFrequency::Yearly,
+                    monthly_credit_timing: MonthlyCreditTiming::NextMonthStart,
                     withholding_tax_rate: Decimal::ZERO,
                     minimum_balance: Decimal::ZERO,
                     day_count: Some("actual_365".into()),
@@ -558,6 +588,24 @@ mod tests {
         assert_eq!(planned.creates[0].amount, dec!(13.89));
     }
 
+    #[test]
+    fn actual_actual_uses_366_days_in_a_leap_year() {
+        let events = vec![deposit("2024-02-29", dec!(100000))];
+        let mut setup = hysa(CreditFrequency::Daily, false);
+        if let Some(y) = setup.product.yield_config.as_mut() {
+            y.apy = dec!(0.05);
+            y.day_count = Some(DAY_COUNT_ACTUAL_ACTUAL.into());
+        }
+        let planned = plan(
+            "acc",
+            &setup,
+            &events,
+            NaiveDate::from_ymd_opt(2024, 2, 29).unwrap(),
+        );
+
+        assert_eq!(planned.creates[0].amount, dec!(13.66));
+    }
+
     /// Mirrors a real BanKo statement: 5% on an actual/360 basis, 20% withholding,
     /// credited on the first of the next month, compounding.
     #[test]
@@ -632,6 +680,28 @@ mod tests {
         );
         // 31 earning days: the Jan 1 deposit earns from Jan 1.
         assert_eq!(interest[0].amount, dec!(31.00));
+    }
+
+    #[test]
+    fn monthly_interest_can_credit_on_the_last_day_of_the_month() {
+        let mut setup = hysa(CreditFrequency::Monthly, true);
+        if let Some(y) = setup.product.yield_config.as_mut() {
+            y.monthly_credit_timing = MonthlyCreditTiming::MonthEnd;
+        }
+        let events = vec![deposit("2024-01-01", dec!(1000))];
+        let planned = plan(
+            "acc",
+            &setup,
+            &events,
+            NaiveDate::from_ymd_opt(2024, 2, 1).unwrap(),
+        );
+
+        assert_eq!(planned.creates.len(), 1);
+        assert_eq!(
+            planned.creates[0].date,
+            NaiveDate::from_ymd_opt(2024, 1, 31).unwrap()
+        );
+        assert_eq!(planned.creates[0].amount, dec!(31.00));
     }
 
     #[test]

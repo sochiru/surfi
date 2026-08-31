@@ -16,7 +16,7 @@ import {
   selectableYears,
   setDeclaredRate,
 } from "./dividend-rates";
-import { projectCashProduct } from "./projection";
+import { projectCashProduct, resolveMp2DividendYear } from "./projection";
 
 describe("cash-product-meta", () => {
   test("parses MP2 meta", () => {
@@ -118,6 +118,59 @@ describe("projectCashProduct", () => {
     expect(result.years.map((y) => y.estimated)).toEqual([false, false, true]);
   });
 
+  test("recorded contributions and dividends replace the assumptions for their year", () => {
+    const result = projectCashProduct({
+      monthlyContribution: 1000,
+      apy: 0.0712,
+      years: 3,
+      compounding: true,
+      startYear: 2024,
+      contributionHistory: { "2024": 500_000, "2025": 0 },
+      dividendHistory: { "2025": 40_000 },
+    });
+
+    const [first, second, third] = result.years;
+    expect(first.contributions).toBe(500_000);
+    expect(first.dividend).toBeCloseTo((500_000 / 12) * 6.5 * 0.0712, 6);
+    expect(second.dividend).toBe(40_000);
+    expect(second.recorded).toBe(true);
+    expect(third.contributions).toBe(12_000);
+    expect(third.recorded).toBe(false);
+    expect(result.totalContributions).toBe(512_000);
+  });
+
+  test("an account with only past contributions still grows to maturity", () => {
+    const result = projectCashProduct({
+      monthlyContribution: 0,
+      apy: 0.07,
+      years: 3,
+      compounding: true,
+      startYear: 2024,
+      contributionHistory: { "2024": 1_000_000 },
+      dividendHistory: { "2024": 123_487.95 },
+    });
+
+    expect(result.years[0].balance).toBeCloseTo(1_123_487.95, 6);
+    expect(result.finalBalance).toBeCloseTo(1_123_487.95 * 1.07 * 1.07, 6);
+  });
+
+  test("does not invent future contributions when no recurring amount is assumed", () => {
+    const result = projectCashProduct({
+      monthlyContribution: 0,
+      apy: 0.07,
+      years: 5,
+      compounding: true,
+      startYear: 2026,
+      contributionHistory: { "2026": 150_000 },
+    });
+
+    expect(result.totalContributions).toBe(150_000);
+    expect(result.finalBalance).toBeCloseTo(
+      result.totalContributions + result.totalDividends,
+      6,
+    );
+  });
+
   test("a lower declared rate reduces every later year", () => {
     const base = {
       monthlyContribution: 1000,
@@ -129,5 +182,19 @@ describe("projectCashProduct", () => {
     const assumed = projectCashProduct(base);
     const corrected = projectCashProduct({ ...base, rateHistory: { "2023": 0.06 } });
     expect(corrected.finalBalance).toBeLessThan(assumed.finalBalance);
+  });
+});
+
+describe("resolveMp2DividendYear", () => {
+  test("uses the explicitly recorded dividend year", () => {
+    expect(resolveMp2DividendYear(new Date(2026, 2, 1), 2024)).toBe(2024);
+  });
+
+  test("attributes a following-year manual credit to the prior year", () => {
+    expect(resolveMp2DividendYear(new Date(2026, 2, 1))).toBe(2025);
+  });
+
+  test("keeps a December 31 auto credit in the same year", () => {
+    expect(resolveMp2DividendYear(new Date(2025, 11, 31))).toBe(2025);
   });
 });

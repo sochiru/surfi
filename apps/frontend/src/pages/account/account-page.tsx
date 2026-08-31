@@ -70,6 +70,7 @@ import { useActivityActionDialogs } from "@/pages/activity/hooks/use-activity-ac
 import { useActivitySearch } from "@/pages/activity/hooks/use-activity-search";
 import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
 import { CashProductPanel } from "@/features/mp2/components/cash-product-panel";
+import { useCashProductActions } from "@/features/mp2/hooks/use-cash-product-actions";
 import { isCashProductAccount } from "@/lib/cash-product-meta";
 import { HoldingsEditMode } from "@/pages/holdings/components/holdings-edit-mode";
 import { useCalculatePerformanceHistory } from "@/pages/performance/hooks/use-performance-data";
@@ -215,6 +216,7 @@ const AccountPage = () => {
   const recalculatePortfolioMutation = useRecalculatePortfolioMutation();
   const { accounts, isLoading: isAccountsLoading } = useAccounts();
   const account = useMemo(() => accounts?.find((acc) => acc.id === id), [accounts, id]);
+  const cashProductActions = useCashProductActions(account);
   const isLiabilityAccount = isLiabilityAccountType(account?.accountType);
   const isCashOnlyAccount = account?.accountType === AccountType.CASH || isLiabilityAccount;
   const supportsPerformance = accountSupportsPurpose(account, AccountPurpose.PERFORMANCE);
@@ -758,8 +760,9 @@ const AccountPage = () => {
           <ActionPalette
             open={actionPaletteOpen}
             onOpenChange={setActionPaletteOpen}
-            groups={
-              canEditHoldingsDirectly
+            groups={[
+              ...(cashProductActions.group ? [cashProductActions.group] : []),
+              ...(canEditHoldingsDirectly
                 ? ([
                     {
                       title: t("account:action_group_holdings"),
@@ -831,8 +834,8 @@ const AccountPage = () => {
                         },
                       ],
                     },
-                  ] satisfies ActionPaletteGroup[])
-            }
+                  ] satisfies ActionPaletteGroup[])),
+            ]}
           />
         }
       >
@@ -1237,6 +1240,8 @@ const AccountPage = () => {
         }
         cashAuditTarget={selectedCashAuditTarget ?? undefined}
       />
+
+      {cashProductActions.dialogs}
 
       {/* Bulk Holdings Modal for Transfer Holdings */}
       <BulkHoldingsModal

@@ -69,6 +69,8 @@ pub struct YieldConfig {
     pub apy: f64,
     #[serde(default)]
     pub credit_frequency: String,
+    #[serde(default = "default_monthly_credit_timing")]
+    pub monthly_credit_timing: String,
     #[serde(default = "default_day_count")]
     pub day_count: String,
     pub start_date: Option<String>,
@@ -76,6 +78,10 @@ pub struct YieldConfig {
 
 fn default_day_count() -> String {
     "actual_365".to_string()
+}
+
+fn default_monthly_credit_timing() -> String {
+    "next_month_start".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

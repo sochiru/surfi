@@ -2,7 +2,8 @@ export const FIXED_INCOME_CATEGORY_ID = "FIXED_INCOME";
 
 export type CashProductType = "HYSA" | "HYSA_GOAL" | "PAGIBIG_MP2";
 export type CreditFrequency = "daily" | "monthly" | "yearly";
-export type DayCount = "actual_365" | "actual_360";
+export type MonthlyCreditTiming = "month_end" | "next_month_start";
+export type DayCount = "actual_actual" | "actual_365" | "actual_360";
 
 export interface YieldConfig {
   enabled: boolean;
@@ -12,6 +13,8 @@ export interface YieldConfig {
    */
   apy: number;
   creditFrequency: CreditFrequency;
+  /** Date used for monthly credits. Defaults to the first day of the next month. */
+  monthlyCreditTiming?: MonthlyCreditTiming;
   /**
    * Final withholding deducted from each credit, as a fraction (0.2 = 20%).
    * Philippine bank interest is taxed at 20%; MP2 dividends are exempt.
@@ -117,6 +120,7 @@ export function defaultHysaProduct(
       enabled: true,
       apy,
       creditFrequency: frequency,
+      monthlyCreditTiming: "next_month_start",
       dayCount: "actual_365",
       startDate: new Date().toISOString().slice(0, 10),
     },
@@ -135,6 +139,7 @@ export function defaultHysaGoalProduct(
       enabled: true,
       apy,
       creditFrequency: "daily",
+      monthlyCreditTiming: "next_month_start",
       dayCount: "actual_365",
       startDate: new Date().toISOString().slice(0, 10),
     },

@@ -2,6 +2,7 @@ import type {
   CashProductType,
   CreditFrequency,
   DayCount,
+  MonthlyCreditTiming,
   ProductConfig,
 } from "@/lib/cash-product-meta";
 import {
@@ -175,6 +176,25 @@ export function CashProductFields({ meta, onMetaChange, productKind }: CashProdu
             </Select>
           </Field>
         )}
+        {!isMp2 && product.yield.creditFrequency === "monthly" && (
+          <Field>
+            <Label>Monthly credit date</Label>
+            <Select
+              value={product.yield.monthlyCreditTiming ?? "next_month_start"}
+              onValueChange={(value) =>
+                updateYield({ monthlyCreditTiming: value as MonthlyCreditTiming })
+              }
+            >
+              <SelectTrigger data-testid="select-monthly-credit-timing">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month_end">Last day of the month</SelectItem>
+                <SelectItem value="next_month_start">First day of the next month</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
       </FieldGrid>
 
       <div className="flex items-center justify-between gap-3">
@@ -300,12 +320,13 @@ export function CashProductFields({ meta, onMetaChange, productKind }: CashProdu
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="actual_actual">Actual / actual (365 or 366)</SelectItem>
                 <SelectItem value="actual_365">Actual / 365</SelectItem>
                 <SelectItem value="actual_360">Actual / 360</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-muted-foreground text-xs">
-              A 360 basis pays slightly more for the same rate.
+              Tonik uses 365 days, or 366 in a leap year. A 360 basis pays slightly more.
             </p>
           </Field>
           <Field>

@@ -10,6 +10,7 @@ pub const CASH_CATEGORY_FIXED_INCOME: &str = "FIXED_INCOME";
 pub const MP2_GROUP: &str = "Pag-IBIG";
 pub const MP2_TERM_YEARS: u32 = 5;
 pub const DAY_COUNT_ACTUAL_360: &str = "actual_360";
+pub const DAY_COUNT_ACTUAL_ACTUAL: &str = "actual_actual";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -28,6 +29,14 @@ pub enum CreditFrequency {
     Yearly,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MonthlyCreditTiming {
+    MonthEnd,
+    #[default]
+    NextMonthStart,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct YieldConfig {
@@ -39,6 +48,8 @@ pub struct YieldConfig {
     pub apy: Decimal,
     #[serde(default)]
     pub credit_frequency: CreditFrequency,
+    #[serde(default)]
+    pub monthly_credit_timing: MonthlyCreditTiming,
     /// Final withholding deducted from each credit, as a fraction (0.20 = 20%).
     /// Philippine bank interest is taxed at 20%; MP2 dividends are exempt.
     #[serde(default)]
@@ -46,8 +57,7 @@ pub struct YieldConfig {
     /// Balance the account must hold on a given day to earn anything that day.
     #[serde(default)]
     pub minimum_balance: Decimal,
-    /// `actual_360` or `actual_365`. A 360 basis pays slightly more per day for
-    /// the same quoted rate, and is what many banks use.
+    /// `actual_360`, `actual_365`, or `actual_actual` (365/366).
     #[serde(default)]
     pub day_count: Option<String>,
     #[serde(default)]
@@ -55,9 +65,16 @@ pub struct YieldConfig {
 }
 
 impl YieldConfig {
-    pub fn day_count_basis(&self) -> i64 {
+    pub fn day_count_basis(&self, date: NaiveDate) -> i64 {
         match self.day_count.as_deref() {
             Some(basis) if basis.eq_ignore_ascii_case(DAY_COUNT_ACTUAL_360) => 360,
+            Some(basis) if basis.eq_ignore_ascii_case(DAY_COUNT_ACTUAL_ACTUAL) => {
+                if NaiveDate::from_ymd_opt(date.year(), 2, 29).is_some() {
+                    366
+                } else {
+                    365
+                }
+            }
             _ => 365,
         }
     }

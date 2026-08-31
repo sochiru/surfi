@@ -6,6 +6,7 @@ interface RecordMp2DividendInput {
   currency: string;
   amount: number;
   activityDate: Date;
+  dividendYear: number;
   compounding: boolean;
   notes?: string;
 }
@@ -20,6 +21,7 @@ export async function recordMp2Dividend(input: RecordMp2DividendInput): Promise<
     currency: input.currency,
     fee: 0,
     comment: input.notes ?? "MP2 dividend",
+    metadata: { mp2DividendYear: input.dividendYear },
   });
   if (!input.compounding) {
     await createActivity({
