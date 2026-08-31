@@ -11,7 +11,15 @@ import {
   Input,
   Label,
 } from "@wealthfolio/ui";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@wealthfolio/ui/components/ui/select";
 import { toast } from "sonner";
+import { selectableYears } from "../lib/dividend-rates";
 import { recordMp2Dividend } from "../lib/record-dividend";
 
 interface RecordDividendDialogProps {
@@ -19,6 +27,7 @@ interface RecordDividendDialogProps {
   onOpenChange: (open: boolean) => void;
   accountId: string;
   currency: string;
+  firstContributionDate?: string;
   compounding: boolean;
   onRecorded: () => void;
 }
@@ -28,11 +37,16 @@ export function RecordDividendDialog({
   onOpenChange,
   accountId,
   currency,
+  firstContributionDate,
   compounding,
   onRecorded,
 }: RecordDividendDialogProps) {
   const [amount, setAmount] = useState("");
   const [activityDate, setActivityDate] = useState(new Date().toISOString().slice(0, 10));
+  const dividendYears = selectableYears(
+    firstContributionDate ? Number(firstContributionDate.slice(0, 4)) : undefined,
+  );
+  const [dividendYear, setDividendYear] = useState(dividendYears[0]);
 
   const recordMutation = useMutation({
     mutationFn: async () =>
@@ -41,6 +55,7 @@ export function RecordDividendDialog({
         currency,
         amount: Number(amount),
         activityDate: new Date(`${activityDate}T00:00:00`),
+        dividendYear,
         compounding,
         notes: compounding ? "MP2 dividend (compounded)" : "MP2 dividend (annual payout)",
       }),
@@ -60,6 +75,27 @@ export function RecordDividendDialog({
           <DialogTitle>Record MP2 dividend</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Dividend year</Label>
+            <Select
+              value={String(dividendYear)}
+              onValueChange={(value) => setDividendYear(Number(value))}
+            >
+              <SelectTrigger data-testid="select-mp2-dividend-year">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {dividendYears.map((year) => (
+                  <SelectItem key={year} value={String(year)}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">
+              The year the dividend was earned, even when credited the following year.
+            </p>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="dividend-date">Credit date</Label>
             <Input

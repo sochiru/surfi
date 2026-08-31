@@ -14,8 +14,8 @@ use uuid::Uuid;
 use wealthfolio_core::{
     activities::Sort,
     exports::{
-        export_file_name, format_holding_list_records, format_records, ExportDataType,
-        ExportFileFormat,
+        export_file_name, format_activity_records, format_holding_list_records, format_records,
+        ExportDataType, ExportFileFormat,
     },
     portfolio::holdings::HoldingListItem,
     portfolios::AccountScope,
@@ -287,7 +287,7 @@ async fn build_data_export_content(
                 )
                 .map_err(|e| format!("Failed to load activities for export: {}", e))?
                 .data;
-            format_records(&records, format).map_err(|e| e.to_string())
+            format_activity_records(&records, format).map_err(|e| e.to_string())
         }
         ExportDataType::Holdings => {
             let base_currency = state.get_base_currency();

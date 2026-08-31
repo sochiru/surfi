@@ -128,6 +128,7 @@ export const ExportForm = () => {
                 <Button
                   variant="outline"
                   size="icon"
+                  data-testid={`button-export-${item.key}`}
                   onClick={() => handleExport(item)}
                   disabled={isExporting}
                 >

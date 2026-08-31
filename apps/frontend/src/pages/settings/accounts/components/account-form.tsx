@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import * as z from "zod";
@@ -15,10 +15,8 @@ import {
   CurrencyInput,
   RadioGroup,
   RadioGroupItem,
-  ResponsiveSelect,
   ToggleGroup,
   ToggleGroupItem,
-  type ResponsiveSelectOption,
 } from "@wealthfolio/ui";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import {
@@ -49,6 +47,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 
 import { useAccountMutations } from "./use-account-mutations";
+import { AccountTypeCards, CatalogProductCards, InstitutionCards } from "./account-form-pickers";
 import { CashProductFields } from "@/features/mp2/components/cash-product-fields";
 import type { CashProductType } from "@/lib/cash-product-meta";
 import {
@@ -56,8 +55,17 @@ import {
   getProductType,
   parseAccountMeta,
   setCashCategoryInMeta,
+  setCatalogSelectionInMeta,
   setProductInMeta,
 } from "@/lib/cash-product-meta";
+import { accountTypeVisual } from "@/lib/account-type-visuals";
+import {
+  applyCatalogProduct,
+  CUSTOM_INSTITUTION_ID,
+  getCatalogProduct,
+  getInstitution,
+  type CatalogProduct,
+} from "@/lib/institutions/catalog";
 
 const CASH_ALLOCATION_DEFAULT_VALUE = "__default__";
 const CASH_FIXED_INCOME_CATEGORY_ID = "FIXED_INCOME";
@@ -69,13 +77,6 @@ function getSelectableCashCategoryFromMeta(meta?: string | null): string {
     ? CASH_FIXED_INCOME_CATEGORY_ID
     : CASH_ALLOCATION_DEFAULT_VALUE;
 }
-
-const accountTypeIcons = {
-  [AccountType.SECURITIES]: Icons.Briefcase,
-  [AccountType.CASH]: Icons.DollarSign,
-  [AccountType.CREDIT_CARD]: Icons.CreditCard,
-  [AccountType.CRYPTOCURRENCY]: Icons.Bitcoin,
-} as const;
 
 const formCardClassName =
   "rounded-xl border border-border bg-background p-4 sm:p-5 dark:border-border/70 dark:bg-muted/20";
@@ -100,15 +101,17 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
   const { t } = useTranslation();
   const { createAccountMutation, updateAccountMutation } = useAccountMutations({ onSuccess });
 
-  const accountTypes: ResponsiveSelectOption[] = useMemo(
-    () => [
-      { label: t("settings:accounts_form_type_securities"), value: "SECURITIES" },
-      { label: t("settings:accounts_form_type_cash"), value: "CASH" },
-      { label: t("settings:accounts_form_type_credit_card"), value: "CREDIT_CARD" },
-      { label: t("settings:accounts_form_type_crypto"), value: "CRYPTOCURRENCY" },
-    ],
+  const accountTypeLabels: Record<AccountType, string> = useMemo(
+    () => ({
+      SECURITIES: t("settings:accounts_form_type_securities"),
+      CASH: t("settings:accounts_form_type_cash"),
+      CREDIT_CARD: t("settings:accounts_form_type_credit_card"),
+      CRYPTOCURRENCY: t("settings:accounts_form_type_crypto"),
+    }),
     [t],
   );
+
+  const lastPrefill = useRef<{ name: string; group?: string; currency: string } | null>(null);
 
   // Track initial tracking mode to detect changes
   const initialTrackingMode = defaultValues?.trackingMode;
@@ -132,7 +135,11 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
   const isCreditCardAccount = currentAccountType === AccountType.CREDIT_CARD;
   const isCashAccount = currentAccountType === AccountType.CASH;
   const cashMeta = form.watch("meta");
+  const parsedCashMeta = parseAccountMeta(cashMeta);
   const cashProductType = getProductType(cashMeta);
+  const selectedInstitutionId = parsedCashMeta.institutionId ?? CUSTOM_INSTITUTION_ID;
+  const selectedCatalogProduct = getCatalogProduct(parsedCashMeta.productId);
+  const catalogInstitution = getInstitution(selectedInstitutionId);
   const isFixedIncome =
     getSelectableCashCategoryFromMeta(cashMeta) === CASH_FIXED_INCOME_CATEGORY_ID;
 
@@ -209,13 +216,40 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
     form.setValue("trackingMode", initialTrackingMode);
   };
 
+  const applyCatalog = useCallback(
+    (product: CatalogProduct) => {
+      const values = form.getValues();
+      const last = lastPrefill.current;
+      form.setValue("meta", applyCatalogProduct(values.meta, product), { shouldDirty: true });
+      if (!values.name || values.name === last?.name) {
+        form.setValue("name", product.suggestedName, { shouldDirty: true });
+      }
+      if (!values.group || values.group === last?.group) {
+        form.setValue("group", product.defaultGroup, { shouldDirty: true });
+      }
+      if (!defaultValues?.id) {
+        const stillDefault = !last && values.currency === defaultValues?.currency;
+        const stillLast = Boolean(last && values.currency === last.currency);
+        if (stillDefault || stillLast) {
+          form.setValue("currency", product.defaultCurrency, { shouldDirty: true });
+        }
+      }
+      lastPrefill.current = {
+        name: product.suggestedName,
+        group: product.defaultGroup,
+        currency: product.defaultCurrency,
+      };
+    },
+    [defaultValues?.currency, defaultValues?.id, form],
+  );
+
   const formTitle = defaultValues?.id
     ? t("settings:accounts_form_update_title")
     : t("settings:accounts_form_add_title");
   const formDescription = defaultValues?.id
     ? t("settings:accounts_form_update_description")
     : t("settings:accounts_form_add_description");
-  const AccountTypeIcon = accountTypeIcons[currentAccountType] ?? Icons.Wallet;
+  const AccountTypeIcon = accountTypeVisual(currentAccountType).icon;
 
   return (
     <Form {...form}>
@@ -282,14 +316,23 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                   <FormItem className="flex flex-col">
                     <FormLabel>{t("settings:accounts_form_type_label")}</FormLabel>
                     <FormControl>
-                      <ResponsiveSelect
+                      <AccountTypeCards
                         value={field.value}
-                        onValueChange={field.onChange}
-                        options={accountTypes}
-                        placeholder={t("settings:accounts_form_type_placeholder")}
-                        sheetTitle={t("settings:accounts_form_type_sheet_title")}
-                        sheetDescription={t("settings:accounts_form_type_sheet_description")}
-                        triggerClassName="h-11"
+                        labels={accountTypeLabels}
+                        onChange={(type) => {
+                          field.onChange(type);
+                          if (type !== AccountType.CASH) {
+                            form.setValue(
+                              "meta",
+                              setCatalogSelectionInMeta(
+                                setProductInMeta(form.getValues("meta"), null),
+                                null,
+                                null,
+                              ),
+                              { shouldDirty: true },
+                            );
+                          }
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -317,6 +360,68 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
               ) : null}
 
               {isCashAccount && (
+                <div className="flex flex-col gap-2">
+                  <div>
+                    <label className="text-sm font-medium">
+                      {t("settings:accounts.form_institution_label")}
+                    </label>
+                    <p className="text-muted-foreground text-xs">
+                      {t("settings:accounts.form_institution_description")}
+                    </p>
+                  </div>
+                  <InstitutionCards
+                    value={selectedInstitutionId}
+                    customLabel={t("settings:accounts.form_institution_custom")}
+                    onChange={(institutionId) => {
+                      if (institutionId === CUSTOM_INSTITUTION_ID) {
+                        form.setValue(
+                          "meta",
+                          setCatalogSelectionInMeta(form.getValues("meta"), null, null),
+                          { shouldDirty: true },
+                        );
+                        return;
+                      }
+                      const firstProduct = getInstitution(institutionId)?.products[0];
+                      if (firstProduct) applyCatalog(firstProduct);
+                    }}
+                  />
+                </div>
+              )}
+
+              {isCashAccount && catalogInstitution && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium">
+                      {t("settings:accounts.form_institution_product_label")}
+                    </label>
+                    <p className="text-muted-foreground text-xs">
+                      {t("settings:accounts.form_institution_product_description")}
+                    </p>
+                  </div>
+                  <CatalogProductCards
+                    products={catalogInstitution.products}
+                    value={parsedCashMeta.productId}
+                    onChange={applyCatalog}
+                  />
+                  {cashProductType && (
+                    <CashProductFields
+                      meta={cashMeta}
+                      productKind={cashProductType}
+                      headingOverride={
+                        selectedCatalogProduct
+                          ? {
+                              title: selectedCatalogProduct.name,
+                              description: selectedCatalogProduct.description,
+                            }
+                          : undefined
+                      }
+                      onMetaChange={(meta) => form.setValue("meta", meta, { shouldDirty: true })}
+                    />
+                  )}
+                </div>
+              )}
+
+              {isCashAccount && selectedInstitutionId === CUSTOM_INSTITUTION_ID && (
                 <div className="flex flex-col gap-2">
                   <div>
                     <label className="text-sm font-medium">
@@ -357,61 +462,70 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                 </div>
               )}
 
-              {isCashAccount && isFixedIncome && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium">Fixed-income product</label>
-                    <p className="text-muted-foreground text-xs">
-                      Configure auto-generated interest or dividends for this account.
-                    </p>
+              {isCashAccount &&
+                selectedInstitutionId === CUSTOM_INSTITUTION_ID &&
+                isFixedIncome && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium">
+                        {t("settings:accounts.form_fixed_income_product_label")}
+                      </label>
+                      <p className="text-muted-foreground text-xs">
+                        {t("settings:accounts.form_fixed_income_product_description")}
+                      </p>
+                    </div>
+                    <ToggleGroup
+                      type="single"
+                      aria-label={t("settings:accounts.form_fixed_income_product_aria")}
+                      value={cashProductType ?? CASH_PRODUCT_NONE}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        const existing = parseAccountMeta(cashMeta).product;
+                        const next =
+                          value === CASH_PRODUCT_NONE
+                            ? null
+                            : existing?.type === value
+                              ? existing
+                              : defaultCashProduct(value as CashProductType);
+                        form.setValue(
+                          "meta",
+                          setCatalogSelectionInMeta(setProductInMeta(cashMeta, next), null, null),
+                          { shouldDirty: true },
+                        );
+                      }}
+                      className="bg-muted grid h-11 grid-cols-4 rounded-lg p-1"
+                    >
+                      <ToggleGroupItem
+                        value={CASH_PRODUCT_NONE}
+                        className={cashClassificationItemClassName}
+                      >
+                        {t("settings:accounts.form_product_none")}
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="HYSA" className={cashClassificationItemClassName}>
+                        {t("settings:accounts.form_product_hysa")}
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value="HYSA_GOAL"
+                        className={cashClassificationItemClassName}
+                      >
+                        {t("settings:accounts.form_product_goal")}
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value="PAGIBIG_MP2"
+                        className={cashClassificationItemClassName}
+                      >
+                        {t("settings:accounts.form_product_mp2")}
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                    {cashProductType && (
+                      <CashProductFields
+                        meta={cashMeta}
+                        productKind={cashProductType}
+                        onMetaChange={(meta) => form.setValue("meta", meta, { shouldDirty: true })}
+                      />
+                    )}
                   </div>
-                  <ToggleGroup
-                    type="single"
-                    aria-label="Fixed income product type"
-                    value={cashProductType ?? CASH_PRODUCT_NONE}
-                    onValueChange={(value) => {
-                      if (!value) return;
-                      const existing = parseAccountMeta(cashMeta).product;
-                      const next =
-                        value === CASH_PRODUCT_NONE
-                          ? null
-                          : existing?.type === value
-                            ? existing
-                            : defaultCashProduct(value as CashProductType);
-                      form.setValue("meta", setProductInMeta(cashMeta, next), {
-                        shouldDirty: true,
-                      });
-                    }}
-                    className="bg-muted grid h-11 grid-cols-4 rounded-lg p-1"
-                  >
-                    <ToggleGroupItem
-                      value={CASH_PRODUCT_NONE}
-                      className={cashClassificationItemClassName}
-                    >
-                      None
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="HYSA" className={cashClassificationItemClassName}>
-                      HYSA
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="HYSA_GOAL" className={cashClassificationItemClassName}>
-                      Goal pot
-                    </ToggleGroupItem>
-                    <ToggleGroupItem
-                      value="PAGIBIG_MP2"
-                      className={cashClassificationItemClassName}
-                    >
-                      MP2
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                  {cashProductType && (
-                    <CashProductFields
-                      meta={cashMeta}
-                      productKind={cashProductType}
-                      onMetaChange={(meta) => form.setValue("meta", meta, { shouldDirty: true })}
-                    />
-                  )}
-                </div>
-              )}
+                )}
             </div>
           </section>
 

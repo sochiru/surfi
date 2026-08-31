@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { CardContent } from "@wealthfolio/ui/components/ui/card";
 import { validateTickerSymbol } from "../utils/validation-utils";
 import { findMappedActivityType } from "../utils/activity-type-mapping";
+import { accountIdFromCsvValue } from "../utils/csv-account";
 import { CSVFileViewer } from "./csv-file-viewer";
 import { MappingTable } from "./mapping-table";
 
@@ -109,8 +110,10 @@ export function CsvMappingEditor(props: CsvMappingEditorProps) {
   }, [props.data, props.getMappedValue]);
 
   const invalidAccounts = useMemo(() => {
-    return distinctAccounts.filter((account) => !props.mapping.accountMappings?.[account]);
-  }, [distinctAccounts, props.mapping.accountMappings]);
+    return distinctAccounts.filter(
+      (account) => !accountIdFromCsvValue(account, props.accounts, props.mapping.accountMappings),
+    );
+  }, [distinctAccounts, props.accounts, props.mapping.accountMappings]);
 
   const { distinctAccountRows } = useMemo(() => {
     const accountMap = new Map<string, { row: CsvRowData; count: number }>();

@@ -189,7 +189,7 @@ export function AssetDividendSection({ assetId, accountId = null }: Props) {
           size="sm"
           className="text-muted-foreground h-8 px-2 text-xs"
         >
-          <Link to="/dividends">View all</Link>
+          <Link to="/insights?tab=dividends">View all</Link>
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">

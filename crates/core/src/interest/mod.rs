@@ -14,8 +14,8 @@ pub use model::{
 };
 pub use product::{
     is_fixed_income_cash, mp2_maturity_date, parse_cash_product, parse_ymd, resolved_maturity_date,
-    CashProduct, CashProductType, CreditFrequency, YieldConfig, CASH_CATEGORY_FIXED_INCOME,
-    MP2_GROUP,
+    CashProduct, CashProductType, CreditFrequency, RateTier, YieldConfig,
+    CASH_CATEGORY_FIXED_INCOME, MP2_GROUP,
 };
 pub use sync::{
     CashInterestAccountResult, CashInterestSyncResult, InterestAccrualService,

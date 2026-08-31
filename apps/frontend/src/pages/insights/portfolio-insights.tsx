@@ -1,5 +1,9 @@
 import { AccountScopeSelector } from "@/components/account-filter-selector";
 import { SwipablePage, SwipablePageView } from "@/components/page";
+import {
+  DividendInsights,
+  DividendInsightsActions,
+} from "@/features/dividends/components/dividend-insights";
 
 import { useAccountScopeStore } from "@/lib/account-scope-store";
 import IncomePage from "@/pages/income/income-page";
@@ -53,6 +57,16 @@ export default function PortfolioInsightsPage() {
     [accountFilter, overviewToolbarActions, setAccountScope],
   );
 
+  const dividendActions = useMemo(
+    () => (
+      <div className="flex items-center gap-1 sm:gap-2">
+        <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
+        <DividendInsightsActions />
+      </div>
+    ),
+    [accountFilter],
+  );
+
   // Define the views with icons
   const views: SwipablePageView[] = useMemo(
     () => [
@@ -91,8 +105,19 @@ export default function PortfolioInsightsPage() {
           </Suspense>
         ),
       },
+      {
+        value: "dividends",
+        label: t("insights:insights.tab_dividends", "Dividends"),
+        icon: Icons.Income,
+        content: (
+          <Suspense fallback={<DashboardLoader />}>
+            <DividendInsights accountFilter={accountFilter} />
+          </Suspense>
+        ),
+        actions: dividendActions,
+      },
     ],
-    [accountFilter, holdingsActions, setAccountScope, t],
+    [accountFilter, dividendActions, holdingsActions, setAccountScope, t],
   );
 
   return <SwipablePage views={views} defaultView="overview" withPadding={true} />;

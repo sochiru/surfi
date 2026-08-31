@@ -77,6 +77,35 @@ describe("buildCashHoldingRows", () => {
     expect(row.rate).toBe(0.061);
   });
 
+  test("blends catalog rate tiers at the current cash balance", () => {
+    const meta = serializeAccountMeta({
+      institutionId: "maya",
+      productId: "maya-personal-goals",
+      product: {
+        type: "HYSA_GOAL",
+        compounding: true,
+        yield: {
+          enabled: true,
+          apy: 0.08,
+          creditFrequency: "monthly",
+          rateTiers: [
+            { upTo: 20_000, apy: 0.04 },
+            { upTo: 40_000, apy: 0.045 },
+            { upTo: 60_000, apy: 0.05 },
+            { upTo: 80_000, apy: 0.065 },
+            { upTo: 100_000, apy: 0.08 },
+          ],
+        },
+      },
+    });
+    const [row] = buildCashHoldingRows(
+      [account("g", "Goal", "CASH", meta)],
+      [valuation("g", 100_000)],
+    );
+
+    expect(row.rate).toBeCloseTo(0.056);
+  });
+
   test("falls back to a zero balance when the account has no valuation yet", () => {
     const [row] = buildCashHoldingRows([account("new", "Fresh")], []);
 

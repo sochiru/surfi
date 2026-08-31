@@ -8,6 +8,7 @@ import {
   ImportFormat,
 } from "@/lib/constants";
 import type { Account, ImportMappingData } from "@/lib/types";
+import { accountIdFromCsvValue } from "./csv-account";
 
 const ACTIVITY_SKIP = "_SKIP_";
 
@@ -41,7 +42,7 @@ export interface ActivityImportProfile {
   reviewColumns: readonly ImportReviewColumnId[];
 }
 
-type AccountProfileOption = { id: string; accountType?: string | null };
+type AccountProfileOption = { id: string; name?: string | null; accountType?: string | null };
 
 const IMPORTABLE_ACTIVITY_TYPES = Object.values(ActivityType).filter(
   (type): type is ActivityType => type !== ActivityType.UNKNOWN,
@@ -227,10 +228,9 @@ export function getActivityImportProfileForImportContext({
   const resolvedAccountIds = new Set<string>();
   for (const row of parsedRows) {
     const rawAccount = getMappedAccountColumnValue(row, headers, accountFieldMapping);
-    const mappedAccountId = rawAccount
-      ? (accountMappings[rawAccount] ?? accountMappings[rawAccount.toLowerCase()])
+    const accountId = rawAccount
+      ? accountIdFromCsvValue(rawAccount, accounts ?? [], accountMappings)
       : accountMappings[""];
-    const accountId = mappedAccountId || (accountById.has(rawAccount) ? rawAccount : "");
     if (accountId && accountById.has(accountId)) {
       resolvedAccountIds.add(accountId);
     }

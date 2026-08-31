@@ -3,9 +3,7 @@ use std::sync::Arc;
 use crate::context::ServiceContext;
 use log::debug;
 use tauri::State;
-use wealthfolio_core::interest::{
-    CashInterestSyncResult, InterestAccrualServiceTrait, Mp2DividendRates,
-};
+use wealthfolio_core::interest::{CashInterestSyncResult, Mp2DividendRates};
 
 #[tauri::command]
 pub async fn sync_cash_interest(

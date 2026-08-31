@@ -22,10 +22,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AccountPage from "./account-page";
 
 vi.mock("@/adapters", () => ({
+  createActivity: vi.fn(),
   getContributionLimit: vi.fn(),
   getHoldingsList: vi.fn(),
   getSnapshots: vi.fn(),
+  removeAutoInterest: vi.fn(),
   searchActivities: vi.fn(),
+  syncCashInterestAccount: vi.fn(),
 }));
 
 vi.mock("@/components/action-palette", () => ({
@@ -152,7 +155,9 @@ vi.mock("@/pages/performance/hooks/use-performance-data", () => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
+  useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useQuery: vi.fn(),
+  useQueryClient: vi.fn(() => ({ invalidateQueries: vi.fn() })),
 }));
 
 vi.mock("@wealthfolio/ui", () => {

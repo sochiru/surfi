@@ -18,6 +18,7 @@ import {
 import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import type { DividendCalendarEvent } from "@/adapters";
+import { useIsMobileViewport } from "@/hooks";
 import type { Holding } from "@/lib/types";
 import { buildDividendIncomeSummary, formatYieldPct } from "../lib/dividend-income-summary";
 
@@ -29,7 +30,7 @@ interface Props {
   fallbackCurrency?: string;
   /** Denser layout for Insights Overview. */
   compact?: boolean;
-  /** Optional header action (e.g. link to /dividends). */
+  /** Optional header action (e.g. link to dividend insights). */
   headerAction?: ReactNode;
 }
 
@@ -41,6 +42,7 @@ export function DividendIncomeChart({
   compact = false,
   headerAction,
 }: Props) {
+  const isMobile = useIsMobileViewport();
   const summary = useMemo(
     () => buildDividendIncomeSummary(events, holdings, fallbackCurrency),
     [events, holdings, fallbackCurrency],
@@ -62,11 +64,11 @@ export function DividendIncomeChart({
   if (isLoading) {
     return (
       <Card>
-        <CardHeader className={compact ? "pb-2" : undefined}>
+        <CardHeader className={compact ? "px-4 pb-2 sm:px-6" : "px-4 sm:px-6"}>
           <CardTitle className={compact ? "text-base" : "text-lg"}>Dividend income</CardTitle>
           <CardDescription>Loading recorded dividends…</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           <div className={`bg-muted/40 animate-pulse rounded-md ${compact ? "h-40" : "h-64"}`} />
         </CardContent>
       </Card>
@@ -76,30 +78,41 @@ export function DividendIncomeChart({
   return (
     <Card>
       <CardHeader
-        className={compact ? "flex flex-row items-start justify-between space-y-0 pb-2" : undefined}
+        className={
+          compact
+            ? "flex flex-row items-start justify-between space-y-0 px-4 pb-2 sm:px-6"
+            : "px-4 sm:px-6"
+        }
       >
         <div className="min-w-0 space-y-1">
           <CardTitle className={compact ? "text-base" : "text-lg"}>Dividend income</CardTitle>
           <CardDescription className={compact ? "text-xs" : undefined}>
             {compact
               ? "Cash received from holdings — 52-week and year to date."
-              : `Cash dividends already recorded — monthly totals by ticker. Yield is 52-week/YTD cash ÷ current investment market value${
+              : "Recorded cash dividends and yield from your current holdings."}
+            {!compact ? (
+              <span className="hidden sm:inline">
+                {` Monthly totals are grouped by ticker. Yield is 52-week/YTD cash ÷ current investment market value${
                   fallbackCurrency ? ` (${fallbackCurrency})` : ""
                 }.${
                   mixedCurrencies
                     ? " Mixed dividend currencies are converted with holding FX when available."
                     : ""
                 }`}
+              </span>
+            ) : null}
           </CardDescription>
         </div>
         {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
       </CardHeader>
-      <CardContent className={compact ? "space-y-4" : "space-y-6"}>
+      <CardContent
+        className={compact ? "space-y-4 px-4 sm:px-6" : "space-y-5 px-4 sm:space-y-6 sm:px-6"}
+      >
         <div
           className={
             compact
               ? "grid grid-cols-2 gap-3 sm:grid-cols-4"
-              : "grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+              : "grid grid-cols-2 gap-x-3 gap-y-4 lg:grid-cols-4"
           }
         >
           <div>
@@ -150,9 +163,12 @@ export function DividendIncomeChart({
         ) : (
           <ChartContainer
             config={chartConfig}
-            className={`aspect-auto w-full ${compact ? "h-44" : "h-72"}`}
+            className={`aspect-auto w-full ${compact ? "h-44" : "h-60 sm:h-72"}`}
           >
-            <BarChart data={chartData} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
+            <BarChart
+              data={chartData}
+              margin={{ left: isMobile ? 0 : 8, right: isMobile ? 0 : 8, top: 8, bottom: 0 }}
+            >
               <CartesianGrid vertical={false} />
               <XAxis
                 dataKey="month"
@@ -165,7 +181,7 @@ export function DividendIncomeChart({
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
-                width={compact ? 36 : 48}
+                width={compact || isMobile ? 36 : 48}
                 tickFormatter={(value: number) =>
                   Math.abs(value) >= 1000
                     ? `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k`
@@ -181,7 +197,7 @@ export function DividendIncomeChart({
                   />
                 }
               />
-              {!compact ? <ChartLegend content={<ChartLegendContent />} /> : null}
+              {!compact && !isMobile ? <ChartLegend content={<ChartLegendContent />} /> : null}
               {symbols.map((symbol, i) => (
                 <Bar
                   key={symbol}

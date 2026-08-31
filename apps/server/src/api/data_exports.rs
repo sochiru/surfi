@@ -12,8 +12,8 @@ use wealthfolio_core::{
     accounts::AccountServiceTrait,
     activities::Sort,
     exports::{
-        export_file_name, format_holding_list_records, format_records, ExportDataType,
-        ExportFileFormat,
+        export_file_name, format_activity_records, format_holding_list_records, format_records,
+        ExportDataType, ExportFileFormat,
     },
     portfolio::holdings::HoldingListItem,
     portfolios::AccountScope,
@@ -57,7 +57,7 @@ async fn build_data_export_content(
                     None,
                 )?
                 .data;
-            Ok(format_records(&records, format)?)
+            Ok(format_activity_records(&records, format)?)
         }
         ExportDataType::Holdings => {
             let base = state.base_currency.read().unwrap().clone();

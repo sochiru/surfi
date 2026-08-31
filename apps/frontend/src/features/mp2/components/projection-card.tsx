@@ -1,4 +1,11 @@
-import { Card, CardContent, CardHeader, CardTitle, PrivacyAmount } from "@wealthfolio/ui";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  PrivacyAmount,
+} from "@wealthfolio/ui";
 import { formatApyPct, projectCashProduct } from "../lib/projection";
 
 interface ProjectionCardProps {
@@ -9,6 +16,8 @@ interface ProjectionCardProps {
   currency: string;
   startYear?: number;
   rateHistory?: Record<string, number>;
+  contributionHistory?: Record<string, number>;
+  dividendHistory?: Record<string, number>;
 }
 
 export function ProjectionCard({
@@ -19,6 +28,8 @@ export function ProjectionCard({
   currency,
   startYear,
   rateHistory,
+  contributionHistory,
+  dividendHistory,
 }: ProjectionCardProps) {
   const projection = projectCashProduct({
     monthlyContribution,
@@ -27,16 +38,25 @@ export function ProjectionCard({
     compounding,
     startYear,
     rateHistory,
+    contributionHistory,
+    dividendHistory,
   });
-  const usesDeclaredRates = projection.years.some((row) => !row.estimated);
+  const recordedYears = projection.years.filter((row) => row.recorded).length;
+  const remainingYears = projection.years.length - recordedYears;
+  const usesDeclaredRates = projection.years.some((row) => !row.recorded && !row.estimated);
+  const lastYear = projection.years.at(-1)?.calendarYear;
 
   return (
     <Card data-testid="card-mp2-projection">
       <CardHeader>
         <CardTitle className="text-base">
-          Projection ({years} years @{" "}
-          {usesDeclaredRates ? "declared + assumed rates" : formatApyPct(apy)})
+          Projection{lastYear ? ` through ${lastYear}` : ""}
         </CardTitle>
+        <CardDescription>
+          {recordedYears > 0 && `${recordedYears} ${plural(recordedYears, "year")} recorded · `}
+          {remainingYears} {plural(remainingYears, "year")} @{" "}
+          {usesDeclaredRates ? "declared + assumed rates" : formatApyPct(apy)}
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
         <div>
@@ -68,4 +88,8 @@ export function ProjectionCard({
       </CardContent>
     </Card>
   );
+}
+
+function plural(count: number, word: string): string {
+  return count === 1 ? word : `${word}s`;
 }

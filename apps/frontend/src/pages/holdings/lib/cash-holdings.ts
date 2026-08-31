@@ -1,7 +1,7 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import type { Mp2DividendRates } from "@/adapters";
 import { rateForYear } from "@/features/mp2/lib/dividend-rates";
-import { type CashProductType, parseAccountMeta } from "@/lib/cash-product-meta";
+import { type CashProductType, effectiveApy, parseAccountMeta } from "@/lib/cash-product-meta";
 import { AccountType } from "@/lib/constants";
 import type { Account, AccountScope, AccountValuation, PortfolioWithAccounts } from "@/lib/types";
 
@@ -68,11 +68,14 @@ export function buildCashHoldingRows(
     .map((account) => {
       const product = parseAccountMeta(account.meta).product;
       const productType = product?.type ?? null;
-      const apy = product?.yield?.enabled ? (product.yield.apy ?? null) : null;
-      const rate =
-        productType === "PAGIBIG_MP2" && apy != null && mp2Rates
-          ? rateForYear(mp2Rates, lastCompletedYear, apy)
-          : apy;
+      const apy = product?.yield?.enabled
+        ? productType === "PAGIBIG_MP2" && product.yield.apy != null && mp2Rates
+          ? rateForYear(mp2Rates, lastCompletedYear, product.yield.apy)
+          : effectiveApy(
+              product.yield,
+              Number(valuationByAccount.get(account.id)?.cashBalance ?? 0),
+            )
+        : null;
       const maturityDate = product?.maturityDate;
 
       return {
@@ -82,7 +85,7 @@ export function buildCashHoldingRows(
         balance: Number(valuationByAccount.get(account.id)?.cashBalance ?? 0),
         productType,
         productLabel: productType ? CASH_PRODUCT_LABELS[productType] : "Cash",
-        rate,
+        rate: apy,
         maturityDate,
         daysToMaturity: maturityDate
           ? differenceInCalendarDays(parseISO(maturityDate), new Date())

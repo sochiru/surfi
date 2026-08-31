@@ -59,7 +59,7 @@ export function DividendIncomeOverviewCard({
           size="sm"
           className="text-muted-foreground h-8 px-2 text-xs"
         >
-          <Link to="/dividends">View dividends</Link>
+          <Link to="/insights?tab=dividends">View details</Link>
         </Button>
       }
     />

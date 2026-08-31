@@ -10,6 +10,7 @@ import type { ActivityImport } from "@/lib/types";
 import { type DateOrder, detectDateOrder, tryParseDate } from "@/lib/utils";
 import { isValid, parse, parseISO } from "date-fns";
 import { findMappedActivityType } from "./activity-type-mapping";
+import { accountIdFromCsvValue } from "./csv-account";
 import { getDateFnsPattern } from "./date-format-options";
 import { normalizeInstrumentType, splitInstrumentPrefixedSymbol } from "./instrument-type";
 import { buildImportAssetCandidateKey } from "./asset-review-utils";
@@ -656,7 +657,10 @@ export function createDraftActivities(
   defaultAccountId: string,
   validAccountIds?: Set<string>,
   accountTypeById?: Map<string, string>,
-  options?: { importProfile?: ActivityImportProfile },
+  options?: {
+    importProfile?: ActivityImportProfile;
+    accounts?: { id: string; name?: string | null }[];
+  },
 ): DraftActivity[] {
   const { fieldMappings, activityMappings, symbolMappings, accountMappings, symbolMappingMeta } =
     mapping;
@@ -810,14 +814,17 @@ export function createDraftActivities(
         : undefined;
     const subtype = inferredCreditSubtype ?? canonicalSubtype;
 
-    // Resolve account ID: use CSV account mapping, or fall back to default
+    // Resolve account ID: mapping, id, unique name, or the wizard default.
     let accountId = accountMappings[""] || defaultAccountId;
     if (rawAccount?.trim()) {
       const rawAccountId = rawAccount.trim();
-      const mappedAccount =
-        accountMappings[rawAccountId] ?? accountMappings[rawAccountId.toLowerCase()];
-      if (mappedAccount) {
-        accountId = mappedAccount;
+      const resolvedAccountId = accountIdFromCsvValue(
+        rawAccountId,
+        options?.accounts ?? [],
+        accountMappings,
+      );
+      if (resolvedAccountId) {
+        accountId = resolvedAccountId;
       } else if (!validAccountIds || validAccountIds.has(rawAccountId)) {
         accountId = rawAccountId;
       }

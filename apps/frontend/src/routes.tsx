@@ -11,7 +11,6 @@ import {
   type DynamicRouteEntry,
 } from "@/addons/addons-runtime-context";
 import { AddonIframeRoute } from "@/addons/iframe/addon-iframe-route";
-import DividendsPage from "@/features/dividends/pages/dividends-page";
 import GoalDetailPage from "@/features/goals/pages/goal-detail-page";
 import GoalNewPage from "@/features/goals/pages/goal-new-page";
 import GoalRetirementGuidePage from "@/features/goals/pages/goal-retirement-guide-page";
@@ -44,6 +43,7 @@ import AddonSettingsPage from "./pages/settings/addons/addon-settings";
 import AgentAccessPage from "./pages/settings/agent-access/agent-access-page";
 import AiProvidersPage from "./pages/settings/ai-providers/ai-providers-page";
 import ContributionLimitPage from "./pages/settings/contribution-limits/contribution-limits-page";
+import DividendsSettingsPage from "./pages/settings/dividends/dividends-settings-page";
 import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
 import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
@@ -108,7 +108,7 @@ export function AppRoutes() {
           <Route path="import" element={<ActivityImportPage />} />
           <Route path="accounts/:id" element={<AccountPage />} />
           <Route path="income" element={<IncomePage />} />
-          <Route path="dividends" element={<DividendsPage />} />
+          <Route path="dividends" element={<Navigate to="/insights?tab=dividends" replace />} />
           <Route path="mp2" element={<Navigate to="/holdings?tab=cash" replace />} />
           <Route path="mp2/:accountId" element={<Mp2AccountRedirect />} />
           <Route path="performance" element={<PerformancePage />} />
@@ -143,6 +143,7 @@ export function AppRoutes() {
             <Route path="about" element={<AboutSettingsPage />} />
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
+            <Route path="dividends" element={<DividendsSettingsPage />} />
             <Route path="mp2" element={<Mp2SettingsPage />} />
             <Route path="spending" element={<SpendingSettingsPage />} />
             <Route path="spending/categories" element={<SpendingSettingsCategoriesPage />} />
