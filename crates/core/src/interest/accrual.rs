@@ -7,7 +7,7 @@ use super::cash::CashLedgerEvent;
 use super::model::{build_idempotency_key, build_payout_idempotency_key};
 use super::product::{
     is_year_end, yield_start_date, CashProduct, CashProductType, CreditFrequency,
-    MonthlyCreditTiming,
+    MonthlyCreditTiming, RateTier, YieldConfig,
 };
 use super::settings::Mp2DividendRates;
 
@@ -120,10 +120,84 @@ pub fn daily_interest(
     basis: i64,
     minimum_balance: Decimal,
 ) -> Decimal {
-    if closing_cash <= Decimal::ZERO || apy <= Decimal::ZERO || closing_cash < minimum_balance {
+    daily_interest_with_tiers(
+        closing_cash,
+        &[RateTier {
+            up_to: None,
+            apy,
+        }],
+        basis,
+        minimum_balance,
+    )
+}
+
+/// Marginal bands: each slice of `closing_cash` earns its own APY. Balance above
+/// the last finite `up_to` earns nothing unless an uncapped row is present.
+pub fn daily_interest_with_tiers(
+    closing_cash: Decimal,
+    tiers: &[RateTier],
+    basis: i64,
+    minimum_balance: Decimal,
+) -> Decimal {
+    if closing_cash <= Decimal::ZERO || closing_cash < minimum_balance || basis <= 0 {
         return Decimal::ZERO;
     }
-    (closing_cash * apy) / Decimal::from(basis)
+    let denominator = Decimal::from(basis);
+    let mut previous_limit = Decimal::ZERO;
+    let mut interest = Decimal::ZERO;
+    for tier in tiers {
+        if closing_cash <= previous_limit {
+            break;
+        }
+        let ceiling = tier.up_to.unwrap_or(closing_cash);
+        if ceiling <= previous_limit {
+            continue;
+        }
+        let slice = closing_cash.min(ceiling) - previous_limit;
+        if slice > Decimal::ZERO && tier.apy > Decimal::ZERO {
+            interest += (slice * tier.apy) / denominator;
+        }
+        previous_limit = ceiling;
+        if tier.up_to.is_none() {
+            break;
+        }
+    }
+    interest
+}
+
+pub fn daily_interest_for_yield(
+    closing_cash: Decimal,
+    yield_cfg: &YieldConfig,
+    date: NaiveDate,
+) -> Decimal {
+    let basis = yield_cfg.day_count_basis(date);
+    if yield_cfg.rate_tiers.is_empty() {
+        return daily_interest(
+            closing_cash,
+            yield_cfg.apy,
+            basis,
+            yield_cfg.minimum_balance,
+        );
+    }
+    daily_interest_with_tiers(
+        closing_cash,
+        &yield_cfg.normalized_rate_tiers(),
+        basis,
+        yield_cfg.minimum_balance,
+    )
+}
+
+/// Blended APY implied by today's closing balance and the configured bands.
+pub fn blended_apy_for_yield(
+    closing_cash: Decimal,
+    yield_cfg: &YieldConfig,
+    date: NaiveDate,
+) -> Decimal {
+    if closing_cash <= Decimal::ZERO {
+        return yield_cfg.apy;
+    }
+    let daily = daily_interest_for_yield(closing_cash, yield_cfg, date);
+    daily * Decimal::from(yield_cfg.day_count_basis(date)) / closing_cash
 }
 
 pub fn round_money(amount: Decimal) -> Decimal {
@@ -239,7 +313,6 @@ pub fn plan_interest(
         .map(|e| e.date)
         .collect();
 
-    let minimum_balance = yield_cfg.minimum_balance;
     let walk_from = first_event.map(|d| d.min(start)).unwrap_or(start);
     let mut acc = PlanAccumulator::with_removals(removals);
     let mut event_idx = 0;
@@ -297,12 +370,8 @@ pub fn plan_interest(
 
                 // Interest is earned on the day's closing balance, so a deposit
                 // earns from the day it lands rather than the day after.
-                let daily = daily_interest(
-                    acc.running,
-                    rate,
-                    yield_cfg.day_count_basis(day),
-                    minimum_balance,
-                );
+                let daily = daily_interest_for_yield(acc.running, yield_cfg, day);
+                let rate = blended_apy_for_yield(acc.running, yield_cfg, day);
                 match yield_cfg.credit_frequency {
                     CreditFrequency::Daily => {
                         try_post(&ctx, &mut acc, day, daily, rate, estimated);
@@ -445,6 +514,7 @@ mod tests {
                 yield_config: Some(YieldConfig {
                     enabled: true,
                     apy: dec!(0.365),
+                    rate_tiers: vec![],
                     credit_frequency: freq,
                     monthly_credit_timing: MonthlyCreditTiming::NextMonthStart,
                     withholding_tax_rate: Decimal::ZERO,
@@ -508,6 +578,7 @@ mod tests {
                 yield_config: Some(YieldConfig {
                     enabled: true,
                     apy,
+                    rate_tiers: vec![],
                     credit_frequency: CreditFrequency::Yearly,
                     monthly_credit_timing: MonthlyCreditTiming::NextMonthStart,
                     withholding_tax_rate: Decimal::ZERO,
@@ -1138,5 +1209,141 @@ mod tests {
         );
         assert!(planned.amendments.is_empty());
         assert!(planned.creates.is_empty());
+    }
+
+    fn personal_goal_tiers() -> Vec<RateTier> {
+        vec![
+            RateTier {
+                up_to: Some(dec!(20000)),
+                apy: dec!(0.04),
+            },
+            RateTier {
+                up_to: Some(dec!(40000)),
+                apy: dec!(0.045),
+            },
+            RateTier {
+                up_to: Some(dec!(60000)),
+                apy: dec!(0.05),
+            },
+            RateTier {
+                up_to: Some(dec!(80000)),
+                apy: dec!(0.065),
+            },
+            RateTier {
+                up_to: Some(dec!(100000)),
+                apy: dec!(0.08),
+            },
+        ]
+    }
+
+    #[test]
+    fn a_tier_boundary_earns_only_the_lower_band() {
+        let interest = daily_interest_with_tiers(
+            dec!(20000),
+            &personal_goal_tiers(),
+            365,
+            Decimal::ZERO,
+        );
+        assert_eq!(interest, dec!(20000) * dec!(0.04) / Decimal::from(365));
+    }
+
+    #[test]
+    fn a_partial_upper_band_is_marginal() {
+        let interest = daily_interest_with_tiers(
+            dec!(20000.01),
+            &personal_goal_tiers(),
+            365,
+            Decimal::ZERO,
+        );
+        let expected = (dec!(20000) * dec!(0.04) + dec!(0.01) * dec!(0.045)) / Decimal::from(365);
+        assert_eq!(interest, expected);
+    }
+
+    #[test]
+    fn a_capped_schedule_pays_nothing_on_the_excess() {
+        let at_cap = daily_interest_with_tiers(
+            dec!(100000),
+            &personal_goal_tiers(),
+            365,
+            Decimal::ZERO,
+        );
+        let above_cap = daily_interest_with_tiers(
+            dec!(150000),
+            &personal_goal_tiers(),
+            365,
+            Decimal::ZERO,
+        );
+        assert_eq!(round_money(at_cap), round_money(above_cap));
+        assert_eq!(round_money(at_cap), round_money(dec!(5600) / Decimal::from(365)));
+    }
+
+    #[test]
+    fn a_base_plus_boost_schedule_keeps_the_base_on_the_excess() {
+        let tiers = vec![
+            RateTier {
+                up_to: Some(dec!(100000)),
+                apy: dec!(0.05),
+            },
+            RateTier {
+                up_to: None,
+                apy: dec!(0.03),
+            },
+        ];
+        let interest = daily_interest_with_tiers(dec!(150000), &tiers, 365, Decimal::ZERO);
+        let expected = (dec!(100000) * dec!(0.05) + dec!(50000) * dec!(0.03)) / Decimal::from(365);
+        assert_eq!(round_money(interest), round_money(expected));
+    }
+
+    #[test]
+    fn a_minimum_balance_still_zeroes_tiered_interest() {
+        let interest = daily_interest_with_tiers(
+            dec!(4000),
+            &[RateTier {
+                up_to: Some(dec!(1000000)),
+                apy: dec!(0.05),
+            }],
+            360,
+            dec!(5000),
+        );
+        assert_eq!(interest, Decimal::ZERO);
+    }
+
+    #[test]
+    fn empty_tiers_match_the_legacy_flat_rate() {
+        let flat = daily_interest(dec!(100000), dec!(0.05), 365, Decimal::ZERO);
+        let mut setup = hysa(CreditFrequency::Daily, false);
+        if let Some(y) = setup.product.yield_config.as_mut() {
+            y.apy = dec!(0.05);
+            y.rate_tiers = vec![];
+        }
+        let yield_cfg = setup.product.yield_config.as_ref().unwrap();
+        let from_yield = daily_interest_for_yield(
+            dec!(100000),
+            yield_cfg,
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+        );
+        assert_eq!(flat, from_yield);
+    }
+
+    #[test]
+    fn monthly_tiered_interest_still_credits_on_the_first() {
+        let mut setup = hysa(CreditFrequency::Monthly, true);
+        if let Some(y) = setup.product.yield_config.as_mut() {
+            y.apy = dec!(0.056);
+            y.rate_tiers = personal_goal_tiers();
+            y.withholding_tax_rate = dec!(0.20);
+        }
+        let events = vec![deposit("2024-01-01", dec!(100000))];
+        let planned = plan(
+            "acc",
+            &setup,
+            &events,
+            NaiveDate::from_ymd_opt(2024, 2, 1).unwrap(),
+        );
+        let credit = &planned.creates[0];
+        assert_eq!(credit.date, NaiveDate::from_ymd_opt(2024, 2, 1).unwrap());
+        // 31 days × (100,000 × 5.6% / 365)
+        assert_eq!(credit.amount, round_money(dec!(5600) / Decimal::from(365) * Decimal::from(31)));
+        assert_eq!(credit.tax, round_money(credit.amount * dec!(0.20)));
     }
 }

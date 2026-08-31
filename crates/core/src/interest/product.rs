@@ -37,6 +37,18 @@ pub enum MonthlyCreditTiming {
     NextMonthStart,
 }
 
+/// One marginal band: the slice of balance from the previous `up_to` up to this
+/// limit earns `apy`. `up_to = None` is uncapped. Balance above the last finite
+/// limit earns nothing unless an uncapped row follows.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RateTier {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub up_to: Option<Decimal>,
+    #[serde(default)]
+    pub apy: Decimal,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct YieldConfig {
@@ -44,8 +56,12 @@ pub struct YieldConfig {
     pub enabled: bool,
     /// Assumed rate, used for any year the provider has not declared yet.
     /// Declared MP2 rates are app-wide and live in [`crate::interest::Mp2DividendRates`].
+    /// Also the flat rate when `rate_tiers` is empty.
     #[serde(default)]
     pub apy: Decimal,
+    /// Marginal APY bands. Empty means the single `apy` applies to the full balance.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rate_tiers: Vec<RateTier>,
     #[serde(default)]
     pub credit_frequency: CreditFrequency,
     #[serde(default)]
@@ -77,6 +93,41 @@ impl YieldConfig {
             }
             _ => 365,
         }
+    }
+
+    /// Sorted unique bands; empty stored tiers collapse to a single uncapped `apy` row.
+    pub fn normalized_rate_tiers(&self) -> Vec<RateTier> {
+        let mut tiers: Vec<RateTier> = self
+            .rate_tiers
+            .iter()
+            .map(|tier| RateTier {
+                up_to: tier.up_to.filter(|limit| *limit > Decimal::ZERO),
+                apy: tier.apy.max(Decimal::ZERO),
+            })
+            .collect();
+        if tiers.is_empty() {
+            return vec![RateTier {
+                up_to: None,
+                apy: self.apy.max(Decimal::ZERO),
+            }];
+        }
+        tiers.sort_by(|a, b| match (a.up_to, b.up_to) {
+            (None, None) => std::cmp::Ordering::Equal,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (Some(left), Some(right)) => left.cmp(&right),
+        });
+        let mut unique: Vec<RateTier> = Vec::new();
+        for tier in tiers {
+            if let Some(last) = unique.last_mut() {
+                if last.up_to == tier.up_to {
+                    *last = tier;
+                    continue;
+                }
+            }
+            unique.push(tier);
+        }
+        unique
     }
 }
 
@@ -247,6 +298,7 @@ mod tests {
         assert!(product.compounding);
         let yield_cfg = product.yield_config.unwrap();
         assert_eq!(yield_cfg.apy, dec!(0.065));
+        assert!(yield_cfg.rate_tiers.is_empty());
         assert_eq!(yield_cfg.credit_frequency, CreditFrequency::Yearly);
         assert_eq!(
             mp2_maturity_date(parse_ymd("2024-03-15").unwrap()).unwrap(),
@@ -267,5 +319,56 @@ mod tests {
         assert!(!account.is_mp2_account());
         assert!(!account.is_hysa_goal_account());
         assert!(is_fixed_income_cash(&account));
+    }
+
+    #[test]
+    fn empty_tiers_normalize_to_flat_apy() {
+        let yield_cfg = YieldConfig {
+            enabled: true,
+            apy: dec!(0.05),
+            rate_tiers: vec![],
+            credit_frequency: CreditFrequency::Daily,
+            monthly_credit_timing: MonthlyCreditTiming::NextMonthStart,
+            withholding_tax_rate: Decimal::ZERO,
+            minimum_balance: Decimal::ZERO,
+            day_count: None,
+            start_date: None,
+        };
+        let tiers = yield_cfg.normalized_rate_tiers();
+        assert_eq!(tiers.len(), 1);
+        assert_eq!(tiers[0].up_to, None);
+        assert_eq!(tiers[0].apy, dec!(0.05));
+    }
+
+    #[test]
+    fn normalizes_tier_order_and_duplicate_limits() {
+        let yield_cfg = YieldConfig {
+            enabled: true,
+            apy: dec!(0.03),
+            rate_tiers: vec![
+                RateTier {
+                    up_to: Some(dec!(100000)),
+                    apy: dec!(0.08),
+                },
+                RateTier {
+                    up_to: Some(dec!(20000)),
+                    apy: dec!(0.04),
+                },
+                RateTier {
+                    up_to: Some(dec!(20000)),
+                    apy: dec!(0.041),
+                },
+            ],
+            credit_frequency: CreditFrequency::Monthly,
+            monthly_credit_timing: MonthlyCreditTiming::NextMonthStart,
+            withholding_tax_rate: Decimal::ZERO,
+            minimum_balance: Decimal::ZERO,
+            day_count: None,
+            start_date: None,
+        };
+        let tiers = yield_cfg.normalized_rate_tiers();
+        assert_eq!(tiers[0].up_to, Some(dec!(20000)));
+        assert_eq!(tiers[0].apy, dec!(0.041));
+        assert_eq!(tiers[1].up_to, Some(dec!(100000)));
     }
 }

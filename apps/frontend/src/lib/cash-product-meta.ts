@@ -5,13 +5,22 @@ export type CreditFrequency = "daily" | "monthly" | "yearly";
 export type MonthlyCreditTiming = "month_end" | "next_month_start";
 export type DayCount = "actual_actual" | "actual_365" | "actual_360";
 
+/** Marginal band. Omit `upTo` for an uncapped row. */
+export interface RateTier {
+  upTo?: number;
+  apy: number;
+}
+
 export interface YieldConfig {
   enabled: boolean;
   /**
    * Assumed rate, used for any year the provider has not declared yet.
    * Declared MP2 rates are app-wide — see `features/mp2/lib/dividend-rates`.
+   * Flat rate when `rateTiers` is empty.
    */
   apy: number;
+  /** Marginal APY bands. Empty/omitted means the single `apy` applies to the full balance. */
+  rateTiers?: RateTier[];
   creditFrequency: CreditFrequency;
   /** Date used for monthly credits. Defaults to the first day of the next month. */
   monthlyCreditTiming?: MonthlyCreditTiming;
@@ -40,6 +49,8 @@ export interface ProductConfig {
 export interface AccountProductMeta {
   allocation?: { cashCategoryId?: string };
   product?: ProductConfig;
+  institutionId?: string;
+  productId?: string;
 }
 
 export function parseAccountMeta(meta?: string | null): AccountProductMeta {
@@ -109,6 +120,40 @@ export function setProductInMeta(
   return serializeAccountMeta(parsed);
 }
 
+export function setCatalogSelectionInMeta(
+  meta: string | null | undefined,
+  institutionId: string | null,
+  productId: string | null,
+): string {
+  const parsed = parseAccountMeta(meta);
+  if (institutionId) {
+    parsed.institutionId = institutionId;
+  } else {
+    delete parsed.institutionId;
+  }
+  if (productId) {
+    parsed.productId = productId;
+  } else {
+    delete parsed.productId;
+  }
+  return serializeAccountMeta(parsed);
+}
+
+export function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function defaultYield(apy: number, frequency: CreditFrequency = "daily"): YieldConfig {
+  return {
+    enabled: true,
+    apy,
+    creditFrequency: frequency,
+    monthlyCreditTiming: "next_month_start",
+    dayCount: "actual_365",
+    startDate: todayIsoDate(),
+  };
+}
+
 export function defaultHysaProduct(
   apy = 0.045,
   frequency: CreditFrequency = "daily",
@@ -116,14 +161,7 @@ export function defaultHysaProduct(
   return {
     type: "HYSA",
     compounding: true,
-    yield: {
-      enabled: true,
-      apy,
-      creditFrequency: frequency,
-      monthlyCreditTiming: "next_month_start",
-      dayCount: "actual_365",
-      startDate: new Date().toISOString().slice(0, 10),
-    },
+    yield: defaultYield(apy, frequency),
   };
 }
 
@@ -135,14 +173,7 @@ export function defaultHysaGoalProduct(
   return {
     type: "HYSA_GOAL",
     compounding: true,
-    yield: {
-      enabled: true,
-      apy,
-      creditFrequency: "daily",
-      monthlyCreditTiming: "next_month_start",
-      dayCount: "actual_365",
-      startDate: new Date().toISOString().slice(0, 10),
-    },
+    yield: defaultYield(apy, "daily"),
     targetAmount,
     maturityDate,
   };
@@ -150,7 +181,7 @@ export function defaultHysaGoalProduct(
 
 export function defaultCashProduct(type: CashProductType): ProductConfig {
   if (type === "PAGIBIG_MP2") {
-    return defaultMp2Product(new Date().toISOString().slice(0, 10));
+    return defaultMp2Product(todayIsoDate());
   }
   return type === "HYSA_GOAL" ? defaultHysaGoalProduct() : defaultHysaProduct();
 }
@@ -173,4 +204,54 @@ export function defaultMp2Product(
     firstContributionDate,
     maturityDate: computeMp2Maturity(firstContributionDate),
   };
+}
+
+export function sanitizeRateTiers(tiers: RateTier[] | undefined): RateTier[] {
+  if (!tiers?.length) return [];
+  const normalized = tiers
+    .map((tier) => ({
+      upTo: tier.upTo != null && tier.upTo > 0 ? tier.upTo : undefined,
+      apy: Math.max(0, tier.apy),
+    }))
+    .sort((a, b) => {
+      if (a.upTo == null && b.upTo == null) return 0;
+      if (a.upTo == null) return 1;
+      if (b.upTo == null) return -1;
+      return a.upTo - b.upTo;
+    });
+  const unique: RateTier[] = [];
+  for (const tier of normalized) {
+    const last = unique[unique.length - 1];
+    if (last && last.upTo === tier.upTo) {
+      unique[unique.length - 1] = tier;
+    } else {
+      unique.push(tier);
+    }
+  }
+  return unique;
+}
+
+export function headlineApy(yieldConfig: YieldConfig): number {
+  const tiers = sanitizeRateTiers(yieldConfig.rateTiers);
+  if (!tiers.length) return yieldConfig.apy;
+  return Math.max(...tiers.map((tier) => tier.apy), 0);
+}
+
+export function effectiveApy(yieldConfig: YieldConfig, balance: number): number {
+  const minimum = yieldConfig.minimumBalance ?? 0;
+  if (balance <= 0 || balance < minimum) return 0;
+  const tiers = sanitizeRateTiers(yieldConfig.rateTiers);
+  if (!tiers.length) return yieldConfig.apy;
+  let previous = 0;
+  let weighted = 0;
+  for (const tier of tiers) {
+    if (balance <= previous) break;
+    const ceiling = tier.upTo ?? balance;
+    if (ceiling <= previous) continue;
+    const slice = Math.min(balance, ceiling) - previous;
+    if (slice > 0) weighted += slice * tier.apy;
+    previous = ceiling;
+    if (tier.upTo == null) break;
+  }
+  return weighted / balance;
 }

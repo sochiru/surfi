@@ -4,16 +4,19 @@ import type {
   DayCount,
   MonthlyCreditTiming,
   ProductConfig,
+  RateTier,
 } from "@/lib/cash-product-meta";
 import {
   computeMp2Maturity,
   defaultHysaGoalProduct,
   defaultHysaProduct,
   defaultMp2Product,
+  headlineApy,
   parseAccountMeta,
+  sanitizeRateTiers,
   setProductInMeta,
 } from "@/lib/cash-product-meta";
-import { Input, Label, Switch } from "@wealthfolio/ui";
+import { Button, Input, Label, Switch } from "@wealthfolio/ui";
 import {
   Select,
   SelectContent,
@@ -28,6 +31,7 @@ interface CashProductFieldsProps {
   meta?: string | null;
   onMetaChange: (meta: string) => void;
   productKind: CashProductType;
+  headingOverride?: { title: string; description: string };
 }
 
 const HEADINGS: Record<CashProductType, { title: string; description: string }> = {
@@ -109,10 +113,123 @@ function readProduct(meta: string | null | undefined, kind: CashProductType): Pr
   return existing?.type === kind ? existing : defaultForKind(kind);
 }
 
-export function CashProductFields({ meta, onMetaChange, productKind }: CashProductFieldsProps) {
+function RateTierEditor({
+  tiers,
+  fallbackApy,
+  onChange,
+}: {
+  tiers: RateTier[] | undefined;
+  fallbackApy: number;
+  onChange: (tiers: RateTier[] | undefined, headline: number) => void;
+}) {
+  const rows = sanitizeRateTiers(tiers);
+
+  const commit = (next: RateTier[]) => {
+    const sanitized = sanitizeRateTiers(next);
+    onChange(sanitized.length ? sanitized : undefined, headlineApy({
+      enabled: true,
+      apy: fallbackApy,
+      rateTiers: sanitized,
+      creditFrequency: "daily",
+    }));
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium">Rate tiers</p>
+          <p className="text-muted-foreground text-xs">
+            Each band earns its own APY. Leave the last limit blank to apply that rate to the rest.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="button-add-rate-tier"
+          onClick={() =>
+            commit([
+              ...rows,
+              rows.length
+                ? { apy: fallbackApy }
+                : { apy: fallbackApy },
+            ])
+          }
+        >
+          Add band
+        </Button>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-muted-foreground text-xs">
+          No bands — the single APY above applies to the full balance.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((tier, index) => (
+            <div key={`${tier.upTo ?? "uncapped"}-${index}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+              <div>
+                {index === 0 ? (
+                  <Label htmlFor={`rate-tier-up-to-${index}`}>Up to (optional)</Label>
+                ) : null}
+                <Input
+                  id={`rate-tier-up-to-${index}`}
+                  data-testid={`input-rate-tier-up-to-${index}`}
+                  type="number"
+                  placeholder="Uncapped"
+                  value={tier.upTo ?? ""}
+                  onChange={(event) => {
+                    const next = [...rows];
+                    const value = event.target.value;
+                    next[index] = {
+                      ...tier,
+                      upTo: value ? Number(value) : undefined,
+                    };
+                    commit(next);
+                  }}
+                />
+              </div>
+              <div>
+                {index === 0 ? <Label htmlFor={`rate-tier-apy-${index}`}>APY (%)</Label> : null}
+                <PercentInput
+                  id={`rate-tier-apy-${index}`}
+                  testId={`input-rate-tier-apy-${index}`}
+                  value={tier.apy}
+                  onChange={(apy) => {
+                    const next = [...rows];
+                    next[index] = { ...tier, apy };
+                    commit(next);
+                  }}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={index === 0 ? "mt-6" : ""}
+                data-testid={`button-remove-rate-tier-${index}`}
+                aria-label={`Remove rate band ${index + 1}`}
+                onClick={() => commit(rows.filter((_, rowIndex) => rowIndex !== index))}
+              >
+                Remove
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CashProductFields({
+  meta,
+  onMetaChange,
+  productKind,
+  headingOverride,
+}: CashProductFieldsProps) {
   const product = readProduct(meta, productKind);
   const isMp2 = productKind === "PAGIBIG_MP2";
-  const heading = HEADINGS[productKind];
+  const heading = headingOverride ?? HEADINGS[productKind];
 
   const update = (patch: Partial<ProductConfig>) => {
     onMetaChange(setProductInMeta(meta, { ...product, type: productKind, ...patch }));
@@ -196,6 +313,14 @@ export function CashProductFields({ meta, onMetaChange, productKind }: CashProdu
           </Field>
         )}
       </FieldGrid>
+
+      {!isMp2 && (
+        <RateTierEditor
+          tiers={product.yield.rateTiers}
+          fallbackApy={product.yield.apy}
+          onChange={(rateTiers, headline) => updateYield({ rateTiers, apy: headline })}
+        />
+      )}
 
       <div className="flex items-center justify-between gap-3">
         <div>

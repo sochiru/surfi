@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, PrivacyAmount } from "@wealthfolio/ui";
 import { getActivities } from "@/adapters";
-import { isHysaAccount, isMp2Account, parseAccountMeta } from "@/lib/cash-product-meta";
+import { isHysaAccount, isMp2Account, headlineApy, parseAccountMeta } from "@/lib/cash-product-meta";
 import { ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, ActivityDetails } from "@/lib/types";
@@ -76,7 +76,7 @@ export function CashProductPanel({ account }: CashProductPanelProps) {
   // Match the holdings cash tab: MP2 rates are declared in arrears, so show the
   // rate for the last completed year and fall back to the assumed one.
   const effectiveRate =
-    isMp2 && mp2Rates ? rateForYear(mp2Rates, year - 1, product.yield.apy) : product.yield.apy;
+    isMp2 && mp2Rates ? rateForYear(mp2Rates, year - 1, product.yield.apy) : headlineApy(product.yield);
 
   // The projection replays every year already on record before assuming anything,
   // so an account opened years ago starts from what it actually holds today.

@@ -1,41 +1,19 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
-import { Icons, type Icon } from "@wealthfolio/ui/components/ui/icons";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui";
-import type { Account, AccountType, Platform } from "@/lib/types";
+import type { Account, Platform } from "@/lib/types";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AccountOperations } from "./account-operations";
-import { getProductType, type CashProductType } from "@/lib/cash-product-meta";
+import { getProductType, parseAccountMeta, type CashProductType } from "@/lib/cash-product-meta";
+import { accountTypeVisual } from "@/lib/account-type-visuals";
+import { logoUrlForInstitution } from "@/lib/institutions/catalog";
 
 const productBadgeLabels: Record<CashProductType, string> = {
   HYSA: "HYSA",
   HYSA_GOAL: "Goal",
   PAGIBIG_MP2: "MP2",
-};
-
-// Map account types to icons and colors for visual distinction
-const accountTypeConfig: Record<AccountType, { icon: Icon; bgClass: string; iconClass: string }> = {
-  SECURITIES: {
-    icon: Icons.Briefcase,
-    bgClass: "bg-blue-500/10",
-    iconClass: "text-blue-500",
-  },
-  CASH: {
-    icon: Icons.DollarSign,
-    bgClass: "bg-green-500/10",
-    iconClass: "text-green-500",
-  },
-  CREDIT_CARD: {
-    icon: Icons.CreditCard,
-    bgClass: "bg-rose-500/10",
-    iconClass: "text-rose-500",
-  },
-  CRYPTOCURRENCY: {
-    icon: Icons.Bitcoin,
-    bgClass: "bg-orange-500/10",
-    iconClass: "text-orange-500",
-  },
 };
 
 export interface AccountItemProps {
@@ -58,23 +36,22 @@ export function AccountItem({
   const { t } = useTranslation();
   // Check if account is synced from broker (has provider_account_id set)
   const isSynced = !!account.providerAccountId;
-  const typeConfig = accountTypeConfig[account.accountType] ?? {
-    icon: Icons.Wallet,
-    bgClass: "bg-muted",
-    iconClass: "text-muted-foreground",
-  };
+  const typeConfig = accountTypeVisual(account.accountType);
   const IconComponent = typeConfig.icon;
   const productType = getProductType(account.meta);
+  const institutionLogo = logoUrlForInstitution(parseAccountMeta(account.meta).institutionId);
+  const logoSrc = (isSynced && platform?.logoUrl) || institutionLogo;
+  const logoAlt = platform?.name || t("settings:accounts.platform_alt");
 
   return (
     <div className="flex items-center justify-between p-4">
       <div className="flex items-center gap-3">
         {/* Avatar with platform logo or account type icon */}
         <Avatar className="h-10 w-10 rounded-lg">
-          {isSynced && platform?.logoUrl ? (
+          {logoSrc ? (
             <AvatarImage
-              src={platform.logoUrl}
-              alt={platform.name || t("settings:accounts.platform_alt")}
+              src={logoSrc}
+              alt={logoAlt}
               className="bg-white object-contain p-1"
             />
           ) : null}
