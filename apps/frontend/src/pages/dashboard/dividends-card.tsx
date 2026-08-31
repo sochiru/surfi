@@ -6,7 +6,7 @@ import { AmountDisplay, Button, Skeleton } from "@wealthfolio/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
-const DIVIDENDS_ROUTE = "/dividends";
+const DIVIDENDS_ROUTE = "/insights?tab=dividends";
 
 export function DividendsCard() {
   const { settings } = useSettingsContext();

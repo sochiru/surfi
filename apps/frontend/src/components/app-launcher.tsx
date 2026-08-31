@@ -382,7 +382,7 @@ export function AppLauncher() {
       },
       {
         title: t("common:component.view_dividends"),
-        href: "/dividends",
+        href: "/insights?tab=dividends",
         icon: <Icons.Income className="size-6" />,
         keywords: ["dividends", "dividend", "income", "payout", "yield", "calendar", "search"],
         label: t("common:component.view_dividends"),
