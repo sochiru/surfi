@@ -49,11 +49,7 @@ export function AccountItem({
         {/* Avatar with platform logo or account type icon */}
         <Avatar className="h-10 w-10 rounded-lg">
           {logoSrc ? (
-            <AvatarImage
-              src={logoSrc}
-              alt={logoAlt}
-              className="bg-white object-contain p-1"
-            />
+            <AvatarImage src={logoSrc} alt={logoAlt} className="bg-white object-contain p-1" />
           ) : null}
           <AvatarFallback className={`rounded-lg ${typeConfig.bgClass}`}>
             <IconComponent className={`h-5 w-5 ${typeConfig.iconClass}`} />

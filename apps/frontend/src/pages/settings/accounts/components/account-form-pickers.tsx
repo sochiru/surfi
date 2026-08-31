@@ -41,7 +41,9 @@ export function AccountTypeCards({ value, onChange, labels }: AccountTypeCardsPr
             )}
             onClick={() => onChange(type)}
           >
-            <span className={cn("flex h-8 w-8 items-center justify-center rounded-lg", visual.bgClass)}>
+            <span
+              className={cn("flex h-8 w-8 items-center justify-center rounded-lg", visual.bgClass)}
+            >
               <Icon className={cn("h-4 w-4", visual.iconClass)} />
             </span>
             <span className="text-sm font-medium">{labels[type]}</span>
@@ -59,11 +61,8 @@ interface InstitutionCardsProps {
 }
 
 export function InstitutionCards({ value, onChange, customLabel }: InstitutionCardsProps) {
-  const options: Array<Pick<CatalogInstitution, "id" | "name" | "logoUrl"> & { custom?: boolean }> =
-    [
-      { id: CUSTOM_INSTITUTION_ID, name: customLabel, logoUrl: "" },
-      ...INSTITUTIONS,
-    ];
+  const options: (Pick<CatalogInstitution, "id" | "name" | "logoUrl"> & { custom?: boolean })[] =
+    [{ id: CUSTOM_INSTITUTION_ID, name: customLabel, logoUrl: "" }, ...INSTITUTIONS];
 
   return (
     <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" role="listbox" aria-label="Institution">

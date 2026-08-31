@@ -121,7 +121,10 @@ impl YieldConfig {
             || self.rate_tiers.iter().any(|tier| tier.apy > Decimal::ZERO)
             || self.rate_schedule.iter().any(|period| {
                 period.apy > Decimal::ZERO
-                    || period.rate_tiers.iter().any(|tier| tier.apy > Decimal::ZERO)
+                    || period
+                        .rate_tiers
+                        .iter()
+                        .any(|tier| tier.apy > Decimal::ZERO)
             })
     }
 
@@ -130,9 +133,7 @@ impl YieldConfig {
         let period = self
             .rate_schedule
             .iter()
-            .filter_map(|period| {
-                parse_ymd(&period.from).map(|from| (from, period))
-            })
+            .filter_map(|period| parse_ymd(&period.from).map(|from| (from, period)))
             .filter(|(from, _)| *from <= date)
             .max_by_key(|(from, _)| *from)
             .map(|(_, period)| period);

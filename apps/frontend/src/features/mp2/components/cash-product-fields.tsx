@@ -131,12 +131,15 @@ function RateTierEditor({
 
   const commit = (next: RateTier[]) => {
     const sanitized = sanitizeRateTiers(next);
-    onChange(sanitized.length ? sanitized : undefined, headlineApy({
-      enabled: true,
-      apy: fallbackApy,
-      rateTiers: sanitized,
-      creditFrequency: "daily",
-    }));
+    onChange(
+      sanitized.length ? sanitized : undefined,
+      headlineApy({
+        enabled: true,
+        apy: fallbackApy,
+        rateTiers: sanitized,
+        creditFrequency: "daily",
+      }),
+    );
   };
 
   return (
@@ -154,12 +157,7 @@ function RateTierEditor({
           size="sm"
           data-testid={`${testIdPrefix}button-add-rate-tier`}
           onClick={() =>
-            commit([
-              ...rows,
-              rows.length
-                ? { apy: fallbackApy }
-                : { apy: fallbackApy },
-            ])
+            commit([...rows, rows.length ? { apy: fallbackApy } : { apy: fallbackApy }])
           }
         >
           Add band
@@ -172,10 +170,15 @@ function RateTierEditor({
       ) : (
         <div className="space-y-2">
           {rows.map((tier, index) => (
-            <div key={`${tier.upTo ?? "uncapped"}-${index}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+            <div
+              key={`${tier.upTo ?? "uncapped"}-${index}`}
+              className="grid grid-cols-[1fr_1fr_auto] gap-2"
+            >
               <div>
                 {index === 0 ? (
-                  <Label htmlFor={`${testIdPrefix}rate-tier-up-to-${index}`}>Up to (optional)</Label>
+                  <Label htmlFor={`${testIdPrefix}rate-tier-up-to-${index}`}>
+                    Up to (optional)
+                  </Label>
                 ) : null}
                 <Input
                   id={`${testIdPrefix}rate-tier-up-to-${index}`}

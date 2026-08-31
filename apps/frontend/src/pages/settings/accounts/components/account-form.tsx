@@ -324,7 +324,11 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                           if (type !== AccountType.CASH) {
                             form.setValue(
                               "meta",
-                              setCatalogSelectionInMeta(setProductInMeta(form.getValues("meta"), null), null, null),
+                              setCatalogSelectionInMeta(
+                                setProductInMeta(form.getValues("meta"), null),
+                                null,
+                                null,
+                              ),
                               { shouldDirty: true },
                             );
                           }
@@ -461,64 +465,67 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
               {isCashAccount &&
                 selectedInstitutionId === CUSTOM_INSTITUTION_ID &&
                 isFixedIncome && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium">
-                      {t("settings:accounts.form_fixed_income_product_label")}
-                    </label>
-                    <p className="text-muted-foreground text-xs">
-                      {t("settings:accounts.form_fixed_income_product_description")}
-                    </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium">
+                        {t("settings:accounts.form_fixed_income_product_label")}
+                      </label>
+                      <p className="text-muted-foreground text-xs">
+                        {t("settings:accounts.form_fixed_income_product_description")}
+                      </p>
+                    </div>
+                    <ToggleGroup
+                      type="single"
+                      aria-label={t("settings:accounts.form_fixed_income_product_aria")}
+                      value={cashProductType ?? CASH_PRODUCT_NONE}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        const existing = parseAccountMeta(cashMeta).product;
+                        const next =
+                          value === CASH_PRODUCT_NONE
+                            ? null
+                            : existing?.type === value
+                              ? existing
+                              : defaultCashProduct(value as CashProductType);
+                        form.setValue(
+                          "meta",
+                          setCatalogSelectionInMeta(setProductInMeta(cashMeta, next), null, null),
+                          { shouldDirty: true },
+                        );
+                      }}
+                      className="bg-muted grid h-11 grid-cols-4 rounded-lg p-1"
+                    >
+                      <ToggleGroupItem
+                        value={CASH_PRODUCT_NONE}
+                        className={cashClassificationItemClassName}
+                      >
+                        {t("settings:accounts.form_product_none")}
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="HYSA" className={cashClassificationItemClassName}>
+                        {t("settings:accounts.form_product_hysa")}
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value="HYSA_GOAL"
+                        className={cashClassificationItemClassName}
+                      >
+                        {t("settings:accounts.form_product_goal")}
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value="PAGIBIG_MP2"
+                        className={cashClassificationItemClassName}
+                      >
+                        {t("settings:accounts.form_product_mp2")}
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                    {cashProductType && (
+                      <CashProductFields
+                        meta={cashMeta}
+                        productKind={cashProductType}
+                        onMetaChange={(meta) => form.setValue("meta", meta, { shouldDirty: true })}
+                      />
+                    )}
                   </div>
-                  <ToggleGroup
-                    type="single"
-                    aria-label={t("settings:accounts.form_fixed_income_product_aria")}
-                    value={cashProductType ?? CASH_PRODUCT_NONE}
-                    onValueChange={(value) => {
-                      if (!value) return;
-                      const existing = parseAccountMeta(cashMeta).product;
-                      const next =
-                        value === CASH_PRODUCT_NONE
-                          ? null
-                          : existing?.type === value
-                            ? existing
-                            : defaultCashProduct(value as CashProductType);
-                      form.setValue(
-                        "meta",
-                        setCatalogSelectionInMeta(setProductInMeta(cashMeta, next), null, null),
-                        { shouldDirty: true },
-                      );
-                    }}
-                    className="bg-muted grid h-11 grid-cols-4 rounded-lg p-1"
-                  >
-                    <ToggleGroupItem
-                      value={CASH_PRODUCT_NONE}
-                      className={cashClassificationItemClassName}
-                    >
-                      {t("settings:accounts.form_product_none")}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="HYSA" className={cashClassificationItemClassName}>
-                      {t("settings:accounts.form_product_hysa")}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="HYSA_GOAL" className={cashClassificationItemClassName}>
-                      {t("settings:accounts.form_product_goal")}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem
-                      value="PAGIBIG_MP2"
-                      className={cashClassificationItemClassName}
-                    >
-                      {t("settings:accounts.form_product_mp2")}
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                  {cashProductType && (
-                    <CashProductFields
-                      meta={cashMeta}
-                      productKind={cashProductType}
-                      onMetaChange={(meta) => form.setValue("meta", meta, { shouldDirty: true })}
-                    />
-                  )}
-                </div>
-              )}
+                )}
             </div>
           </section>
 

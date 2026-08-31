@@ -44,9 +44,9 @@ describe("effectiveApy", () => {
   };
 
   it("uses the flat APY when there are no bands", () => {
-    expect(
-      effectiveApy({ enabled: true, apy: 0.045, creditFrequency: "daily" }, 50_000),
-    ).toBe(0.045);
+    expect(effectiveApy({ enabled: true, apy: 0.045, creditFrequency: "daily" }, 50_000)).toBe(
+      0.045,
+    );
   });
 
   it("blends Personal Goals at ₱100,000 to 5.6%", () => {
@@ -55,7 +55,7 @@ describe("effectiveApy", () => {
   });
 
   it("pays nothing on the excess above the last cap", () => {
-    expect(effectiveApy(goalYield, 150_000)).toBeCloseTo((5600) / 150_000);
+    expect(effectiveApy(goalYield, 150_000)).toBeCloseTo(5600 / 150_000);
   });
 
   it("returns zero below the minimum balance", () => {
@@ -73,18 +73,12 @@ describe("rate schedule", () => {
     enabled: true,
     apy: 0.03,
     creditFrequency: "daily" as const,
-    rateTiers: [
-      { upTo: 100_000, apy: 0.03 },
-      { apy: 0.03 },
-    ],
+    rateTiers: [{ upTo: 100_000, apy: 0.03 }, { apy: 0.03 }],
     rateSchedule: [
       {
         from: "2026-08-04",
         apy: 0.1,
-        rateTiers: [
-          { upTo: 100_000, apy: 0.1 },
-          { apy: 0.03 },
-        ],
+        rateTiers: [{ upTo: 100_000, apy: 0.1 }, { apy: 0.03 }],
       },
     ],
   };

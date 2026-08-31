@@ -71,7 +71,10 @@ export function buildCashHoldingRows(
       const apy = product?.yield?.enabled
         ? productType === "PAGIBIG_MP2" && product.yield.apy != null && mp2Rates
           ? rateForYear(mp2Rates, lastCompletedYear, product.yield.apy)
-          : effectiveApy(product.yield, Number(valuationByAccount.get(account.id)?.cashBalance ?? 0))
+          : effectiveApy(
+              product.yield,
+              Number(valuationByAccount.get(account.id)?.cashBalance ?? 0),
+            )
         : null;
       const maturityDate = product?.maturityDate;
 

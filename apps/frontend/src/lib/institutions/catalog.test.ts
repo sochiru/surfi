@@ -11,8 +11,12 @@ describe("institution catalog", () => {
       "maribank",
     ]);
     expect(getCatalogProduct("maya-personal-goals")?.productKind).toBe("HYSA_GOAL");
-    expect(getCatalogProduct("banko-todo-savings")?.createProduct().yield.minimumBalance).toBe(5000);
-    expect(getCatalogProduct("tonik-account")?.createProduct().yield.dayCount).toBe("actual_actual");
+    expect(getCatalogProduct("banko-todo-savings")?.createProduct().yield.minimumBalance).toBe(
+      5000,
+    );
+    expect(getCatalogProduct("tonik-account")?.createProduct().yield.dayCount).toBe(
+      "actual_actual",
+    );
   });
 
   it("applies a Maya Personal Goals template into account meta", () => {
@@ -40,9 +44,6 @@ describe("institution catalog", () => {
 
   it("models Maya Savings as a boost band plus uncapped base", () => {
     const yieldConfig = getCatalogProduct("maya-savings")!.createProduct().yield;
-    expect(yieldConfig.rateTiers).toEqual([
-      { upTo: 100_000, apy: 0.05 },
-      { apy: 0.03 },
-    ]);
+    expect(yieldConfig.rateTiers).toEqual([{ upTo: 100_000, apy: 0.05 }, { apy: 0.03 }]);
   });
 });

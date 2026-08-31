@@ -24,9 +24,7 @@ export function accountIdFromCsvValue(
   if (exact.length === 1) return exact[0].id;
 
   const lowered = value.toLowerCase();
-  const insensitive = accounts.filter(
-    (account) => account.name?.trim().toLowerCase() === lowered,
-  );
+  const insensitive = accounts.filter((account) => account.name?.trim().toLowerCase() === lowered);
   if (insensitive.length === 1) return insensitive[0].id;
 
   return undefined;

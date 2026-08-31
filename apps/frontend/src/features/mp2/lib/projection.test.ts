@@ -165,10 +165,7 @@ describe("projectCashProduct", () => {
     });
 
     expect(result.totalContributions).toBe(150_000);
-    expect(result.finalBalance).toBeCloseTo(
-      result.totalContributions + result.totalDividends,
-      6,
-    );
+    expect(result.finalBalance).toBeCloseTo(result.totalContributions + result.totalDividends, 6);
   });
 
   test("a lower declared rate reduces every later year", () => {

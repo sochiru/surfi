@@ -459,11 +459,7 @@ export function MappingCell({
 
   if (field === ImportFormat.ACCOUNT) {
     const mappingKey = value?.trim() || "";
-    const resolvedAccountId = accountIdFromCsvValue(
-      mappingKey,
-      accounts,
-      mapping.accountMappings,
-    );
+    const resolvedAccountId = accountIdFromCsvValue(mappingKey, accounts, mapping.accountMappings);
     const isInvalid = mappingKey === "" || !resolvedAccountId;
     const mappedAccountId = mapping.accountMappings?.[mappingKey] ?? resolvedAccountId;
     const account = accounts.find((acc) => acc.id === mappedAccountId);

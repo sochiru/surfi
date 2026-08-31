@@ -122,10 +122,7 @@ pub fn daily_interest(
 ) -> Decimal {
     daily_interest_with_tiers(
         closing_cash,
-        &[RateTier {
-            up_to: None,
-            apy,
-        }],
+        &[RateTier { up_to: None, apy }],
         basis,
         minimum_balance,
     )
@@ -172,12 +169,7 @@ pub fn daily_interest_for_yield(
 ) -> Decimal {
     let basis = yield_cfg.day_count_basis(date);
     let (_, tiers) = yield_cfg.rate_snapshot_on(date);
-    daily_interest_with_tiers(
-        closing_cash,
-        &tiers,
-        basis,
-        yield_cfg.minimum_balance,
-    )
+    daily_interest_with_tiers(closing_cash, &tiers, basis, yield_cfg.minimum_balance)
 }
 
 /// Blended APY implied by today's closing balance and the configured bands.
@@ -1234,43 +1226,30 @@ mod tests {
 
     #[test]
     fn a_tier_boundary_earns_only_the_lower_band() {
-        let interest = daily_interest_with_tiers(
-            dec!(20000),
-            &personal_goal_tiers(),
-            365,
-            Decimal::ZERO,
-        );
+        let interest =
+            daily_interest_with_tiers(dec!(20000), &personal_goal_tiers(), 365, Decimal::ZERO);
         assert_eq!(interest, dec!(20000) * dec!(0.04) / Decimal::from(365));
     }
 
     #[test]
     fn a_partial_upper_band_is_marginal() {
-        let interest = daily_interest_with_tiers(
-            dec!(20000.01),
-            &personal_goal_tiers(),
-            365,
-            Decimal::ZERO,
-        );
+        let interest =
+            daily_interest_with_tiers(dec!(20000.01), &personal_goal_tiers(), 365, Decimal::ZERO);
         let expected = (dec!(20000) * dec!(0.04) + dec!(0.01) * dec!(0.045)) / Decimal::from(365);
         assert_eq!(interest, expected);
     }
 
     #[test]
     fn a_capped_schedule_pays_nothing_on_the_excess() {
-        let at_cap = daily_interest_with_tiers(
-            dec!(100000),
-            &personal_goal_tiers(),
-            365,
-            Decimal::ZERO,
-        );
-        let above_cap = daily_interest_with_tiers(
-            dec!(150000),
-            &personal_goal_tiers(),
-            365,
-            Decimal::ZERO,
-        );
+        let at_cap =
+            daily_interest_with_tiers(dec!(100000), &personal_goal_tiers(), 365, Decimal::ZERO);
+        let above_cap =
+            daily_interest_with_tiers(dec!(150000), &personal_goal_tiers(), 365, Decimal::ZERO);
         assert_eq!(round_money(at_cap), round_money(above_cap));
-        assert_eq!(round_money(at_cap), round_money(dec!(5600) / Decimal::from(365)));
+        assert_eq!(
+            round_money(at_cap),
+            round_money(dec!(5600) / Decimal::from(365))
+        );
     }
 
     #[test]
@@ -1339,7 +1318,10 @@ mod tests {
         let credit = &planned.creates[0];
         assert_eq!(credit.date, NaiveDate::from_ymd_opt(2024, 2, 1).unwrap());
         // 31 days × (100,000 × 5.6% / 365)
-        assert_eq!(credit.amount, round_money(dec!(5600) / Decimal::from(365) * Decimal::from(31)));
+        assert_eq!(
+            credit.amount,
+            round_money(dec!(5600) / Decimal::from(365) * Decimal::from(31))
+        );
         assert_eq!(credit.tax, round_money(credit.amount * dec!(0.20)));
     }
 

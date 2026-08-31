@@ -317,7 +317,11 @@ pub fn format_activity_records(
                 .iter()
                 .map(ActivityImportCsvRow::from)
                 .collect::<Vec<_>>();
-            rows.sort_by(|left, right| left.date.cmp(&right.date).then(left.account.cmp(&right.account)));
+            rows.sort_by(|left, right| {
+                left.date
+                    .cmp(&right.date)
+                    .then(left.account.cmp(&right.account))
+            });
             format_records(&rows, format)
         }
         ExportFileFormat::Json => format_records(records, format),
@@ -722,13 +726,7 @@ mod tests {
     #[test]
     fn activity_csv_matches_the_import_template() {
         let mut records = vec![
-            sample_activity(
-                "2024-06-01T12:00:00Z",
-                "Brokerage",
-                "AAPL",
-                "BUY",
-                None,
-            ),
+            sample_activity("2024-06-01T12:00:00Z", "Brokerage", "AAPL", "BUY", None),
             sample_activity(
                 "2024-01-15T00:00:00Z",
                 "Maya Savings",

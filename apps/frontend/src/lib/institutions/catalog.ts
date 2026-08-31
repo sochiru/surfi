@@ -73,10 +73,7 @@ export const INSTITUTIONS: CatalogInstitution[] = [
           catalogProduct("HYSA", 0.05, {
             creditFrequency: "daily",
             dayCount: "actual_365",
-            rateTiers: [
-              { upTo: 100_000, apy: 0.05 },
-              { apy: 0.03 },
-            ],
+            rateTiers: [{ upTo: 100_000, apy: 0.05 }, { apy: 0.03 }],
           }),
       },
       {
@@ -124,10 +121,7 @@ export const INSTITUTIONS: CatalogInstitution[] = [
             monthlyCreditTiming: "next_month_start",
             dayCount: "actual_360",
             minimumBalance: 5_000,
-            rateTiers: [
-              { upTo: 1_000_000, apy: 0.05 },
-              { apy: 0.000625 },
-            ],
+            rateTiers: [{ upTo: 1_000_000, apy: 0.05 }, { apy: 0.000625 }],
           }),
       },
     ],
@@ -180,7 +174,8 @@ export const INSTITUTIONS: CatalogInstitution[] = [
         id: "maribank-savings",
         institutionId: "maribank",
         name: "Mari Savings Account",
-        description: "0.88% p.a. base on all balances, credited daily. Boost on the first S$100,000 is editable.",
+        description:
+          "0.88% p.a. base on all balances, credited daily. Boost on the first S$100,000 is editable.",
         productKind: "HYSA",
         defaultCurrency: "SGD",
         defaultGroup: "MariBank",
@@ -190,10 +185,7 @@ export const INSTITUTIONS: CatalogInstitution[] = [
             withholdingTaxRate: 0,
             creditFrequency: "daily",
             dayCount: "actual_365",
-            rateTiers: [
-              { upTo: 100_000, apy: 0.0248 },
-              { apy: 0.0088 },
-            ],
+            rateTiers: [{ upTo: 100_000, apy: 0.0248 }, { apy: 0.0088 }],
           }),
       },
       {
