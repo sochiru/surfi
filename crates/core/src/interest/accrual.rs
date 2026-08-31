@@ -88,7 +88,7 @@ impl InterestPlan {
 
 fn is_month_end(date: NaiveDate) -> bool {
     date.succ_opt()
-        .map_or(true, |next| next.month() != date.month())
+        .is_none_or(|next| next.month() != date.month())
 }
 
 /// Whether the product's schedule credits interest on `date`.
@@ -109,23 +109,6 @@ fn is_credit_date(
         },
         CreditFrequency::Yearly => is_year_end(date),
     }
-}
-
-/// Interest earned in one day on `closing_cash`, the balance the account holds at
-/// the end of that day. `basis` is the day-count denominator (360 or 365), and
-/// `minimum_balance` is the threshold the account must reach to earn at all.
-pub fn daily_interest(
-    closing_cash: Decimal,
-    apy: Decimal,
-    basis: i64,
-    minimum_balance: Decimal,
-) -> Decimal {
-    daily_interest_with_tiers(
-        closing_cash,
-        &[RateTier { up_to: None, apy }],
-        basis,
-        minimum_balance,
-    )
 }
 
 /// Marginal bands: each slice of `closing_cash` earns its own APY. Balance above
@@ -1285,7 +1268,15 @@ mod tests {
 
     #[test]
     fn empty_tiers_match_the_legacy_flat_rate() {
-        let flat = daily_interest(dec!(100000), dec!(0.05), 365, Decimal::ZERO);
+        let flat = daily_interest_with_tiers(
+            dec!(100000),
+            &[RateTier {
+                up_to: None,
+                apy: dec!(0.05),
+            }],
+            365,
+            Decimal::ZERO,
+        );
         let mut setup = hysa(CreditFrequency::Daily, false);
         if let Some(y) = setup.product.yield_config.as_mut() {
             y.apy = dec!(0.05);

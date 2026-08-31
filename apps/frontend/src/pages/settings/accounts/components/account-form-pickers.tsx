@@ -61,8 +61,10 @@ interface InstitutionCardsProps {
 }
 
 export function InstitutionCards({ value, onChange, customLabel }: InstitutionCardsProps) {
-  const options: (Pick<CatalogInstitution, "id" | "name" | "logoUrl"> & { custom?: boolean })[] =
-    [{ id: CUSTOM_INSTITUTION_ID, name: customLabel, logoUrl: "" }, ...INSTITUTIONS];
+  const options: (Pick<CatalogInstitution, "id" | "name" | "logoUrl"> & { custom?: boolean })[] = [
+    { id: CUSTOM_INSTITUTION_ID, name: customLabel, logoUrl: "" },
+    ...INSTITUTIONS,
+  ];
 
   return (
     <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" role="listbox" aria-label="Institution">

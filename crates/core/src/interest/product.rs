@@ -100,12 +100,11 @@ impl YieldConfig {
     pub fn day_count_basis(&self, date: NaiveDate) -> i64 {
         match self.day_count.as_deref() {
             Some(basis) if basis.eq_ignore_ascii_case(DAY_COUNT_ACTUAL_360) => 360,
-            Some(basis) if basis.eq_ignore_ascii_case(DAY_COUNT_ACTUAL_ACTUAL) => {
-                if NaiveDate::from_ymd_opt(date.year(), 2, 29).is_some() {
-                    366
-                } else {
-                    365
-                }
+            Some(basis)
+                if basis.eq_ignore_ascii_case(DAY_COUNT_ACTUAL_ACTUAL)
+                    && NaiveDate::from_ymd_opt(date.year(), 2, 29).is_some() =>
+            {
+                366
             }
             _ => 365,
         }
