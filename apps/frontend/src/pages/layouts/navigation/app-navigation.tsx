@@ -67,13 +67,6 @@ function buildStaticNavigation(t: TFunction): NavigationProps {
         label: t("common:nav.label_activities"),
       },
       {
-        icon: <Icons.Income className="size-6" />,
-        title: t("common:dividends"),
-        href: "/dividends",
-        keywords: ["dividends", "income", "payout", "yield", "calendar"],
-        label: t("common:nav.label_dividends"),
-      },
-      {
         icon: <Icons.Goals className="size-6" />,
         title: t("common:goals"),
         href: "/goals",

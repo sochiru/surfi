@@ -1205,7 +1205,7 @@
       "optionalFields": "Optional fields:",
       "activitiesOptionalFields": "account, currency, fee, tax, comment, fxRate, subtype, instrumentType, isin",
       "tipBold": "💡 Tip:",
-      "activitiesTip": " Column names and activity types don't need to match exactly — you can map them during import. Mappings can be saved as custom templates for future imports.",
+      "activitiesTip": " Column names and activity types don't need to match exactly — you can map them during import. A CSV exported from Activities (or Settings → Export) re-imports when destination accounts use the same names.",
       "amountBold": "💰 Amount field:",
       "activitiesAmount": " Use amount for cash activities and cash transfers. Security transfers use quantity and cost basis; market value is derived from quotes.",
       "autoFormattingBold": "⚡ Auto-formatting:",

@@ -1,63 +1,52 @@
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle, PrivacyAmount } from "@wealthfolio/ui";
+import { getActivities } from "@/adapters";
 import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  Input,
-  Label,
-  PrivacyAmount,
-} from "@wealthfolio/ui";
-import {
-  createActivity,
-  getActivities,
-  removeAutoInterest,
-  syncCashInterestAccount,
-} from "@/adapters";
-import { isHysaAccount, isMp2Account, parseAccountMeta } from "@/lib/cash-product-meta";
+  isHysaAccount,
+  isMp2Account,
+  headlineApy,
+  parseAccountMeta,
+} from "@/lib/cash-product-meta";
 import { ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, ActivityDetails } from "@/lib/types";
 import { ProjectionCard } from "./projection-card";
-import { RecordDividendDialog } from "./record-dividend-dialog";
 import { useMp2Rates } from "../hooks/use-mp2-rates";
 import { rateForYear } from "../lib/dividend-rates";
+import { resolveMp2DividendYear } from "../lib/projection";
 
 interface CashProductPanelProps {
   account: Account;
 }
 
-function ytdSum(activities: ActivityDetails[], type: string, year: number): number {
-  return activities
-    .filter((a) => a.activityType === type && new Date(a.date).getFullYear() === year)
-    .reduce((sum, a) => sum + Number(a.amount ?? 0), 0);
+function sumByYear(
+  activities: ActivityDetails[],
+  type: string,
+  yearForActivity: (activity: ActivityDetails) => number = (activity) =>
+    new Date(activity.date).getFullYear(),
+): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const activity of activities) {
+    if (activity.activityType !== type) continue;
+    const key = String(yearForActivity(activity));
+    totals[key] = (totals[key] ?? 0) + Number(activity.amount ?? 0);
+  }
+  return totals;
 }
 
 /**
- * Product-specific controls for cash accounts, shown on the account page.
- * MP2 additionally gets contribution/dividend entry and a maturity projection.
+ * Product-specific summary for cash accounts, shown on the account page. MP2
+ * additionally gets a maturity projection. The matching contribution, dividend
+ * and interest actions live in the page header's action palette.
  */
 export function CashProductPanel({ account }: CashProductPanelProps) {
-  const queryClient = useQueryClient();
   const year = new Date().getFullYear();
   const product = parseAccountMeta(account.meta).product;
   const isMp2 = isMp2Account(account.meta);
   const isHysa = isHysaAccount(account.meta);
   const compounding = product?.compounding ?? true;
-
-  const [contributeOpen, setContributeOpen] = useState(false);
-  const [dividendOpen, setDividendOpen] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [activityDate, setActivityDate] = useState(new Date().toISOString().slice(0, 10));
 
   const { data: mp2Rates } = useMp2Rates();
   const activitiesQuery = useQuery({
@@ -67,57 +56,24 @@ export function CashProductPanel({ account }: CashProductPanelProps) {
   });
 
   const activities = useMemo(() => activitiesQuery.data ?? [], [activitiesQuery.data]);
-  const contributionsYtd = useMemo(
-    () => ytdSum(activities, ActivityType.DEPOSIT, year),
-    [activities, year],
+  const contributionHistory = useMemo(
+    () => sumByYear(activities, ActivityType.DEPOSIT),
+    [activities],
   );
-  const interestYtd = useMemo(
-    () => ytdSum(activities, ActivityType.INTEREST, year),
-    [activities, year],
-  );
-
-  const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] });
-    void queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
-  };
-
-  const syncMutation = useMutation({
-    mutationFn: () => syncCashInterestAccount(account.id),
-    onSuccess: (result) => {
-      toast.success(`Generated ${result.created} interest entries`);
-      invalidate();
-    },
-    onError: (error) => toast.error(String(error)),
-  });
-
-  const removeMutation = useMutation({
-    mutationFn: removeAutoInterest,
-    onSuccess: (count) => {
-      toast.success(`Removed ${count} auto interest entries`);
-      invalidate();
-    },
-    onError: (error) => toast.error(String(error)),
-  });
-
-  const contributeMutation = useMutation({
-    mutationFn: () =>
-      createActivity({
-        accountId: account.id,
-        activityType: ActivityType.DEPOSIT,
-        activityDate: new Date(`${activityDate}T00:00:00`),
-        amount: Number(amount),
-        currency: account.currency,
-        fee: 0,
-        comment: "MP2 contribution",
+  const dividendHistory = useMemo(
+    () =>
+      sumByYear(activities, ActivityType.INTEREST, (activity) => {
+        if (!isMp2) return new Date(activity.date).getFullYear();
+        return resolveMp2DividendYear(new Date(activity.date), activity.metadata?.mp2DividendYear);
       }),
-    onSuccess: () => {
-      toast.success("Contribution recorded");
-      setContributeOpen(false);
-      setAmount("");
-      invalidate();
-    },
-    onError: (error) => toast.error(String(error)),
-  });
+    [activities, isMp2],
+  );
+  const creditedInterestHistory = useMemo(
+    () => sumByYear(activities, ActivityType.INTEREST),
+    [activities],
+  );
+  const contributionsYtd = contributionHistory[String(year)] ?? 0;
+  const interestYtd = creditedInterestHistory[String(year)] ?? 0;
 
   if (!product?.yield?.enabled) return null;
 
@@ -125,54 +81,27 @@ export function CashProductPanel({ account }: CashProductPanelProps) {
   // Match the holdings cash tab: MP2 rates are declared in arrears, so show the
   // rate for the last completed year and fall back to the assumed one.
   const effectiveRate =
-    isMp2 && mp2Rates ? rateForYear(mp2Rates, year - 1, product.yield.apy) : product.yield.apy;
+    isMp2 && mp2Rates
+      ? rateForYear(mp2Rates, year - 1, product.yield.apy)
+      : headlineApy(product.yield);
+
+  // The projection replays every year already on record before assuming anything,
+  // so an account opened years ago starts from what it actually holds today.
+  const activityYears = Object.keys({ ...contributionHistory, ...dividendHistory }).map(Number);
+  if (product.firstContributionDate) {
+    activityYears.push(Number(product.firstContributionDate.slice(0, 4)));
+  }
+  const projectionStartYear = activityYears.length ? Math.min(...activityYears) : year;
+  const maturityYear = maturity ? Number(maturity.slice(0, 4)) : projectionStartYear + 5;
+  const projectionYears = Math.max(1, maturityYear - projectionStartYear);
 
   return (
     <>
       <Card data-testid="card-cash-product">
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+        <CardHeader>
           <CardTitle className="text-base">
             {isMp2 ? "Pag-IBIG MP2" : isHysa ? "Savings interest" : "Fixed-income yield"}
           </CardTitle>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="button-sync-cash-interest"
-              onClick={() => syncMutation.mutate()}
-              disabled={syncMutation.isPending}
-            >
-              Generate interest
-            </Button>
-            {isMp2 && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-testid="button-mp2-contribute"
-                  onClick={() => setContributeOpen(true)}
-                >
-                  Contribute
-                </Button>
-                <Button
-                  size="sm"
-                  data-testid="button-mp2-record-dividend"
-                  onClick={() => setDividendOpen(true)}
-                >
-                  Record dividend
-                </Button>
-              </>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              data-testid="button-remove-auto-interest"
-              onClick={() => removeMutation.mutate()}
-              disabled={removeMutation.isPending}
-            >
-              Remove auto interest
-            </Button>
-          </div>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-3">
           <Stat
@@ -216,66 +145,17 @@ export function CashProductPanel({ account }: CashProductPanelProps) {
 
       {isMp2 && product.yield.apy ? (
         <ProjectionCard
-          monthlyContribution={contributionsYtd > 0 ? contributionsYtd / 12 : 0}
+          monthlyContribution={0}
           apy={product.yield.apy}
+          years={projectionYears}
           rateHistory={mp2Rates?.rates}
-          startYear={year}
+          contributionHistory={contributionHistory}
+          dividendHistory={dividendHistory}
+          startYear={projectionStartYear}
           compounding={compounding}
           currency={account.currency}
         />
       ) : null}
-
-      <Dialog open={contributeOpen} onOpenChange={setContributeOpen}>
-        <DialogContent data-testid="dialog-mp2-contribute">
-          <DialogHeader>
-            <DialogTitle>Record contribution</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="mp2-contrib-date">Date</Label>
-              <Input
-                id="mp2-contrib-date"
-                data-testid="input-mp2-contrib-date"
-                type="date"
-                value={activityDate}
-                onChange={(e) => setActivityDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mp2-contrib-amount">Amount ({account.currency})</Label>
-              <Input
-                id="mp2-contrib-amount"
-                data-testid="input-mp2-contrib-amount"
-                type="number"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setContributeOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              data-testid="button-mp2-contrib-save"
-              disabled={contributeMutation.isPending || !amount || Number(amount) <= 0}
-              onClick={() => contributeMutation.mutate()}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <RecordDividendDialog
-        open={dividendOpen}
-        onOpenChange={setDividendOpen}
-        accountId={account.id}
-        currency={account.currency}
-        compounding={compounding}
-        onRecorded={invalidate}
-      />
     </>
   );
 }

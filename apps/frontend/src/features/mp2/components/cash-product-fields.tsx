@@ -2,17 +2,24 @@ import type {
   CashProductType,
   CreditFrequency,
   DayCount,
+  MonthlyCreditTiming,
   ProductConfig,
+  RatePeriod,
+  RateTier,
 } from "@/lib/cash-product-meta";
 import {
   computeMp2Maturity,
   defaultHysaGoalProduct,
   defaultHysaProduct,
   defaultMp2Product,
+  headlineApy,
   parseAccountMeta,
+  sanitizeRateSchedule,
+  sanitizeRateTiers,
   setProductInMeta,
+  todayIsoDate,
 } from "@/lib/cash-product-meta";
-import { Input, Label, Switch } from "@wealthfolio/ui";
+import { Button, Input, Label, Switch } from "@wealthfolio/ui";
 import {
   Select,
   SelectContent,
@@ -27,6 +34,7 @@ interface CashProductFieldsProps {
   meta?: string | null;
   onMetaChange: (meta: string) => void;
   productKind: CashProductType;
+  headingOverride?: { title: string; description: string };
 }
 
 const HEADINGS: Record<CashProductType, { title: string; description: string }> = {
@@ -108,10 +116,226 @@ function readProduct(meta: string | null | undefined, kind: CashProductType): Pr
   return existing?.type === kind ? existing : defaultForKind(kind);
 }
 
-export function CashProductFields({ meta, onMetaChange, productKind }: CashProductFieldsProps) {
+function RateTierEditor({
+  tiers,
+  fallbackApy,
+  onChange,
+  testIdPrefix = "",
+}: {
+  tiers: RateTier[] | undefined;
+  fallbackApy: number;
+  onChange: (tiers: RateTier[] | undefined, headline: number) => void;
+  testIdPrefix?: string;
+}) {
+  const rows = sanitizeRateTiers(tiers);
+
+  const commit = (next: RateTier[]) => {
+    const sanitized = sanitizeRateTiers(next);
+    onChange(
+      sanitized.length ? sanitized : undefined,
+      headlineApy({
+        enabled: true,
+        apy: fallbackApy,
+        rateTiers: sanitized,
+        creditFrequency: "daily",
+      }),
+    );
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium">Rate tiers</p>
+          <p className="text-muted-foreground text-xs">
+            Each band earns its own APY. Leave the last limit blank to apply that rate to the rest.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid={`${testIdPrefix}button-add-rate-tier`}
+          onClick={() =>
+            commit([...rows, rows.length ? { apy: fallbackApy } : { apy: fallbackApy }])
+          }
+        >
+          Add band
+        </Button>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-muted-foreground text-xs">
+          No bands — the single APY above applies to the full balance.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((tier, index) => (
+            <div
+              key={`${tier.upTo ?? "uncapped"}-${index}`}
+              className="grid grid-cols-[1fr_1fr_auto] gap-2"
+            >
+              <div>
+                {index === 0 ? (
+                  <Label htmlFor={`${testIdPrefix}rate-tier-up-to-${index}`}>
+                    Up to (optional)
+                  </Label>
+                ) : null}
+                <Input
+                  id={`${testIdPrefix}rate-tier-up-to-${index}`}
+                  data-testid={`input-${testIdPrefix}rate-tier-up-to-${index}`}
+                  type="number"
+                  placeholder="Uncapped"
+                  value={tier.upTo ?? ""}
+                  onChange={(event) => {
+                    const next = [...rows];
+                    const value = event.target.value;
+                    next[index] = {
+                      ...tier,
+                      upTo: value ? Number(value) : undefined,
+                    };
+                    commit(next);
+                  }}
+                />
+              </div>
+              <div>
+                {index === 0 ? (
+                  <Label htmlFor={`${testIdPrefix}rate-tier-apy-${index}`}>APY (%)</Label>
+                ) : null}
+                <PercentInput
+                  id={`${testIdPrefix}rate-tier-apy-${index}`}
+                  testId={`input-${testIdPrefix}rate-tier-apy-${index}`}
+                  value={tier.apy}
+                  onChange={(apy) => {
+                    const next = [...rows];
+                    next[index] = { ...tier, apy };
+                    commit(next);
+                  }}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={index === 0 ? "mt-6" : ""}
+                data-testid={`button-${testIdPrefix}remove-rate-tier-${index}`}
+                aria-label={`Remove rate band ${index + 1}`}
+                onClick={() => commit(rows.filter((_, rowIndex) => rowIndex !== index))}
+              >
+                Remove
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RateScheduleEditor({
+  periods,
+  fallback,
+  onChange,
+}: {
+  periods: RatePeriod[] | undefined;
+  fallback: { apy: number; rateTiers?: RateTier[] };
+  onChange: (periods: RatePeriod[] | undefined) => void;
+}) {
+  const rows = sanitizeRateSchedule(periods);
+
+  const commit = (next: RatePeriod[]) => {
+    const sanitized = sanitizeRateSchedule(next);
+    onChange(sanitized.length ? sanitized : undefined);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium">Rate periods</p>
+          <p className="text-muted-foreground text-xs">
+            Use this when a promo starts mid-month. Keep 3% in the default bands, then add a period
+            from Aug 4 at 10% on the first ₱100,000. Days before that stay on the default.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="button-add-rate-period"
+          onClick={() =>
+            commit([
+              ...rows,
+              {
+                from: todayIsoDate(),
+                apy: fallback.apy,
+                rateTiers: fallback.rateTiers,
+              },
+            ])
+          }
+        >
+          Add period
+        </Button>
+      </div>
+      {rows.map((period, index) => (
+        <div
+          key={`${period.from}-${index}`}
+          className="border-border space-y-2 rounded-lg border p-3"
+        >
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Label htmlFor={`rate-period-from-${index}`}>Starts on</Label>
+              <Input
+                id={`rate-period-from-${index}`}
+                data-testid={`input-rate-period-from-${index}`}
+                type="date"
+                value={period.from}
+                onChange={(event) => {
+                  const next = [...rows];
+                  next[index] = { ...period, from: event.target.value };
+                  commit(next);
+                }}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              data-testid={`button-remove-rate-period-${index}`}
+              aria-label={`Remove rate period ${index + 1}`}
+              onClick={() => commit(rows.filter((_, rowIndex) => rowIndex !== index))}
+            >
+              Remove
+            </Button>
+          </div>
+          <RateTierEditor
+            tiers={period.rateTiers}
+            fallbackApy={period.apy}
+            testIdPrefix={`rate-period-${index}-`}
+            onChange={(rateTiers, headline) => {
+              const next = [...rows];
+              next[index] = {
+                ...period,
+                apy: headline,
+                rateTiers,
+              };
+              commit(next);
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function CashProductFields({
+  meta,
+  onMetaChange,
+  productKind,
+  headingOverride,
+}: CashProductFieldsProps) {
   const product = readProduct(meta, productKind);
   const isMp2 = productKind === "PAGIBIG_MP2";
-  const heading = HEADINGS[productKind];
+  const heading = headingOverride ?? HEADINGS[productKind];
 
   const update = (patch: Partial<ProductConfig>) => {
     onMetaChange(setProductInMeta(meta, { ...product, type: productKind, ...patch }));
@@ -175,7 +399,42 @@ export function CashProductFields({ meta, onMetaChange, productKind }: CashProdu
             </Select>
           </Field>
         )}
+        {!isMp2 && product.yield.creditFrequency === "monthly" && (
+          <Field>
+            <Label>Monthly credit date</Label>
+            <Select
+              value={product.yield.monthlyCreditTiming ?? "next_month_start"}
+              onValueChange={(value) =>
+                updateYield({ monthlyCreditTiming: value as MonthlyCreditTiming })
+              }
+            >
+              <SelectTrigger data-testid="select-monthly-credit-timing">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month_end">Last day of the month</SelectItem>
+                <SelectItem value="next_month_start">First day of the next month</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
       </FieldGrid>
+
+      {!isMp2 && (
+        <RateTierEditor
+          tiers={product.yield.rateTiers}
+          fallbackApy={product.yield.apy}
+          onChange={(rateTiers, headline) => updateYield({ rateTiers, apy: headline })}
+        />
+      )}
+
+      {!isMp2 && (
+        <RateScheduleEditor
+          periods={product.yield.rateSchedule}
+          fallback={{ apy: product.yield.apy, rateTiers: product.yield.rateTiers }}
+          onChange={(rateSchedule) => updateYield({ rateSchedule })}
+        />
+      )}
 
       <div className="flex items-center justify-between gap-3">
         <div>
@@ -300,12 +559,13 @@ export function CashProductFields({ meta, onMetaChange, productKind }: CashProdu
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="actual_actual">Actual / actual (365 or 366)</SelectItem>
                 <SelectItem value="actual_365">Actual / 365</SelectItem>
                 <SelectItem value="actual_360">Actual / 360</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-muted-foreground text-xs">
-              A 360 basis pays slightly more for the same rate.
+              Tonik uses 365 days, or 366 in a leap year. A 360 basis pays slightly more.
             </p>
           </Field>
           <Field>

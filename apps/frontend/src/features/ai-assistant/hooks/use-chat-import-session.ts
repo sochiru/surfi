@@ -697,7 +697,7 @@ export function useChatImportSession({
           accountId,
           validAccountIds,
           accountTypeById,
-          { importProfile },
+          { importProfile, accounts: mapping.availableAccounts },
         );
 
         if (drafts.length === 0) {
@@ -956,7 +956,7 @@ export function useChatImportSession({
               accountId,
               validAccountIds,
               state.accountTypeById,
-              { importProfile: nextProfile },
+              { importProfile: nextProfile, accounts: current.availableAccounts },
             );
             if (!nextProfile.assetResolutionEnabled) {
               shouldClearPreview = true;

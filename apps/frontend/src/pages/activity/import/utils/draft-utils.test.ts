@@ -409,6 +409,27 @@ describe("createDraftActivities explicit activity mapping", () => {
     expect(draft.accountId).toBe("account-2");
   });
 
+  it("maps a unique CSV account name to the destination account id", () => {
+    const [draft] = createDraftActivities(
+      [["2024-03-15", "DEPOSIT", "1000.00", "USD", "Maya Savings"]],
+      [...headers, ImportFormat.ACCOUNT],
+      {
+        ...baseMapping,
+        fieldMappings: {
+          ...baseMapping.fieldMappings,
+          [ImportFormat.ACCOUNT]: ImportFormat.ACCOUNT,
+        },
+      },
+      parseConfig,
+      "account-1",
+      new Set(["account-1", "maya-1"]),
+      undefined,
+      { accounts: [{ id: "maya-1", name: "Maya Savings" }] },
+    );
+
+    expect(draft.accountId).toBe("maya-1");
+  });
+
   it("keeps explicitly mapped withdrawal labels when amount is positive", () => {
     const draft = createSingleDraftWithMapping(["2024-03-15", "WITHDRAWAL", "1000.00", "USD"], {
       [ActivityType.WITHDRAWAL]: ["WITHDRAWAL"],

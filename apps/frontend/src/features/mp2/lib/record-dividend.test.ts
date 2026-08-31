@@ -19,11 +19,16 @@ describe("recordMp2Dividend", () => {
       currency: "PHP",
       amount: 500,
       activityDate: new Date("2024-12-31"),
+      dividendYear: 2024,
       compounding: true,
     });
     expect(createActivity).toHaveBeenCalledTimes(1);
     expect(createActivity).toHaveBeenCalledWith(
-      expect.objectContaining({ activityType: "INTEREST", amount: 500 }),
+      expect.objectContaining({
+        activityType: "INTEREST",
+        amount: 500,
+        metadata: { mp2DividendYear: 2024 },
+      }),
     );
   });
 
@@ -33,6 +38,7 @@ describe("recordMp2Dividend", () => {
       currency: "PHP",
       amount: 500,
       activityDate: new Date("2024-12-31"),
+      dividendYear: 2024,
       compounding: false,
     });
     expect(createActivity).toHaveBeenCalledTimes(2);

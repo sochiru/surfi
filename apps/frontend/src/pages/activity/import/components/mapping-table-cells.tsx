@@ -13,6 +13,7 @@ import {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
+import { accountIdFromCsvValue } from "../utils/csv-account";
 import {
   Badge,
   SearchableSelect,
@@ -375,7 +376,7 @@ export function MappingCell({
   handleSymbolMapping,
   handleAccountIdMapping,
   invalidSymbols,
-  invalidAccounts,
+  invalidAccounts: _invalidAccounts,
   allowedActivityTypes,
   getActivityTypeLabel,
 }: {
@@ -458,8 +459,9 @@ export function MappingCell({
 
   if (field === ImportFormat.ACCOUNT) {
     const mappingKey = value?.trim() || "";
-    const isInvalid = mappingKey === "" || invalidAccounts.includes(mappingKey);
-    const mappedAccountId = mapping.accountMappings?.[mappingKey];
+    const resolvedAccountId = accountIdFromCsvValue(mappingKey, accounts, mapping.accountMappings);
+    const isInvalid = mappingKey === "" || !resolvedAccountId;
+    const mappedAccountId = mapping.accountMappings?.[mappingKey] ?? resolvedAccountId;
     const account = accounts.find((acc) => acc.id === mappedAccountId);
     return (
       <AccountIdDisplayCell

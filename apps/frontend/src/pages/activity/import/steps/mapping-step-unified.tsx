@@ -51,6 +51,7 @@ import { ImportFormat, type ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, CsvRowData, ImportTemplateData } from "@/lib/types";
 import { ImportType } from "@/lib/types";
+import { accountIdFromCsvValue } from "../utils/csv-account";
 
 export function MappingStepUnified() {
   const { state, dispatch } = useImportContext();
@@ -246,12 +247,11 @@ export function MappingStepUnified() {
     );
   }, [data, localMapping.fieldMappings, getMappedValue]);
 
-  const validAccountIds = useMemo(() => new Set(accounts.map((account) => account.id)), [accounts]);
   const invalidAccounts = useMemo(() => {
     return distinctAccountIds.filter(
-      (account) => !validAccountIds.has(account) && !localMapping.accountMappings?.[account],
+      (account) => !accountIdFromCsvValue(account, accounts, localMapping.accountMappings),
     );
-  }, [distinctAccountIds, localMapping.accountMappings, validAccountIds]);
+  }, [accounts, distinctAccountIds, localMapping.accountMappings]);
 
   const missingAccountRowsCount = useMemo(() => {
     if (

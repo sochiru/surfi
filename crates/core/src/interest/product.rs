@@ -10,6 +10,7 @@ pub const CASH_CATEGORY_FIXED_INCOME: &str = "FIXED_INCOME";
 pub const MP2_GROUP: &str = "Pag-IBIG";
 pub const MP2_TERM_YEARS: u32 = 5;
 pub const DAY_COUNT_ACTUAL_360: &str = "actual_360";
+pub const DAY_COUNT_ACTUAL_ACTUAL: &str = "actual_actual";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -28,6 +29,38 @@ pub enum CreditFrequency {
     Yearly,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MonthlyCreditTiming {
+    MonthEnd,
+    #[default]
+    NextMonthStart,
+}
+
+/// One marginal band: the slice of balance from the previous `up_to` up to this
+/// limit earns `apy`. `up_to = None` is uncapped. Balance above the last finite
+/// limit earns nothing unless an uncapped row follows.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RateTier {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub up_to: Option<Decimal>,
+    #[serde(default)]
+    pub apy: Decimal,
+}
+
+/// APY (and optional bands) that apply from `from` until the next period.
+/// Days before every period use the account's default `apy` / `rate_tiers`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RatePeriod {
+    pub from: String,
+    #[serde(default)]
+    pub apy: Decimal,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rate_tiers: Vec<RateTier>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct YieldConfig {
@@ -35,10 +68,20 @@ pub struct YieldConfig {
     pub enabled: bool,
     /// Assumed rate, used for any year the provider has not declared yet.
     /// Declared MP2 rates are app-wide and live in [`crate::interest::Mp2DividendRates`].
+    /// Also the flat rate when `rate_tiers` is empty.
     #[serde(default)]
     pub apy: Decimal,
+    /// Marginal APY bands. Empty means the single `apy` applies to the full balance.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rate_tiers: Vec<RateTier>,
+    /// Dated promo windows (Maya mission boosts, campaign start mid-month).
+    /// Latest `from` on or before a day wins; earlier days keep the default bands.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rate_schedule: Vec<RatePeriod>,
     #[serde(default)]
     pub credit_frequency: CreditFrequency,
+    #[serde(default)]
+    pub monthly_credit_timing: MonthlyCreditTiming,
     /// Final withholding deducted from each credit, as a fraction (0.20 = 20%).
     /// Philippine bank interest is taxed at 20%; MP2 dividends are exempt.
     #[serde(default)]
@@ -46,8 +89,7 @@ pub struct YieldConfig {
     /// Balance the account must hold on a given day to earn anything that day.
     #[serde(default)]
     pub minimum_balance: Decimal,
-    /// `actual_360` or `actual_365`. A 360 basis pays slightly more per day for
-    /// the same quoted rate, and is what many banks use.
+    /// `actual_360`, `actual_365`, or `actual_actual` (365/366).
     #[serde(default)]
     pub day_count: Option<String>,
     #[serde(default)]
@@ -55,11 +97,85 @@ pub struct YieldConfig {
 }
 
 impl YieldConfig {
-    pub fn day_count_basis(&self) -> i64 {
+    pub fn day_count_basis(&self, date: NaiveDate) -> i64 {
         match self.day_count.as_deref() {
             Some(basis) if basis.eq_ignore_ascii_case(DAY_COUNT_ACTUAL_360) => 360,
+            Some(basis)
+                if basis.eq_ignore_ascii_case(DAY_COUNT_ACTUAL_ACTUAL)
+                    && NaiveDate::from_ymd_opt(date.year(), 2, 29).is_some() =>
+            {
+                366
+            }
             _ => 365,
         }
+    }
+
+    /// Sorted unique bands; empty stored tiers collapse to a single uncapped `apy` row.
+    pub fn normalized_rate_tiers(&self) -> Vec<RateTier> {
+        Self::normalize_tiers(self.apy, &self.rate_tiers)
+    }
+
+    pub fn has_positive_rate(&self) -> bool {
+        self.apy > Decimal::ZERO
+            || self.rate_tiers.iter().any(|tier| tier.apy > Decimal::ZERO)
+            || self.rate_schedule.iter().any(|period| {
+                period.apy > Decimal::ZERO
+                    || period
+                        .rate_tiers
+                        .iter()
+                        .any(|tier| tier.apy > Decimal::ZERO)
+            })
+    }
+
+    /// Default bands, unless a schedule period has started on or before `date`.
+    pub fn rate_snapshot_on(&self, date: NaiveDate) -> (Decimal, Vec<RateTier>) {
+        let period = self
+            .rate_schedule
+            .iter()
+            .filter_map(|period| parse_ymd(&period.from).map(|from| (from, period)))
+            .filter(|(from, _)| *from <= date)
+            .max_by_key(|(from, _)| *from)
+            .map(|(_, period)| period);
+        match period {
+            Some(period) => (
+                period.apy.max(Decimal::ZERO),
+                Self::normalize_tiers(period.apy, &period.rate_tiers),
+            ),
+            None => (self.apy.max(Decimal::ZERO), self.normalized_rate_tiers()),
+        }
+    }
+
+    fn normalize_tiers(apy: Decimal, rate_tiers: &[RateTier]) -> Vec<RateTier> {
+        let mut tiers: Vec<RateTier> = rate_tiers
+            .iter()
+            .map(|tier| RateTier {
+                up_to: tier.up_to.filter(|limit| *limit > Decimal::ZERO),
+                apy: tier.apy.max(Decimal::ZERO),
+            })
+            .collect();
+        if tiers.is_empty() {
+            return vec![RateTier {
+                up_to: None,
+                apy: apy.max(Decimal::ZERO),
+            }];
+        }
+        tiers.sort_by(|a, b| match (a.up_to, b.up_to) {
+            (None, None) => std::cmp::Ordering::Equal,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (Some(left), Some(right)) => left.cmp(&right),
+        });
+        let mut unique: Vec<RateTier> = Vec::new();
+        for tier in tiers {
+            if let Some(last) = unique.last_mut() {
+                if last.up_to == tier.up_to {
+                    *last = tier;
+                    continue;
+                }
+            }
+            unique.push(tier);
+        }
+        unique
     }
 }
 
@@ -230,6 +346,7 @@ mod tests {
         assert!(product.compounding);
         let yield_cfg = product.yield_config.unwrap();
         assert_eq!(yield_cfg.apy, dec!(0.065));
+        assert!(yield_cfg.rate_tiers.is_empty());
         assert_eq!(yield_cfg.credit_frequency, CreditFrequency::Yearly);
         assert_eq!(
             mp2_maturity_date(parse_ymd("2024-03-15").unwrap()).unwrap(),
@@ -250,5 +367,91 @@ mod tests {
         assert!(!account.is_mp2_account());
         assert!(!account.is_hysa_goal_account());
         assert!(is_fixed_income_cash(&account));
+    }
+
+    #[test]
+    fn empty_tiers_normalize_to_flat_apy() {
+        let yield_cfg = YieldConfig {
+            enabled: true,
+            apy: dec!(0.05),
+            rate_tiers: vec![],
+            credit_frequency: CreditFrequency::Daily,
+            monthly_credit_timing: MonthlyCreditTiming::NextMonthStart,
+            withholding_tax_rate: Decimal::ZERO,
+            minimum_balance: Decimal::ZERO,
+            day_count: None,
+            start_date: None,
+            rate_schedule: vec![],
+        };
+        let tiers = yield_cfg.normalized_rate_tiers();
+        assert_eq!(tiers.len(), 1);
+        assert_eq!(tiers[0].up_to, None);
+        assert_eq!(tiers[0].apy, dec!(0.05));
+    }
+
+    #[test]
+    fn normalizes_tier_order_and_duplicate_limits() {
+        let yield_cfg = YieldConfig {
+            enabled: true,
+            apy: dec!(0.03),
+            rate_tiers: vec![
+                RateTier {
+                    up_to: Some(dec!(100000)),
+                    apy: dec!(0.08),
+                },
+                RateTier {
+                    up_to: Some(dec!(20000)),
+                    apy: dec!(0.04),
+                },
+                RateTier {
+                    up_to: Some(dec!(20000)),
+                    apy: dec!(0.041),
+                },
+            ],
+            credit_frequency: CreditFrequency::Monthly,
+            monthly_credit_timing: MonthlyCreditTiming::NextMonthStart,
+            withholding_tax_rate: Decimal::ZERO,
+            minimum_balance: Decimal::ZERO,
+            day_count: None,
+            start_date: None,
+            rate_schedule: vec![],
+        };
+        let tiers = yield_cfg.normalized_rate_tiers();
+        assert_eq!(tiers[0].up_to, Some(dec!(20000)));
+        assert_eq!(tiers[0].apy, dec!(0.041));
+        assert_eq!(tiers[1].up_to, Some(dec!(100000)));
+    }
+
+    #[test]
+    fn rate_snapshot_uses_the_latest_started_period() {
+        let yield_cfg = YieldConfig {
+            enabled: true,
+            apy: dec!(0.03),
+            rate_tiers: vec![],
+            rate_schedule: vec![
+                RatePeriod {
+                    from: "2024-08-04".into(),
+                    apy: dec!(0.10),
+                    rate_tiers: vec![],
+                },
+                RatePeriod {
+                    from: "2024-09-01".into(),
+                    apy: dec!(0.03),
+                    rate_tiers: vec![],
+                },
+            ],
+            credit_frequency: CreditFrequency::Daily,
+            monthly_credit_timing: MonthlyCreditTiming::NextMonthStart,
+            withholding_tax_rate: Decimal::ZERO,
+            minimum_balance: Decimal::ZERO,
+            day_count: None,
+            start_date: None,
+        };
+        let (aug3, _) = yield_cfg.rate_snapshot_on(parse_ymd("2024-08-03").unwrap());
+        let (aug4, _) = yield_cfg.rate_snapshot_on(parse_ymd("2024-08-04").unwrap());
+        let (sep, _) = yield_cfg.rate_snapshot_on(parse_ymd("2024-09-01").unwrap());
+        assert_eq!(aug3, dec!(0.03));
+        assert_eq!(aug4, dec!(0.10));
+        assert_eq!(sep, dec!(0.03));
     }
 }
