@@ -491,6 +491,7 @@ impl FinnhubProvider {
                 Some(DividendEvent {
                     amount: d.amount,
                     date: timestamp.timestamp(),
+                    payment_date: None,
                 })
             })
             .collect();

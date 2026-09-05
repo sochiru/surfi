@@ -1885,10 +1885,12 @@ mod tests {
                     DividendEvent {
                         amount: 0.3,
                         date: 2,
+                        payment_date: None,
                     },
                     DividendEvent {
                         amount: 0.2,
                         date: 1,
+                        payment_date: None,
                     },
                 ])
             }

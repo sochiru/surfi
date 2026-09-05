@@ -211,7 +211,9 @@ export interface ActivitiesAPI {
  */
 export interface DividendEvent {
   amount: number;
-  date: number; // unix seconds
+  date: number; // unix seconds (ex-dividend date)
+  /** Payment date, unix seconds, when the provider supplies it. */
+  payment_date?: number;
 }
 
 export interface FetchDividendsOptions {

@@ -12,7 +12,7 @@ import {
   Input,
   Label,
 } from "@wealthfolio/ui";
-import { createActivity, removeAutoInterest, syncCashInterestAccount } from "@/adapters";
+import { createActivity, removeAutoInterestAccount, syncCashInterestAccount } from "@/adapters";
 import type { ActionPaletteGroup } from "@/components/action-palette";
 import { isMp2Account, parseAccountMeta } from "@/lib/cash-product-meta";
 import { ActivityType } from "@/lib/constants";
@@ -50,16 +50,16 @@ export function useCashProductActions(account: Account | undefined): CashProduct
   const syncMutation = useMutation({
     mutationFn: () => syncCashInterestAccount(account?.id ?? ""),
     onSuccess: (result) => {
-      toast.success(`Generated ${result.created} interest entries`);
+      toast.success(`Generated ${result.created} interest entries for ${account?.name}`);
       invalidate();
     },
     onError: (error) => toast.error(String(error)),
   });
 
   const removeMutation = useMutation({
-    mutationFn: removeAutoInterest,
+    mutationFn: () => removeAutoInterestAccount(account?.id ?? ""),
     onSuccess: (count) => {
-      toast.success(`Removed ${count} auto interest entries`);
+      toast.success(`Removed ${count} auto interest entries from ${account?.name}`);
       invalidate();
     },
     onError: (error) => toast.error(String(error)),
@@ -108,13 +108,13 @@ export function useCashProductActions(account: Account | undefined): CashProduct
         : []),
       {
         icon: Icons.Sparkles,
-        label: "Generate interest",
+        label: "Generate interest for this account",
         testId: "button-sync-cash-interest",
         onClick: () => syncMutation.mutate(),
       },
       {
         icon: Icons.Trash,
-        label: "Remove auto interest",
+        label: "Remove auto interest from this account",
         testId: "button-remove-auto-interest",
         variant: "destructive",
         onClick: () => removeMutation.mutate(),

@@ -88,12 +88,15 @@ export const COMMANDS: CommandMap = {
   get_dividend_sync_settings: { method: "GET", path: "/dividends/settings" },
   update_dividend_sync_settings: { method: "PUT", path: "/dividends/settings" },
   sync_dividends: { method: "POST", path: "/dividends/sync" },
+  sync_dividends_account: { method: "POST", path: "/dividends/sync" },
   remove_auto_dividends: { method: "DELETE", path: "/dividends/auto" },
+  remove_auto_dividends_account: { method: "DELETE", path: "/dividends/auto" },
   get_dividend_calendar_events: { method: "GET", path: "/dividends/calendar" },
   get_asset_dividend_view: { method: "GET", path: "/dividends/assets" },
   sync_cash_interest: { method: "POST", path: "/cash-interest/sync" },
   sync_cash_interest_account: { method: "POST", path: "/cash-interest/sync" },
   remove_auto_interest: { method: "DELETE", path: "/cash-interest/auto" },
+  remove_auto_interest_account: { method: "DELETE", path: "/cash-interest/auto" },
   get_mp2_rates: { method: "GET", path: "/cash-interest/mp2-rates" },
   update_mp2_rates: { method: "PUT", path: "/cash-interest/mp2-rates" },
   // Retirement plan simulations
@@ -821,7 +824,10 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       url += `/${encodeURIComponent(assetId)}`;
       break;
     }
-    case "sync_cash_interest_account": {
+    case "sync_cash_interest_account":
+    case "remove_auto_interest_account":
+    case "sync_dividends_account":
+    case "remove_auto_dividends_account": {
       const { accountId } = payload as { accountId: string };
       url += `/${encodeURIComponent(accountId)}`;
       break;

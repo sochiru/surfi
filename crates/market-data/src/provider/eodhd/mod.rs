@@ -2,7 +2,7 @@
 //!
 //! End-of-day historical prices, dividend history, and company profiles:
 //! - `GET /api/eod/{symbol}` — daily OHLCV (and latest via a short window)
-//! - `GET /api/div/{symbol}` — cash dividend history (ex-date + value)
+//! - `GET /api/div/{symbol}` — cash dividend history (ex-date, value, payment date when available)
 //! - `GET /api/fundamentals/{symbol}` — sector, country, GICS, and identity
 //!
 //! Symbol format: `{TICKER}.{EXCHANGE}` (e.g. `SM.PSE`, `AAPL.US`).
@@ -51,6 +51,9 @@ struct EodBar {
 struct DivBar {
     date: String,
     value: f64,
+    /// Present for major US/EU listings; omitted on many other exchanges.
+    #[serde(default, rename = "paymentDate")]
+    payment_date: Option<String>,
 }
 
 /// Filtered fundamentals payload (`filter=General,Highlights,Technicals`).
@@ -279,6 +282,21 @@ impl EodhdProvider {
             .unwrap_or_else(|| "USD".to_string())
     }
 
+    fn parse_optional_date_midnight(date: Option<&str>) -> Option<DateTime<Utc>> {
+        let raw = date.map(str::trim).filter(|s| !s.is_empty())?;
+        Self::parse_date_midnight(raw).ok()
+    }
+
+    fn dividend_from_bar(bar: &DivBar) -> Result<DividendEvent, MarketDataError> {
+        let timestamp = Self::parse_date_midnight(&bar.date)?;
+        Ok(DividendEvent {
+            amount: bar.value,
+            date: timestamp.timestamp(),
+            payment_date: Self::parse_optional_date_midnight(bar.payment_date.as_deref())
+                .map(|dt| dt.timestamp()),
+        })
+    }
+
     fn parse_date_midnight(date: &str) -> Result<DateTime<Utc>, MarketDataError> {
         let naive = NaiveDate::parse_from_str(date, "%Y-%m-%d").map_err(|e| {
             MarketDataError::ProviderError {
@@ -397,11 +415,8 @@ impl EodhdProvider {
 
         let mut events = Vec::with_capacity(bars.len());
         for bar in bars {
-            match Self::parse_date_midnight(&bar.date) {
-                Ok(ts) => events.push(DividendEvent {
-                    amount: bar.value,
-                    date: ts.timestamp(),
-                }),
+            match Self::dividend_from_bar(&bar) {
+                Ok(event) => events.push(event),
                 Err(e) => warn!("EODHD skipping dividend for {}: {}", symbol, e),
             }
         }
@@ -611,12 +626,32 @@ mod tests {
     fn test_parse_dividends_json_shape() {
         let json = r#"[
             {"date":"2023-02-10","value":0.23,"currency":"USD"},
-            {"date":"2023-05-12","value":0.24,"currency":"USD"}
+            {
+                "date":"2023-05-12",
+                "declarationDate":"2023-05-04",
+                "recordDate":"2023-05-15",
+                "paymentDate":"2023-05-18",
+                "value":0.24,
+                "unadjustedValue":0.24,
+                "currency":"USD"
+            }
         ]"#;
         let bars: Vec<DivBar> = serde_json::from_str(json).unwrap();
         assert_eq!(bars.len(), 2);
         assert_eq!(bars[0].value, 0.23);
+        assert_eq!(bars[0].payment_date, None);
         assert_eq!(bars[1].date, "2023-05-12");
+        assert_eq!(bars[1].payment_date.as_deref(), Some("2023-05-18"));
+
+        let with_pay = EodhdProvider::dividend_from_bar(&bars[1]).unwrap();
+        assert_eq!(
+            with_pay.payment_date,
+            Some(
+                Utc.with_ymd_and_hms(2023, 5, 18, 0, 0, 0)
+                    .unwrap()
+                    .timestamp()
+            )
+        );
     }
 
     #[test]

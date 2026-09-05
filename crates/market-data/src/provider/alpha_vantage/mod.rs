@@ -948,6 +948,7 @@ impl AlphaVantageProvider {
                 Some(DividendEvent {
                     amount,
                     date: timestamp.timestamp(),
+                    payment_date: None,
                 })
             })
             .collect();

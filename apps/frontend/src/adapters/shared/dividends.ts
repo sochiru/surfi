@@ -81,11 +81,29 @@ export const syncDividends = async (): Promise<DividendSyncResult> => {
   }
 };
 
+export const syncDividendsAccount = async (accountId: string): Promise<DividendSyncResult> => {
+  try {
+    return await invoke<DividendSyncResult>("sync_dividends_account", { accountId });
+  } catch (error) {
+    logger.error("Error syncing dividends for account.");
+    throw error;
+  }
+};
+
 export const removeAutoDividends = async (): Promise<number> => {
   try {
     return await invoke<number>("remove_auto_dividends");
   } catch (error) {
     logger.error("Error removing auto dividends.");
+    throw error;
+  }
+};
+
+export const removeAutoDividendsAccount = async (accountId: string): Promise<number> => {
+  try {
+    return await invoke<number>("remove_auto_dividends_account", { accountId });
+  } catch (error) {
+    logger.error("Error removing auto dividends for account.");
     throw error;
   }
 };

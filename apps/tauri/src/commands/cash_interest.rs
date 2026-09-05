@@ -64,3 +64,19 @@ pub async fn remove_auto_interest(state: State<'_, Arc<ServiceContext>>) -> Resu
         .await
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn remove_auto_interest_account(
+    account_id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<usize, String> {
+    debug!(
+        "Removing auto-created interest activities for {}...",
+        account_id
+    );
+    state
+        .interest_accrual_service()
+        .remove_auto_created_account(&account_id)
+        .await
+        .map_err(|e| e.to_string())
+}

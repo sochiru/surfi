@@ -59,7 +59,11 @@ pub trait DividendSyncServiceTrait: Send + Sync {
     async fn update_settings(&self, settings: DividendSyncSettings)
         -> Result<DividendSyncSettings>;
     async fn sync(&self) -> Result<DividendSyncResult>;
+    /// Same as [`Self::sync`] but limited to one account.
+    async fn sync_account(&self, account_id: &str) -> Result<DividendSyncResult>;
     async fn remove_auto_created(&self) -> Result<usize>;
+    /// Same as [`Self::remove_auto_created`] but limited to one account.
+    async fn remove_auto_created_account(&self, account_id: &str) -> Result<usize>;
     async fn build_calendar_events(&self) -> Result<Vec<DividendCalendarEvent>>;
     async fn build_asset_dividend_view(&self, asset_id: &str) -> Result<AssetDividendView>;
 }
@@ -139,6 +143,25 @@ impl DividendSyncService {
         Utc.timestamp_opt(secs, 0)
             .single()
             .map(|dt| dt.date_naive())
+    }
+
+    /// Ex-date plus the date cash is booked (payment date when the provider
+    /// supplies one, otherwise the ex-date).
+    fn dividend_booking_dates(div: &DividendEvent) -> Option<(NaiveDate, NaiveDate)> {
+        let ex_date = Self::ex_date_from_unix(div.date)?;
+        let activity_date = div
+            .payment_date
+            .and_then(Self::ex_date_from_unix)
+            .unwrap_or(ex_date);
+        Some((ex_date, activity_date))
+    }
+
+    fn metadata_ex_date(a: &Activity) -> Option<String> {
+        a.metadata
+            .as_ref()
+            .and_then(|m| m.get("ex_date"))
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
     }
 
     async fn fetch_dividends(
@@ -289,50 +312,20 @@ impl DividendSyncService {
             }
             if let Some(asset_id) = a.asset_id.as_deref() {
                 dated.insert(format!("{}:{}", asset_id, date.format("%Y-%m-%d")));
+                if let Some(ex_ymd) = Self::metadata_ex_date(&a) {
+                    dated.insert(format!("{}:{}", asset_id, ex_ymd));
+                }
             }
         }
         Ok((keys, dated))
     }
 
-    fn legacy_idempotency_key(symbol: &str, ex_unix: i64, rounded: &str) -> String {
-        format!(
-            "pse-div:{}:{}:{}",
-            symbol.to_ascii_uppercase(),
-            ex_unix,
-            rounded
-        )
-    }
-
-    fn activity_date(a: &Activity) -> NaiveDate {
-        a.activity_date.date_naive()
-    }
-
-    fn normalize_symbol(symbol: &str) -> String {
-        symbol
-            .trim_start_matches("PSE:")
-            .split('.')
-            .next()
-            .unwrap_or(symbol)
-            .to_ascii_uppercase()
-    }
-}
-
-#[async_trait]
-impl DividendSyncServiceTrait for DividendSyncService {
-    fn get_settings(&self) -> Result<DividendSyncSettings> {
-        self.load_settings()
-    }
-
-    async fn update_settings(
-        &self,
-        settings: DividendSyncSettings,
-    ) -> Result<DividendSyncSettings> {
-        self.save_settings(&settings).await?;
-        Ok(settings)
-    }
-
-    async fn remove_auto_created(&self) -> Result<usize> {
-        let accounts = self.accounts.get_all_accounts()?;
+    async fn remove_auto_created_inner(&self, account_id: Option<&str>) -> Result<usize> {
+        let accounts = if let Some(id) = account_id {
+            vec![self.accounts.get_account(id)?]
+        } else {
+            self.accounts.get_all_accounts()?
+        };
         let mut delete_ids = Vec::new();
         for account in accounts {
             for a in self.activities.get_activities_by_account_id(&account.id)? {
@@ -359,7 +352,28 @@ impl DividendSyncServiceTrait for DividendSyncService {
         Ok(n)
     }
 
-    async fn sync(&self) -> Result<DividendSyncResult> {
+    fn legacy_idempotency_key(symbol: &str, ex_unix: i64, rounded: &str) -> String {
+        format!(
+            "pse-div:{}:{}:{}",
+            symbol.to_ascii_uppercase(),
+            ex_unix,
+            rounded
+        )
+    }
+
+    fn activity_date(a: &Activity) -> NaiveDate {
+        a.activity_date.date_naive()
+    }
+
+    fn normalize_symbol(symbol: &str) -> String {
+        symbol
+            .trim_start_matches("PSE:")
+            .split('.')
+            .next()
+            .unwrap_or(symbol)
+            .to_ascii_uppercase()
+    }
+    async fn sync_inner(&self, account_id: Option<&str>) -> Result<DividendSyncResult> {
         let mut settings = self.load_settings()?;
         let mut result = DividendSyncResult::default();
         if !settings.global_enabled {
@@ -370,7 +384,11 @@ impl DividendSyncServiceTrait for DividendSyncService {
         }
 
         let base_ccy = self.base_currency.read().unwrap().clone();
-        let accounts = self.accounts.get_all_accounts()?;
+        let accounts = if let Some(id) = account_id {
+            vec![self.accounts.get_account(id)?]
+        } else {
+            self.accounts.get_all_accounts()?
+        };
         let mut creates: Vec<NewActivity> = Vec::new();
         let mut batch_keys: HashSet<String> = HashSet::new();
         let mut net_cash = Decimal::ZERO;
@@ -444,15 +462,17 @@ impl DividendSyncServiceTrait for DividendSyncService {
                     .clamp(Decimal::ZERO, Decimal::ONE);
 
                 for div in dividends {
-                    let Some(ex_date) = Self::ex_date_from_unix(div.date) else {
+                    let Some((ex_date, activity_date)) = Self::dividend_booking_dates(&div) else {
                         continue;
                     };
-                    if ex_date > today {
+                    if activity_date > today {
                         continue;
                     }
 
                     let rounded = round_amount_str(div.amount, 6);
                     let ex_ymd = ex_date.format("%Y-%m-%d").to_string();
+                    let activity_ymd = activity_date.format("%Y-%m-%d").to_string();
+                    let used_payment_date = activity_date != ex_date;
                     let key = build_idempotency_key(&account.id, &asset_id, &ex_ymd, &rounded);
                     let legacy = Self::legacy_idempotency_key(&symbol, div.date, &rounded);
                     let dated = format!("{asset_id}:{ex_ymd}");
@@ -496,9 +516,14 @@ impl DividendSyncServiceTrait for DividendSyncService {
                         "tax_amount": tax.to_string(),
                         "amount_per_share": per_share.to_string(),
                         "ex_date": ex_ymd,
+                        "payment_date": if used_payment_date { Some(&activity_ymd) } else { None },
                         "shares_at_ex_date": shares.to_string(),
                         "shares_source": if trades.is_empty() { "snapshot_at_ex_date" } else { "activity_replay" },
-                        "activity_date_note": "ex-date (provider payment date unavailable)",
+                        "activity_date_note": if used_payment_date {
+                            "payment date"
+                        } else {
+                            "ex-date (provider payment date unavailable)"
+                        },
                     });
 
                     creates.push(NewActivity {
@@ -518,7 +543,7 @@ impl DividendSyncServiceTrait for DividendSyncService {
                         }),
                         activity_type: ACTIVITY_TYPE_DIVIDEND.to_string(),
                         subtype: None,
-                        activity_date: ex_ymd,
+                        activity_date: activity_ymd.clone(),
                         quantity: Some(shares),
                         unit_price: Some(per_share),
                         currency: ccy.clone(),
@@ -538,6 +563,9 @@ impl DividendSyncServiceTrait for DividendSyncService {
                     });
                     existing_keys.insert(key.clone());
                     existing_dated.insert(dated);
+                    if used_payment_date {
+                        existing_dated.insert(format!("{asset_id}:{activity_ymd}"));
+                    }
                     batch_keys.insert(key);
                     acct_result.created += 1;
                 }
@@ -567,6 +595,37 @@ impl DividendSyncServiceTrait for DividendSyncService {
         let _ = self.save_settings(&settings).await;
         result.net_cash_added = net_cash.round_dp(2).to_string();
         Ok(result)
+    }
+}
+
+#[async_trait]
+impl DividendSyncServiceTrait for DividendSyncService {
+    fn get_settings(&self) -> Result<DividendSyncSettings> {
+        self.load_settings()
+    }
+
+    async fn update_settings(
+        &self,
+        settings: DividendSyncSettings,
+    ) -> Result<DividendSyncSettings> {
+        self.save_settings(&settings).await?;
+        Ok(settings)
+    }
+
+    async fn sync(&self) -> Result<DividendSyncResult> {
+        self.sync_inner(None).await
+    }
+
+    async fn sync_account(&self, account_id: &str) -> Result<DividendSyncResult> {
+        self.sync_inner(Some(account_id)).await
+    }
+
+    async fn remove_auto_created(&self) -> Result<usize> {
+        self.remove_auto_created_inner(None).await
+    }
+
+    async fn remove_auto_created_account(&self, account_id: &str) -> Result<usize> {
+        self.remove_auto_created_inner(Some(account_id)).await
     }
 
     async fn build_calendar_events(&self) -> Result<Vec<DividendCalendarEvent>> {
@@ -637,13 +696,18 @@ impl DividendSyncServiceTrait for DividendSyncService {
 
             let posted_keys: HashSet<String> = posted
                 .iter()
-                .map(|a| {
-                    format!(
+                .flat_map(|a| {
+                    let asset = a.asset_id.as_deref().unwrap_or("");
+                    let mut keys = vec![format!(
                         "{}:{}:{}",
                         account.id,
-                        a.asset_id.as_deref().unwrap_or(""),
+                        asset,
                         Self::activity_date(a).format("%Y-%m-%d")
-                    )
+                    )];
+                    if let Some(ex_ymd) = Self::metadata_ex_date(a) {
+                        keys.push(format!("{}:{}:{}", account.id, asset, ex_ymd));
+                    }
+                    keys
                 })
                 .collect();
 
@@ -668,16 +732,18 @@ impl DividendSyncServiceTrait for DividendSyncService {
                 let current_qty = holding.quantity;
 
                 for div in &dividends {
-                    let Some(ex_date) = Self::ex_date_from_unix(div.date) else {
+                    let Some((ex_date, activity_date)) = Self::dividend_booking_dates(div) else {
                         continue;
                     };
-                    let date = ex_date.format("%Y-%m-%d").to_string();
-                    let posted_key = format!("{}:{}:{}", account.id, asset_id, date);
-                    if posted_keys.contains(&posted_key) {
+                    let date = activity_date.format("%Y-%m-%d").to_string();
+                    let posted_key =
+                        format!("{}:{}:{}", account.id, asset_id, ex_date.format("%Y-%m-%d"));
+                    let posted_pay_key = format!("{}:{}:{}", account.id, asset_id, date);
+                    if posted_keys.contains(&posted_key) || posted_keys.contains(&posted_pay_key) {
                         continue;
                     }
 
-                    let is_upcoming = ex_date > now;
+                    let is_upcoming = activity_date > now;
                     let shares = if is_upcoming {
                         current_qty
                     } else {
@@ -732,8 +798,8 @@ impl DividendSyncServiceTrait for DividendSyncService {
                 }
                 let announced_upcoming = dividends
                     .iter()
-                    .filter_map(|div| Self::ex_date_from_unix(div.date))
-                    .any(|ex_date| ex_date > now);
+                    .filter_map(Self::dividend_booking_dates)
+                    .any(|(_, activity_date)| activity_date > now);
                 if announced_upcoming {
                     continue;
                 }
