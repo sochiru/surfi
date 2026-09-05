@@ -19,7 +19,8 @@ import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 
 function metadataNumber(metadata: Record<string, unknown>, key: string): number | null {
   const value = metadata[key];
-  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  const parsed =
+    typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -171,7 +172,11 @@ function SummaryCard({
       <CardContent className="flex items-center justify-between p-5">
         <div>
           <p className="text-muted-foreground text-sm">{label}</p>
-          <p className={destructive ? "text-destructive text-2xl font-semibold" : "text-2xl font-semibold"}>
+          <p
+            className={
+              destructive ? "text-destructive text-2xl font-semibold" : "text-2xl font-semibold"
+            }
+          >
             {value}
           </p>
         </div>
@@ -199,10 +204,7 @@ function LiabilityCard({ holding }: { holding: AlternativeAssetHolding }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="text-base">
-              <Link
-                to={`/holdings/${encodeURIComponent(holding.id)}`}
-                className="hover:underline"
-              >
+              <Link to={`/holdings/${encodeURIComponent(holding.id)}`} className="hover:underline">
                 {holding.name}
               </Link>
             </CardTitle>

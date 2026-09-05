@@ -754,9 +754,7 @@ function LiabilityFields({
         )}
       />
 
-      {!isRevolvingLiability(form.watch("liabilityType")) && (
-        <InstallmentLoanFields form={form} />
-      )}
+      {!isRevolvingLiability(form.watch("liabilityType")) && <InstallmentLoanFields form={form} />}
 
       {/* Linked Asset Display/Selector */}
       <FormField

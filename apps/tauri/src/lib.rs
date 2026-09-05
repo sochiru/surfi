@@ -211,10 +211,7 @@ mod desktop {
         tauri::async_runtime::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(180)).await;
             loop {
-                match periodic_alt_service
-                    .sync_liability_amortization(None)
-                    .await
-                {
+                match periodic_alt_service.sync_liability_amortization(None).await {
                     Ok(n) => {
                         log::info!("Periodic liability amortization completed: {} quotes", n);
                     }

@@ -267,7 +267,8 @@ export function AlternativeAssetQuickAddModal({
       if (formData.purchaseDate) metadata.origination_date = formatDateToISO(formData.purchaseDate);
       if (formData.interestRate) metadata.interest_rate = formData.interestRate;
       if (formData.monthlyPayment) metadata.monthly_payment = formData.monthlyPayment;
-      if (formData.remainingTermMonths) metadata.original_term_months = formData.remainingTermMonths;
+      if (formData.remainingTermMonths)
+        metadata.original_term_months = formData.remainingTermMonths;
     }
 
     const request: CreateAlternativeAssetRequest = {

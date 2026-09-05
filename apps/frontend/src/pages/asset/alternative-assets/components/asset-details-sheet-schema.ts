@@ -151,12 +151,7 @@ export const liabilityDetailsSchema = baseSchema.extend({
     .array(
       z.object({
         effectiveFrom: z.date().optional().nullable(),
-        rate: z.coerce
-          .number()
-          .min(0)
-          .max(100)
-          .optional()
-          .nullable(),
+        rate: z.coerce.number().min(0).max(100).optional().nullable(),
       }),
     )
     .optional(),
@@ -358,9 +353,7 @@ export function formValuesToMetadata(values: AssetDetailsFormValues): Record<str
       metadata.original_term_months =
         values.originalTermMonths != null ? values.originalTermMonths.toString() : "";
       metadata.payment_day = values.paymentDay != null ? values.paymentDay.toString() : "";
-      metadata.lock_in_end_date = values.lockInEndDate
-        ? formatDateToISO(values.lockInEndDate)
-        : "";
+      metadata.lock_in_end_date = values.lockInEndDate ? formatDateToISO(values.lockInEndDate) : "";
       const scheduleRows = (values.rateSchedule ?? [])
         .filter((row) => row.effectiveFrom && row.rate != null)
         .map((row) => ({

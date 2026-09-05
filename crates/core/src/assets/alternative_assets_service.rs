@@ -28,9 +28,7 @@ use super::alternative_assets_traits::{
 use super::{AssetKind, AssetRepositoryTrait, NewAsset, QuoteMode};
 use crate::errors::{Error, Result, ValidationError};
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
-use crate::planning::loan::{
-    calculated_quote_id, loan_terms_from_metadata, project, LoanTerms,
-};
+use crate::planning::loan::{calculated_quote_id, loan_terms_from_metadata, project, LoanTerms};
 use crate::quotes::constants::{DATA_SOURCE_CALCULATED, DATA_SOURCE_MANUAL};
 use crate::quotes::{Quote, QuoteServiceTrait};
 
@@ -1445,23 +1443,20 @@ mod tests {
         ];
         let mut terms = loan_terms_from_metadata(&metadata).unwrap();
         let (upserts, deletes) = plan_liability_amortization_quotes(
-            "loan-1",
-            "EUR",
-            &metadata,
-            &existing,
-            &mut terms,
-            current,
+            "loan-1", "EUR", &metadata, &existing, &mut terms, current,
         );
         assert!(deletes.is_empty());
         assert_eq!(upserts.len(), 2);
-        assert!(upserts.iter().all(|q| q.data_source == DATA_SOURCE_CALCULATED));
-        assert!(upserts.iter().any(|q| q.timestamp.date_naive()
-            == NaiveDate::from_ymd_opt(2020, 2, 1).unwrap()));
-        assert!(upserts.iter().any(|q| q.timestamp.date_naive()
-            == NaiveDate::from_ymd_opt(2020, 3, 1).unwrap()));
-        assert!(!upserts
+        assert!(upserts
             .iter()
-            .any(|q| q.timestamp.date_naive() == current));
+            .all(|q| q.data_source == DATA_SOURCE_CALCULATED));
+        assert!(upserts
+            .iter()
+            .any(|q| q.timestamp.date_naive() == NaiveDate::from_ymd_opt(2020, 2, 1).unwrap()));
+        assert!(upserts
+            .iter()
+            .any(|q| q.timestamp.date_naive() == NaiveDate::from_ymd_opt(2020, 3, 1).unwrap()));
+        assert!(!upserts.iter().any(|q| q.timestamp.date_naive() == current));
     }
 
     #[test]
@@ -1492,12 +1487,7 @@ mod tests {
         ];
         let mut terms = loan_terms_from_metadata(&metadata).unwrap();
         let (upserts, _deletes) = plan_liability_amortization_quotes(
-            "loan-1",
-            "EUR",
-            &metadata,
-            &existing,
-            &mut terms,
-            as_of,
+            "loan-1", "EUR", &metadata, &existing, &mut terms, as_of,
         );
         let feb = upserts
             .iter()
@@ -1514,8 +1504,6 @@ mod tests {
         assert!(feb.close > Decimal::new(250000, 0));
         assert!(mar.close > Decimal::new(250000, 0));
         assert!(may.close < Decimal::new(250000, 0));
-        assert!(!upserts
-            .iter()
-            .any(|q| q.timestamp.date_naive() == stmt));
+        assert!(!upserts.iter().any(|q| q.timestamp.date_naive() == stmt));
     }
 }

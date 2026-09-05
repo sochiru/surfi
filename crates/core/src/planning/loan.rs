@@ -142,9 +142,7 @@ fn pause_reason(terms: &LoanTerms, payment_date: NaiveDate) -> Option<PauseReaso
     let latest_adjustment = terms
         .rate_schedule
         .iter()
-        .filter(|period| {
-            period.effective_from >= ended_on && period.effective_from <= payment_date
-        })
+        .filter(|period| period.effective_from >= ended_on && period.effective_from <= payment_date)
         .max_by_key(|period| period.effective_from);
 
     let Some(latest_adjustment) = latest_adjustment else {
@@ -482,7 +480,10 @@ mod tests {
             .find(|s| s.date == d(2020, 4, 1))
             .unwrap();
         assert!(after.payment > before.payment);
-        assert_eq!(after.remaining_term_months, before.remaining_term_months - 1);
+        assert_eq!(
+            after.remaining_term_months,
+            before.remaining_term_months - 1
+        );
     }
 
     #[test]
@@ -601,12 +602,7 @@ mod tests {
             .find(|s| s.date == d(2020, 3, 1))
             .unwrap();
         assert!(before.balance > dec!(250000));
-        assert!(
-            !projection
-                .steps
-                .iter()
-                .any(|s| s.date == d(2020, 4, 1))
-        );
+        assert!(!projection.steps.iter().any(|s| s.date == d(2020, 4, 1)));
         let after = projection
             .steps
             .iter()
