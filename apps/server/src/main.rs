@@ -122,6 +122,18 @@ async fn main() -> anyhow::Result<()> {
         .await;
     });
 
+    let alt_svc = state.alternative_asset_service.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(180)).await;
+        loop {
+            match alt_svc.sync_liability_amortization(None).await {
+                Ok(n) => tracing::info!("Periodic liability amortization completed: {} quotes", n),
+                Err(e) => tracing::error!("Periodic liability amortization failed: {}", e),
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(6 * 3600)).await;
+        }
+    });
+
     let static_dir = std::path::PathBuf::from(&config.static_dir);
     let index_file = static_dir.join("index.html");
     let static_service = ServeDir::new(static_dir).fallback(ServeFile::new(index_file));

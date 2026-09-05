@@ -3,21 +3,36 @@ import type { AlternativeAssetHolding } from "@/lib/types";
 import { ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES } from "@/lib/types";
 import { AmountDisplay, GainPercent, Separator } from "@wealthfolio/ui";
 import { Card } from "@wealthfolio/ui/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@wealthfolio/ui/components/ui/dropdown-menu";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { useTranslation } from "react-i18next";
 
 interface AlternativeHoldingsListMobileProps {
   holdings: AlternativeAssetHolding[];
   isLoading: boolean;
   onRowClick?: (holding: AlternativeAssetHolding) => void;
+  onEdit?: (holding: AlternativeAssetHolding) => void;
+  onUpdateValue?: (holding: AlternativeAssetHolding) => void;
+  onDelete?: (holding: AlternativeAssetHolding) => void;
 }
 
 export function AlternativeHoldingsListMobile({
   holdings,
   isLoading,
   onRowClick,
+  onEdit,
+  onUpdateValue,
+  onDelete,
 }: AlternativeHoldingsListMobileProps) {
   const { isBalanceHidden } = useBalancePrivacy();
+  const { t } = useTranslation();
 
   if (isLoading) {
     return (
@@ -64,25 +79,64 @@ export function AlternativeHoldingsListMobile({
                   <p className="text-muted-foreground truncate text-sm">{kindDisplay}</p>
                 </div>
               </div>
-              <div className="ml-2 text-right">
-                <AmountDisplay
-                  value={parseFloat(holding.marketValue)}
-                  currency={holding.currency}
-                  isHidden={isBalanceHidden}
-                  className="font-medium"
-                />
-                {gain !== null && gainPct !== null && (
-                  <div className="flex items-center justify-end gap-1">
-                    <AmountDisplay
-                      value={gain}
-                      currency={holding.currency}
-                      isHidden={isBalanceHidden}
-                      colorFormat
-                      className="text-xs"
-                    />
-                    <Separator orientation="vertical" className="mx-1 h-4" />
-                    <GainPercent value={gainPct} className="text-xs" />
-                  </div>
+              <div className="ml-2 flex items-center gap-1 text-right">
+                <div>
+                  <AmountDisplay
+                    value={parseFloat(holding.marketValue)}
+                    currency={holding.currency}
+                    isHidden={isBalanceHidden}
+                    className="font-medium"
+                  />
+                  {gain !== null && gainPct !== null && (
+                    <div className="flex items-center justify-end gap-1">
+                      <AmountDisplay
+                        value={gain}
+                        currency={holding.currency}
+                        isHidden={isBalanceHidden}
+                        colorFormat
+                        className="text-xs"
+                      />
+                      <Separator orientation="vertical" className="mx-1 h-4" />
+                      <GainPercent value={gainPct} className="text-xs" />
+                    </div>
+                  )}
+                </div>
+                {(onEdit || onUpdateValue || onDelete) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md"
+                        aria-label={t("holdings:open_actions")}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <Icons.MoreVertical className="h-4 w-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                      {onUpdateValue && (
+                        <DropdownMenuItem onClick={() => onUpdateValue(holding)}>
+                          {t("holdings:update_value")}
+                        </DropdownMenuItem>
+                      )}
+                      {onEdit && (
+                        <DropdownMenuItem onClick={() => onEdit(holding)}>
+                          {t("holdings:edit_details")}
+                        </DropdownMenuItem>
+                      )}
+                      {onDelete && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => onDelete(holding)}
+                          >
+                            {t("holdings:delete_asset")}
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             </div>

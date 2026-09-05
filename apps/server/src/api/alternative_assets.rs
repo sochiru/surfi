@@ -14,7 +14,7 @@ use crate::{
     main_lib::AppState,
 };
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get, post, put},
     Json, Router,
@@ -381,6 +381,23 @@ async fn get_alternative_holdings(
     Ok(Json(response))
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SyncAmortizationQuery {
+    asset_id: Option<String>,
+}
+
+async fn sync_liability_amortization(
+    Query(query): Query<SyncAmortizationQuery>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<u32>> {
+    let written = state
+        .alternative_asset_service
+        .sync_liability_amortization(query.asset_id.as_deref())
+        .await?;
+    Ok(Json(written as u32))
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Router
 // ─────────────────────────────────────────────────────────────────────────────
@@ -406,4 +423,8 @@ pub fn router() -> Router<Arc<AppState>> {
             put(update_alternative_asset_metadata),
         )
         .route("/alternative-holdings", get(get_alternative_holdings))
+        .route(
+            "/alternative-assets/amortization-sync",
+            post(sync_liability_amortization),
+        )
 }
