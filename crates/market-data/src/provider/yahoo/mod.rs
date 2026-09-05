@@ -358,6 +358,7 @@ impl YahooProvider {
             .map(|d| DividendEvent {
                 amount: d.amount,
                 date: d.date,
+                payment_date: None,
             })
             .collect();
         result.sort_by_key(|d| d.date);
