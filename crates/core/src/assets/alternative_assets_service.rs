@@ -11,8 +11,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{TimeZone, Utc};
-use log::debug;
+use chrono::{Datelike, NaiveDate, TimeZone, Utc};
+use log::{debug, warn};
 use rust_decimal::Decimal;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -28,7 +28,10 @@ use super::alternative_assets_traits::{
 use super::{AssetKind, AssetRepositoryTrait, NewAsset, QuoteMode};
 use crate::errors::{Error, Result, ValidationError};
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
-use crate::quotes::constants::DATA_SOURCE_MANUAL;
+use crate::planning::loan::{
+    calculated_quote_id, loan_terms_from_metadata, project, LoanTerms,
+};
+use crate::quotes::constants::{DATA_SOURCE_CALCULATED, DATA_SOURCE_MANUAL};
 use crate::quotes::{Quote, QuoteServiceTrait};
 
 /// Service for managing alternative assets.
@@ -141,7 +144,6 @@ impl AlternativeAssetService {
     }
 
     /// Removes linked_asset_id from metadata.
-    #[cfg(test)]
     fn remove_linked_asset_id(metadata: Option<Value>) -> Option<Value> {
         let mut meta = metadata?;
         if let Some(obj) = meta.as_object_mut() {
@@ -180,6 +182,53 @@ impl AlternativeAssetService {
             })
             .collect::<Vec<_>>()
             .join(" ")
+    }
+
+    async fn sync_one_liability(&self, asset_id: &str) -> Result<usize> {
+        let asset = self.asset_repository.get_by_id(asset_id)?;
+        if asset.kind != AssetKind::Liability {
+            return Ok(0);
+        }
+        let Some(metadata) = asset.metadata.as_ref() else {
+            return Ok(0);
+        };
+        let Some(mut terms) = loan_terms_from_metadata(metadata) else {
+            return Ok(0);
+        };
+
+        let existing = self.quote_service.get_historical_quotes(asset_id)?;
+        let as_of = chrono::Local::now().date_naive();
+        let (to_upsert, to_delete) = plan_liability_amortization_quotes(
+            &asset.id,
+            &asset.quote_ccy,
+            metadata,
+            &existing,
+            &mut terms,
+            as_of,
+        );
+
+        for id in &to_delete {
+            if let Err(e) = self.quote_service.delete_quote(id).await {
+                warn!("Failed to delete calculated liability quote {}: {}", id, e);
+            }
+        }
+        if !to_upsert.is_empty() {
+            self.quote_service
+                .bulk_upsert_quotes(to_upsert.clone())
+                .await?;
+        }
+        debug!(
+            "Synced {} calculated amortization quotes for {}",
+            to_upsert.len(),
+            asset_id
+        );
+        Ok(to_upsert.len())
+    }
+
+    async fn maybe_sync_liability(&self, asset_id: &str) {
+        if let Err(e) = self.sync_one_liability(asset_id).await {
+            warn!("Liability amortization sync failed for {}: {}", asset_id, e);
+        }
     }
 }
 
@@ -292,6 +341,10 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         let saved_quote = self.quote_service.add_quote(&quote).await?;
         debug!("Created current valuation quote: {}", saved_quote.id);
 
+        if request.kind == AssetKind::Liability {
+            self.maybe_sync_liability(&asset_id).await;
+        }
+
         Ok(CreateAlternativeAssetResponse {
             asset_id,
             quote_id: saved_quote.id,
@@ -341,6 +394,8 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
 
         let saved_quote = self.quote_service.add_quote(&quote).await?;
         debug!("Created valuation quote: {}", saved_quote.id);
+
+        self.maybe_sync_liability(&request.asset_id).await;
 
         Ok(UpdateValuationResponse {
             quote_id: saved_quote.id,
@@ -394,7 +449,8 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         }
 
         // Update liability metadata with linked_asset_id
-        let new_metadata = Self::set_linked_asset_id(None, &request.target_asset_id);
+        let new_metadata =
+            Self::set_linked_asset_id(liability.metadata.clone(), &request.target_asset_id);
         self.alternative_asset_repository
             .update_asset_metadata(&request.liability_id, Some(new_metadata))
             .await?;
@@ -423,8 +479,9 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         }
 
         // Remove linked_asset_id from metadata
+        let new_metadata = Self::remove_linked_asset_id(liability.metadata);
         self.alternative_asset_repository
-            .update_asset_metadata(liability_id, None)
+            .update_asset_metadata(liability_id, new_metadata)
             .await?;
 
         debug!("Unlinked liability {}", liability_id);
@@ -559,6 +616,8 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             request.asset_id, purchase_quote_updated
         );
 
+        self.maybe_sync_liability(&request.asset_id).await;
+
         Ok(UpdateAssetDetailsResponse {
             asset_id: request.asset_id,
             purchase_quote_updated,
@@ -669,6 +728,144 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         debug!("Found {} alternative holdings", holdings.len());
         Ok(holdings)
     }
+
+    async fn sync_liability_amortization(&self, asset_id: Option<&str>) -> Result<usize> {
+        if let Some(id) = asset_id {
+            return self.sync_one_liability(id).await;
+        }
+
+        let liabilities: Vec<_> = self
+            .asset_repository
+            .list()?
+            .into_iter()
+            .filter(|a| a.kind == AssetKind::Liability)
+            .collect();
+
+        let mut written = 0;
+        for asset in liabilities {
+            match self.sync_one_liability(&asset.id).await {
+                Ok(n) => written += n,
+                Err(e) => warn!("Liability amortization sync failed for {}: {}", asset.id, e),
+            }
+        }
+        Ok(written)
+    }
+}
+
+fn metadata_decimal(metadata: &Value, keys: &[&str]) -> Option<Decimal> {
+    keys.iter().find_map(|key| {
+        metadata
+            .get(*key)
+            .and_then(|v| {
+                v.as_str()
+                    .map(|s| s.to_string())
+                    .or_else(|| v.as_number().map(|n| n.to_string()))
+            })
+            .and_then(|s| s.parse().ok())
+    })
+}
+
+fn metadata_date(metadata: &Value, keys: &[&str]) -> Option<NaiveDate> {
+    keys.iter().find_map(|key| {
+        metadata
+            .get(*key)
+            .and_then(|v| v.as_str())
+            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+    })
+}
+
+fn quote_day(quote: &Quote) -> NaiveDate {
+    quote.timestamp.date_naive()
+}
+
+fn resolve_amortization_start(
+    metadata: &Value,
+    existing: &[Quote],
+) -> Option<(NaiveDate, Decimal)> {
+    let mut manuals: Vec<&Quote> = existing
+        .iter()
+        .filter(|q| q.data_source == DATA_SOURCE_MANUAL)
+        .collect();
+    manuals.sort_by_key(|q| q.timestamp);
+
+    let orig_date = metadata_date(metadata, &["origination_date", "purchase_date"]);
+    let orig_amount = metadata_decimal(metadata, &["original_amount", "purchase_price"]);
+
+    if let Some(date) = orig_date {
+        if let Some(quote) = manuals.iter().find(|q| quote_day(q) == date) {
+            return Some((date, quote.close));
+        }
+        if let Some(amount) = orig_amount {
+            return Some((date, amount));
+        }
+    }
+
+    manuals.first().map(|q| (quote_day(q), q.close))
+}
+
+fn apply_payment_day_default(terms: &mut LoanTerms, start: NaiveDate, metadata: &Value) {
+    if metadata.get("payment_day").is_none() {
+        terms.payment_day = start.day().clamp(1, 28);
+    }
+}
+
+fn plan_liability_amortization_quotes(
+    asset_id: &str,
+    currency: &str,
+    metadata: &Value,
+    existing: &[Quote],
+    terms: &mut LoanTerms,
+    as_of: NaiveDate,
+) -> (Vec<Quote>, Vec<String>) {
+    let Some((start, principal)) = resolve_amortization_start(metadata, existing) else {
+        return (vec![], vec![]);
+    };
+    apply_payment_day_default(terms, start, metadata);
+
+    let statements: Vec<(NaiveDate, Decimal)> = existing
+        .iter()
+        .filter(|q| q.data_source == DATA_SOURCE_MANUAL)
+        .map(|q| (quote_day(q), q.close))
+        .collect();
+
+    let projection = project(start, principal, terms, &statements, as_of);
+    let now = Utc::now();
+    let to_upsert: Vec<Quote> = projection
+        .steps
+        .iter()
+        .filter(|step| {
+            !existing
+                .iter()
+                .any(|q| q.data_source == DATA_SOURCE_MANUAL && quote_day(q) == step.date)
+        })
+        .map(|step| {
+            let ts = Utc.from_utc_datetime(&step.date.and_hms_opt(12, 0, 0).unwrap());
+            Quote {
+                id: calculated_quote_id(asset_id, step.date),
+                asset_id: asset_id.to_string(),
+                timestamp: ts,
+                open: step.balance,
+                high: step.balance,
+                low: step.balance,
+                close: step.balance,
+                adjclose: step.balance,
+                volume: Decimal::ZERO,
+                currency: currency.to_string(),
+                data_source: DATA_SOURCE_CALCULATED.to_string(),
+                created_at: now,
+                notes: None,
+            }
+        })
+        .collect();
+
+    let keep: std::collections::HashSet<&str> = to_upsert.iter().map(|q| q.id.as_str()).collect();
+    let to_delete: Vec<String> = existing
+        .iter()
+        .filter(|q| q.data_source == DATA_SOURCE_CALCULATED && !keep.contains(q.id.as_str()))
+        .map(|q| q.id.clone())
+        .collect();
+
+    (to_upsert, to_delete)
 }
 
 #[cfg(test)]
@@ -1222,5 +1419,103 @@ mod tests {
             Decimal::new(180_000, 0),
             "market_value must reflect the past-dated quote, not the future 0 payoff row"
         );
+    }
+
+    fn make_manual_quote(asset_id: &str, close: Decimal, day: NaiveDate) -> Quote {
+        let mut q = make_quote(asset_id, close, day);
+        q.data_source = DATA_SOURCE_MANUAL.to_string();
+        q
+    }
+
+    #[test]
+    fn origination_and_current_fill_calculated_gap() {
+        let orig = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
+        let current = NaiveDate::from_ymd_opt(2020, 4, 1).unwrap();
+        let metadata = json!({
+            "sub_type": "mortgage",
+            "interest_rate": "3.5",
+            "original_term_months": "360",
+            "origination_date": "2020-01-01",
+            "original_amount": "300000",
+            "payment_day": "1"
+        });
+        let existing = vec![
+            make_manual_quote("loan-1", Decimal::new(300000, 0), orig),
+            make_manual_quote("loan-1", Decimal::new(295000, 0), current),
+        ];
+        let mut terms = loan_terms_from_metadata(&metadata).unwrap();
+        let (upserts, deletes) = plan_liability_amortization_quotes(
+            "loan-1",
+            "EUR",
+            &metadata,
+            &existing,
+            &mut terms,
+            current,
+        );
+        assert!(deletes.is_empty());
+        assert_eq!(upserts.len(), 2);
+        assert!(upserts.iter().all(|q| q.data_source == DATA_SOURCE_CALCULATED));
+        assert!(upserts.iter().any(|q| q.timestamp.date_naive()
+            == NaiveDate::from_ymd_opt(2020, 2, 1).unwrap()));
+        assert!(upserts.iter().any(|q| q.timestamp.date_naive()
+            == NaiveDate::from_ymd_opt(2020, 3, 1).unwrap()));
+        assert!(!upserts
+            .iter()
+            .any(|q| q.timestamp.date_naive() == current));
+    }
+
+    #[test]
+    fn later_statement_rebases_only_after_that_date() {
+        let orig = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
+        let stmt = NaiveDate::from_ymd_opt(2020, 4, 1).unwrap();
+        let as_of = NaiveDate::from_ymd_opt(2020, 6, 1).unwrap();
+        let metadata = json!({
+            "sub_type": "mortgage",
+            "interest_rate": "3.5",
+            "original_term_months": "360",
+            "origination_date": "2020-01-01",
+            "original_amount": "300000",
+            "payment_day": "1"
+        });
+        let existing = vec![
+            make_manual_quote("loan-1", Decimal::new(300000, 0), orig),
+            make_manual_quote("loan-1", Decimal::new(250000, 0), stmt),
+            Quote {
+                id: calculated_quote_id("loan-1", NaiveDate::from_ymd_opt(2020, 5, 1).unwrap()),
+                data_source: DATA_SOURCE_CALCULATED.to_string(),
+                ..make_quote(
+                    "loan-1",
+                    Decimal::new(1, 0),
+                    NaiveDate::from_ymd_opt(2020, 5, 1).unwrap(),
+                )
+            },
+        ];
+        let mut terms = loan_terms_from_metadata(&metadata).unwrap();
+        let (upserts, _deletes) = plan_liability_amortization_quotes(
+            "loan-1",
+            "EUR",
+            &metadata,
+            &existing,
+            &mut terms,
+            as_of,
+        );
+        let feb = upserts
+            .iter()
+            .find(|q| q.timestamp.date_naive() == NaiveDate::from_ymd_opt(2020, 2, 1).unwrap())
+            .unwrap();
+        let mar = upserts
+            .iter()
+            .find(|q| q.timestamp.date_naive() == NaiveDate::from_ymd_opt(2020, 3, 1).unwrap())
+            .unwrap();
+        let may = upserts
+            .iter()
+            .find(|q| q.timestamp.date_naive() == NaiveDate::from_ymd_opt(2020, 5, 1).unwrap())
+            .unwrap();
+        assert!(feb.close > Decimal::new(250000, 0));
+        assert!(mar.close > Decimal::new(250000, 0));
+        assert!(may.close < Decimal::new(250000, 0));
+        assert!(!upserts
+            .iter()
+            .any(|q| q.timestamp.date_naive() == stmt));
     }
 }

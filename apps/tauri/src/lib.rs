@@ -207,6 +207,25 @@ mod desktop {
             .await;
         });
 
+        let periodic_alt_service = Arc::clone(&context.alternative_asset_service);
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(180)).await;
+            loop {
+                match periodic_alt_service
+                    .sync_liability_amortization(None)
+                    .await
+                {
+                    Ok(n) => {
+                        log::info!("Periodic liability amortization completed: {} quotes", n);
+                    }
+                    Err(e) => {
+                        log::error!("Periodic liability amortization failed: {}", e);
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(6 * 3600)).await;
+            }
+        });
+
         // Start background device sync engine (self-skips when device is not READY).
         #[cfg(feature = "device-sync")]
         {
@@ -590,6 +609,7 @@ pub fn run() {
             commands::alternative_assets::get_net_worth,
             commands::alternative_assets::get_net_worth_history,
             commands::alternative_assets::get_alternative_holdings,
+            commands::alternative_assets::sync_liability_amortization,
             // Market data commands
             commands::market_data::search_symbol,
             commands::market_data::resolve_symbol_quote,

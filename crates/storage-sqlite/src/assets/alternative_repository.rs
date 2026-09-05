@@ -89,11 +89,15 @@ impl AlternativeAssetRepositoryTrait for AlternativeAssetRepository {
                     }
                 }
 
-                // Step 2: Delete all quotes for this asset with source = 'MANUAL'
+                // Step 2: Delete valuation quotes for this asset (manual + calculated)
                 diesel::delete(
                     quotes::table
                         .filter(quotes::asset_id.eq(&asset_id_owned))
-                        .filter(quotes::source.eq("MANUAL")),
+                        .filter(
+                            quotes::source
+                                .eq("MANUAL")
+                                .or(quotes::source.eq("CALCULATED")),
+                        ),
                 )
                 .execute(tx.conn())
                 .map_err(StorageError::from)?;

@@ -127,6 +127,39 @@ export const liabilityDetailsSchema = baseSchema.extend({
     .max(100, "Interest rate must be 100 or less")
     .optional()
     .nullable(),
+  monthlyPayment: z.coerce
+    .number()
+    .positive("Monthly payment must be greater than 0")
+    .optional()
+    .nullable(),
+  originalTermMonths: z.coerce
+    .number()
+    .int("Term must be a whole number")
+    .min(1, "Term must be at least 1 month")
+    .max(720, "Term must be 720 months or less")
+    .optional()
+    .nullable(),
+  paymentDay: z.coerce
+    .number()
+    .int()
+    .min(1, "Payment day must be between 1 and 28")
+    .max(28, "Payment day must be between 1 and 28")
+    .optional()
+    .nullable(),
+  lockInEndDate: z.date().optional().nullable(),
+  rateSchedule: z
+    .array(
+      z.object({
+        effectiveFrom: z.date().optional().nullable(),
+        rate: z.coerce
+          .number()
+          .min(0)
+          .max(100)
+          .optional()
+          .nullable(),
+      }),
+    )
+    .optional(),
   linkedAssetId: z.string().optional().nullable(),
 });
 
@@ -216,20 +249,47 @@ export function getDefaultDetailsFormValues(
         description: (metadata?.description as string) ?? null,
       };
 
-    case AlternativeAssetKind.LIABILITY:
+    case AlternativeAssetKind.LIABILITY: {
       // For original amount, check both new field (original_amount) and legacy field (purchase_price)
       const origAmount = metadata?.original_amount ?? metadata?.purchase_price;
       // For origination date, check both new field (origination_date) and legacy field (purchase_date)
       const origDate = metadata?.origination_date ?? metadata?.purchase_date;
+      const interestRate = metadata?.interest_rate
+        ? parseFloat(metadata.interest_rate as string)
+        : null;
+      const parsedSchedule = parseRateSchedule(metadata?.rate_schedule);
+      const rateSchedule =
+        parsedSchedule.length > 0
+          ? parsedSchedule
+          : interestRate != null
+            ? [
+                {
+                  effectiveFrom: origDate ? parseLocalDate(origDate as string) : null,
+                  rate: interestRate,
+                },
+              ]
+            : [];
       return {
         ...base,
         kind: AlternativeAssetKind.LIABILITY,
         liabilityType: subType as LiabilityDetailsFormValues["liabilityType"],
         originalAmount: origAmount ? parseFloat(origAmount as string) : null,
         originationDate: origDate ? parseLocalDate(origDate as string) : null,
-        interestRate: metadata?.interest_rate ? parseFloat(metadata.interest_rate as string) : null,
+        interestRate,
+        monthlyPayment: metadata?.monthly_payment
+          ? parseFloat(metadata.monthly_payment as string)
+          : null,
+        originalTermMonths: metadata?.original_term_months
+          ? parseInt(metadata.original_term_months as string, 10)
+          : null,
+        paymentDay: metadata?.payment_day ? parseInt(metadata.payment_day as string, 10) : null,
+        lockInEndDate: metadata?.lock_in_end_date
+          ? parseLocalDate(metadata.lock_in_end_date as string)
+          : null,
+        rateSchedule,
         linkedAssetId: (metadata?.linked_asset_id as string) ?? null,
       };
+    }
 
     case AlternativeAssetKind.OTHER:
     default:
@@ -285,15 +345,33 @@ export function formValuesToMetadata(values: AssetDetailsFormValues): Record<str
       if (values.description) metadata.description = values.description;
       break;
 
-    case AlternativeAssetKind.LIABILITY:
+    case AlternativeAssetKind.LIABILITY: {
       if (values.liabilityType) metadata.sub_type = values.liabilityType;
-      if (values.originalAmount != null)
-        metadata.original_amount = values.originalAmount.toString();
-      if (values.originationDate)
-        metadata.origination_date = formatDateToISO(values.originationDate);
-      if (values.interestRate != null) metadata.interest_rate = values.interestRate.toString();
+      metadata.original_amount =
+        values.originalAmount != null ? values.originalAmount.toString() : "";
+      metadata.origination_date = values.originationDate
+        ? formatDateToISO(values.originationDate)
+        : "";
+      metadata.interest_rate = values.interestRate != null ? values.interestRate.toString() : "";
+      metadata.monthly_payment =
+        values.monthlyPayment != null ? values.monthlyPayment.toString() : "";
+      metadata.original_term_months =
+        values.originalTermMonths != null ? values.originalTermMonths.toString() : "";
+      metadata.payment_day = values.paymentDay != null ? values.paymentDay.toString() : "";
+      metadata.lock_in_end_date = values.lockInEndDate
+        ? formatDateToISO(values.lockInEndDate)
+        : "";
+      const scheduleRows = (values.rateSchedule ?? [])
+        .filter((row) => row.effectiveFrom && row.rate != null)
+        .map((row) => ({
+          effective_from: formatDateToISO(row.effectiveFrom!),
+          rate: String(row.rate),
+        }));
+      metadata.rate_schedule = scheduleRows.length > 0 ? JSON.stringify(scheduleRows) : "";
       if (values.linkedAssetId) metadata.linked_asset_id = values.linkedAssetId;
+      else metadata.linked_asset_id = "";
       break;
+    }
 
     case AlternativeAssetKind.OTHER:
       if (values.description) metadata.description = values.description;
@@ -309,4 +387,83 @@ function formatDateToISO(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+export interface RateScheduleRow {
+  effectiveFrom: Date | null;
+  rate: number | null;
+}
+
+export function parseRateSchedule(raw: unknown): RateScheduleRow[] {
+  if (!raw) return [];
+  let parsed: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const from = (row.effective_from ?? row.effectiveFrom) as string | undefined;
+      const rateRaw = row.rate;
+      const rate =
+        typeof rateRaw === "number"
+          ? rateRaw
+          : typeof rateRaw === "string"
+            ? parseFloat(rateRaw)
+            : NaN;
+      return {
+        effectiveFrom: from ? parseLocalDate(from) : null,
+        rate: Number.isFinite(rate) ? rate : null,
+      };
+    })
+    .filter((row): row is RateScheduleRow => row != null);
+}
+
+const REVOLVING_SUBTYPES = new Set(["credit_card", "heloc"]);
+
+export function isRevolvingLiability(subType?: string | null): boolean {
+  return !!subType && REVOLVING_SUBTYPES.has(subType);
+}
+
+export interface RateReviewStatus {
+  dueOn: Date;
+  isDue: boolean;
+}
+
+export function getRateReviewStatus(
+  metadata?: Record<string, unknown>,
+  today = new Date(),
+): RateReviewStatus | null {
+  const lockIn = metadata?.lock_in_end_date as string | undefined;
+  if (!lockIn) return null;
+
+  const lockInDate = parseLocalDate(lockIn);
+  const todayIso = formatDateToISO(today);
+  const adjustments = parseRateSchedule(metadata?.rate_schedule)
+    .filter(
+      (row): row is { effectiveFrom: Date; rate: number | null } =>
+        !!row.effectiveFrom &&
+        formatDateToISO(row.effectiveFrom) >= lockIn &&
+        formatDateToISO(row.effectiveFrom) <= todayIso,
+    )
+    .sort((a, b) => a.effectiveFrom.getTime() - b.effectiveFrom.getTime());
+
+  if (adjustments.length === 0) {
+    return { dueOn: lockInDate, isDue: todayIso > lockIn };
+  }
+
+  const latest = adjustments.at(-1)!.effectiveFrom;
+  const dueOn = new Date(latest);
+  dueOn.setFullYear(dueOn.getFullYear() + 1);
+  return { dueOn, isDue: todayIso >= formatDateToISO(dueOn) };
+}
+
+export function isAmortizationPaused(metadata?: Record<string, unknown>): boolean {
+  return getRateReviewStatus(metadata)?.isDue ?? false;
 }

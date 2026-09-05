@@ -291,6 +291,7 @@ export {
   getNetWorthHistory,
   linkLiability,
   unlinkLiability,
+  syncLiabilityAmortization,
   updateAlternativeAssetMetadata,
   updateAlternativeAssetValuation,
 } from "../shared/alternative-assets";

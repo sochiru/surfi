@@ -104,6 +104,14 @@ export const getAlternativeHoldings = async (): Promise<AlternativeAssetHolding[
 };
 
 /**
+ * Recalculate installment liability balances (CALCULATED quotes) from loan terms.
+ * Omit assetId to sync every installment liability.
+ */
+export const syncLiabilityAmortization = async (assetId?: string): Promise<number> => {
+  return invoke<number>("sync_liability_amortization", { assetId });
+};
+
+/**
  * Get net worth history over a date range
  * @param startDate Start date (ISO format: YYYY-MM-DD)
  * @param endDate End date (ISO format: YYYY-MM-DD)

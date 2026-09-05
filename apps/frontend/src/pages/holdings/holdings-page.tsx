@@ -542,6 +542,9 @@ export const HoldingsPage = () => {
               holdings={assetsHoldings}
               isLoading={isDataLoading}
               onRowClick={handleRowClick}
+              onEdit={handleEditAsset}
+              onUpdateValue={setUpdateValueAsset}
+              onDelete={handleDeleteAsset}
             />
           </div>
         </>
@@ -588,6 +591,9 @@ export const HoldingsPage = () => {
               holdings={liabilitiesHoldings}
               isLoading={isDataLoading}
               onRowClick={handleRowClick}
+              onEdit={handleEditAsset}
+              onUpdateValue={setUpdateValueAsset}
+              onDelete={handleDeleteAsset}
             />
           </div>
         </>
