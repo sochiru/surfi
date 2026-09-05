@@ -3,7 +3,9 @@ import { toast } from "sonner";
 import {
   getDividendSyncSettings,
   removeAutoDividends,
+  removeAutoDividendsAccount,
   syncDividends,
+  syncDividendsAccount,
   updateDividendSyncSettings,
   type DividendSyncResult,
 } from "@/adapters";
@@ -55,10 +57,11 @@ export function describeSyncResult(result: DividendSyncResult): string {
   return `${parts.join(", ")}.${accountParts.length ? ` ${accountParts.join(" · ")}.` : ""}${errText}`;
 }
 
+/** Pass an account id to scope the run; omit it to cover every enabled account. */
 export function useSyncDividends(onMessage?: (message: string) => void) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: syncDividends,
+  return useMutation<DividendSyncResult, Error, string | void>({
+    mutationFn: (accountId) => (accountId ? syncDividendsAccount(accountId) : syncDividends()),
     onSuccess: (result) => {
       onMessage?.(describeSyncResult(result));
 
@@ -90,10 +93,12 @@ export function useSyncDividends(onMessage?: (message: string) => void) {
   });
 }
 
+/** Pass an account id to scope the removal; omit it to clear every account. */
 export function useRemoveAutoDividends() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: removeAutoDividends,
+  return useMutation<number, Error, string | void>({
+    mutationFn: (accountId) =>
+      accountId ? removeAutoDividendsAccount(accountId) : removeAutoDividends(),
     onSuccess: (n) => {
       toast.success(`Removed ${n} auto-created activities`);
       for (const key of LEDGER_KEYS) {

@@ -59,6 +59,15 @@ export const removeAutoInterest = async (): Promise<number> => {
   }
 };
 
+export const removeAutoInterestAccount = async (accountId: string): Promise<number> => {
+  try {
+    return await invoke<number>("remove_auto_interest_account", { accountId });
+  } catch (error) {
+    logger.error("Error removing auto interest for account.");
+    throw error;
+  }
+};
+
 export const getMp2Rates = async (): Promise<Mp2DividendRates> => {
   try {
     return await invoke<Mp2DividendRates>("get_mp2_rates");

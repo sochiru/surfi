@@ -1,7 +1,7 @@
 //! Market-data dividend automation.
 //!
 //! Auto-creates `DIVIDEND` activities from provider history using shares held
-//! at each ex-date, scoped per account.
+//! at each ex-date, booked on the payment date when the provider supplies one.
 
 mod model;
 mod projection;

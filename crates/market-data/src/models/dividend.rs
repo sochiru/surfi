@@ -4,5 +4,9 @@
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DividendEvent {
     pub amount: f64,
-    pub date: i64, // unix seconds
+    /// Ex-dividend date, unix seconds (UTC midnight when the provider sends a calendar date).
+    pub date: i64,
+    /// Payment date, unix seconds, when the provider supplies it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payment_date: Option<i64>,
 }

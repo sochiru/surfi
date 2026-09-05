@@ -53,6 +53,8 @@ pub trait InterestAccrualServiceTrait: Send + Sync {
     async fn sync(&self) -> Result<CashInterestSyncResult>;
     async fn sync_account(&self, account_id: &str) -> Result<CashInterestSyncResult>;
     async fn remove_auto_created(&self) -> Result<usize>;
+    /// Same as [`Self::remove_auto_created`] but limited to one account.
+    async fn remove_auto_created_account(&self, account_id: &str) -> Result<usize>;
     /// App-wide MP2 dividend rates, shared by every MP2 account.
     fn get_mp2_rates(&self) -> Result<Mp2DividendRates>;
     async fn set_mp2_rates(&self, rates: &Mp2DividendRates) -> Result<()>;
@@ -188,6 +190,42 @@ impl InterestAccrualService {
         }
     }
 
+    async fn remove_auto_created_inner(&self, account_id: Option<&str>) -> Result<usize> {
+        let accounts = if let Some(id) = account_id {
+            vec![self.accounts.get_account(id)?]
+        } else {
+            self.accounts.get_all_accounts()?
+        };
+        let mut delete_ids = Vec::new();
+        for account in accounts {
+            for a in self.activities.get_activities_by_account_id(&account.id)? {
+                if a.is_user_modified {
+                    continue;
+                }
+                let ty = a.effective_type();
+                if ty != ACTIVITY_TYPE_INTEREST && ty != ACTIVITY_TYPE_WITHDRAWAL {
+                    continue;
+                }
+                if is_auto_interest_source(a.source_system.as_deref())
+                    || is_auto_interest_key(a.idempotency_key.as_deref())
+                {
+                    delete_ids.push(a.id);
+                }
+            }
+        }
+        let n = delete_ids.len();
+        if n > 0 {
+            self.activities
+                .bulk_mutate_activities(ActivityBulkMutationRequest {
+                    creates: vec![],
+                    updates: vec![],
+                    delete_ids,
+                })
+                .await?;
+        }
+        Ok(n)
+    }
+
     async fn sync_inner(&self, account_id: Option<&str>) -> Result<CashInterestSyncResult> {
         let mut result = CashInterestSyncResult::default();
         let tz = self.user_timezone();
@@ -317,34 +355,10 @@ impl InterestAccrualServiceTrait for InterestAccrualService {
     }
 
     async fn remove_auto_created(&self) -> Result<usize> {
-        let accounts = self.accounts.get_all_accounts()?;
-        let mut delete_ids = Vec::new();
-        for account in accounts {
-            for a in self.activities.get_activities_by_account_id(&account.id)? {
-                if a.is_user_modified {
-                    continue;
-                }
-                let ty = a.effective_type();
-                if ty != ACTIVITY_TYPE_INTEREST && ty != ACTIVITY_TYPE_WITHDRAWAL {
-                    continue;
-                }
-                if is_auto_interest_source(a.source_system.as_deref())
-                    || is_auto_interest_key(a.idempotency_key.as_deref())
-                {
-                    delete_ids.push(a.id);
-                }
-            }
-        }
-        let n = delete_ids.len();
-        if n > 0 {
-            self.activities
-                .bulk_mutate_activities(ActivityBulkMutationRequest {
-                    creates: vec![],
-                    updates: vec![],
-                    delete_ids,
-                })
-                .await?;
-        }
-        Ok(n)
+        self.remove_auto_created_inner(None).await
+    }
+
+    async fn remove_auto_created_account(&self, account_id: &str) -> Result<usize> {
+        self.remove_auto_created_inner(Some(account_id)).await
     }
 }

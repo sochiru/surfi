@@ -26,7 +26,7 @@ vi.mock("@/adapters", () => ({
   getContributionLimit: vi.fn(),
   getHoldingsList: vi.fn(),
   getSnapshots: vi.fn(),
-  removeAutoInterest: vi.fn(),
+  removeAutoInterestAccount: vi.fn(),
   searchActivities: vi.fn(),
   syncCashInterestAccount: vi.fn(),
 }));

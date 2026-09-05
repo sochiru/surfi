@@ -143,7 +143,9 @@ export {
   getDividendSyncSettings,
   updateDividendSyncSettings,
   syncDividends,
+  syncDividendsAccount,
   removeAutoDividends,
+  removeAutoDividendsAccount,
   getDividendCalendarEvents,
   getAssetDividendView,
 } from "../shared/dividends";
@@ -160,6 +162,7 @@ export {
   syncCashInterest,
   syncCashInterestAccount,
   removeAutoInterest,
+  removeAutoInterestAccount,
   getMp2Rates,
   updateMp2Rates,
 } from "../shared/cash-interest";

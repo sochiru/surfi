@@ -34,8 +34,30 @@ async fn sync_dividends(State(state): State<Arc<AppState>>) -> ApiResult<Json<Di
     Ok(Json(result))
 }
 
+async fn sync_dividends_account(
+    Path(account_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<DividendSyncResult>> {
+    let result = state
+        .dividend_sync_service
+        .sync_account(&account_id)
+        .await?;
+    Ok(Json(result))
+}
+
 async fn remove_auto_dividends(State(state): State<Arc<AppState>>) -> ApiResult<Json<usize>> {
     let n = state.dividend_sync_service.remove_auto_created().await?;
+    Ok(Json(n))
+}
+
+async fn remove_auto_dividends_account(
+    Path(account_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<usize>> {
+    let n = state
+        .dividend_sync_service
+        .remove_auto_created_account(&account_id)
+        .await?;
     Ok(Json(n))
 }
 
@@ -64,7 +86,12 @@ pub fn router() -> Router<Arc<AppState>> {
             get(get_dividend_sync_settings).put(update_dividend_sync_settings),
         )
         .route("/dividends/sync", post(sync_dividends))
+        .route("/dividends/sync/{account_id}", post(sync_dividends_account))
         .route("/dividends/auto", delete(remove_auto_dividends))
+        .route(
+            "/dividends/auto/{account_id}",
+            delete(remove_auto_dividends_account),
+        )
         .route("/dividends/calendar", get(get_dividend_calendar_events))
         .route("/dividends/assets/{asset_id}", get(get_asset_dividend_view))
 }

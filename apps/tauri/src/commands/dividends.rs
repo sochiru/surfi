@@ -44,11 +44,37 @@ pub async fn sync_dividends(
 }
 
 #[tauri::command]
+pub async fn sync_dividends_account(
+    account_id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<DividendSyncResult, String> {
+    debug!("Syncing market-data dividends for {}...", account_id);
+    state
+        .dividend_sync_service()
+        .sync_account(&account_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn remove_auto_dividends(state: State<'_, Arc<ServiceContext>>) -> Result<usize, String> {
     debug!("Removing auto-created dividends...");
     state
         .dividend_sync_service()
         .remove_auto_created()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn remove_auto_dividends_account(
+    account_id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<usize, String> {
+    debug!("Removing auto-created dividends for {}...", account_id);
+    state
+        .dividend_sync_service()
+        .remove_auto_created_account(&account_id)
         .await
         .map_err(|e| e.to_string())
 }

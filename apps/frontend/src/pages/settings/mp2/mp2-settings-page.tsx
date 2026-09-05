@@ -1,5 +1,6 @@
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { SettingsHeader } from "../settings-header";
+import { CashInterestMaintenance } from "./cash-interest-maintenance";
 import { Mp2RatesSettings } from "./mp2-rates-settings";
 
 export default function Mp2SettingsPage() {
@@ -8,6 +9,7 @@ export default function Mp2SettingsPage() {
       <SettingsHeader heading="Pag-IBIG MP2" text="Dividend rates shared by every MP2 account." />
       <Separator />
       <Mp2RatesSettings />
+      <CashInterestMaintenance />
     </div>
   );
 }

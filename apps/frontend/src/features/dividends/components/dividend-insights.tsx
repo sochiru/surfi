@@ -153,7 +153,7 @@ export function DividendInsights({ accountFilter }: DividendInsightsProps) {
             />
           </div>
           {upcoming.nextDate ? (
-            <p className="text-muted-foreground text-xs">Next ex-date {upcoming.nextDate}</p>
+            <p className="text-muted-foreground text-xs">Next payout {upcoming.nextDate}</p>
           ) : null}
         </CardContent>
       </Card>

@@ -32,6 +32,17 @@ async fn remove_auto_interest(State(state): State<Arc<AppState>>) -> ApiResult<J
     Ok(Json(n))
 }
 
+async fn remove_auto_interest_account(
+    Path(account_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<usize>> {
+    let n = state
+        .interest_accrual_service
+        .remove_auto_created_account(&account_id)
+        .await?;
+    Ok(Json(n))
+}
+
 async fn get_mp2_rates(State(state): State<Arc<AppState>>) -> ApiResult<Json<Mp2DividendRates>> {
     let rates = state.interest_accrual_service.get_mp2_rates()?;
     Ok(Json(rates))
@@ -56,6 +67,10 @@ pub fn router() -> Router<Arc<AppState>> {
             post(sync_cash_interest_account),
         )
         .route("/cash-interest/auto", delete(remove_auto_interest))
+        .route(
+            "/cash-interest/auto/{account_id}",
+            delete(remove_auto_interest_account),
+        )
         .route(
             "/cash-interest/mp2-rates",
             get(get_mp2_rates).put(update_mp2_rates),

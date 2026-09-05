@@ -83,8 +83,9 @@ export function DividendAutomationSettings() {
             <CardTitle className="text-base">Automatic dividends</CardTitle>
             <CardDescription>
               Create cash dividend activities from market data history, using the shares held in
-              each account at the ex-date. The same ticker held in several accounts gets a separate
-              payout per account.
+              each account at the ex-date. Cash is booked on the payment date when the provider
+              supplies one (EODHD does for major US/EU listings). The same ticker held in several
+              accounts gets a separate payout per account.
             </CardDescription>
           </div>
           <Switch
@@ -114,7 +115,8 @@ export function DividendAutomationSettings() {
             {enabledCount === 0
               ? "No account is syncing dividends yet — turn one on to start."
               : `${enabledCount} of ${accounts.length} accounts sync dividends.`}{" "}
-            Withholding is deducted from the gross payout before it hits your cash balance.
+            Withholding is deducted from the gross payout before it hits your cash balance. The sync
+            and delete buttons on each row affect only that account.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -187,6 +189,28 @@ export function DividendAutomationSettings() {
                       }}
                     />
                     <span className="text-muted-foreground text-sm">%</span>
+                    <div className="col-span-3 flex items-center justify-end gap-1 sm:col-span-1 sm:ml-2 sm:justify-start">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Sync dividends for ${account.name}`}
+                        data-testid={`button-sync-dividends-${account.id}`}
+                        disabled={!settings.globalEnabled || !row.enabled || busy}
+                        onClick={() => syncMutation.mutate(account.id)}
+                      >
+                        <Icons.Refresh className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Remove auto-created dividends for ${account.name}`}
+                        data-testid={`button-remove-auto-dividends-${account.id}`}
+                        disabled={busy}
+                        onClick={() => removeMutation.mutate(account.id)}
+                      >
+                        <Icons.Trash className="size-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               );
@@ -197,10 +221,10 @@ export function DividendAutomationSettings() {
 
       <Card>
         <CardHeader className="px-4 sm:px-6">
-          <CardTitle className="text-base">Maintenance</CardTitle>
+          <CardTitle className="text-base">Maintenance — all accounts</CardTitle>
           <CardDescription>
             Run a catch-up sync after changing these settings, or clear everything automation has
-            created.
+            created. Both buttons here apply to every account at once.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 px-4 sm:px-6">
@@ -215,21 +239,23 @@ export function DividendAutomationSettings() {
               ) : (
                 <Icons.Refresh className="mr-2 size-4" />
               )}
-              Sync missing dividends
+              Sync missing dividends (all accounts)
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="w-full sm:w-auto" disabled={busy}>
                   <Icons.Trash className="mr-2 size-4" />
-                  Remove auto-created
+                  Remove auto-created (all accounts)
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Remove auto-created dividends?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This deletes every dividend activity that automation created, including legacy
-                    ones from the PSE addon. Dividends you entered manually are kept.
+                    This deletes every dividend activity that automation created in{" "}
+                    <span className="font-medium">all {accounts.length} accounts</span>, including
+                    legacy ones from the PSE addon. Dividends you entered manually are kept. To
+                    clear a single account, use the delete button on its row above.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
