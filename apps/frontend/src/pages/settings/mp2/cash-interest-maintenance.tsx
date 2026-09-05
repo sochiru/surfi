@@ -63,8 +63,8 @@ export function CashInterestMaintenance() {
                 <AlertDialogTitle>Remove auto interest everywhere?</AlertDialogTitle>
                 <AlertDialogDescription>
                   This deletes auto-created interest and MP2 payout activities in every account.
-                  Entries you edited yourself are kept. To clear a single account, open that
-                  account and use its action menu instead.
+                  Entries you edited yourself are kept. To clear a single account, open that account
+                  and use its action menu instead.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

@@ -798,7 +798,7 @@ impl DividendSyncServiceTrait for DividendSyncService {
                 }
                 let announced_upcoming = dividends
                     .iter()
-                    .filter_map(|div| Self::dividend_booking_dates(div))
+                    .filter_map(Self::dividend_booking_dates)
                     .any(|(_, activity_date)| activity_date > now);
                 if announced_upcoming {
                     continue;

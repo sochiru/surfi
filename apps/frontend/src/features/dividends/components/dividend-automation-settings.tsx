@@ -115,8 +115,8 @@ export function DividendAutomationSettings() {
             {enabledCount === 0
               ? "No account is syncing dividends yet — turn one on to start."
               : `${enabledCount} of ${accounts.length} accounts sync dividends.`}{" "}
-            Withholding is deducted from the gross payout before it hits your cash balance. The
-            sync and delete buttons on each row affect only that account.
+            Withholding is deducted from the gross payout before it hits your cash balance. The sync
+            and delete buttons on each row affect only that account.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
