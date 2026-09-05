@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/car
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Suspense, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { LiabilityInsights } from "./liabilities/liability-insights";
 import { OverviewPage } from "./overview/overview-page";
 
 // Loading skeleton to show while the dashboard is loading
@@ -114,6 +115,16 @@ export default function PortfolioInsightsPage() {
           </Suspense>
         ),
         actions: dividendActions,
+      },
+      {
+        value: "liabilities",
+        label: t("insights:insights.tab_liabilities"),
+        icon: Icons.TrendingDown,
+        content: (
+          <Suspense fallback={<DashboardLoader />}>
+            <LiabilityInsights />
+          </Suspense>
+        ),
       },
     ],
     [accountFilter, dividendActions, holdingsActions, t],

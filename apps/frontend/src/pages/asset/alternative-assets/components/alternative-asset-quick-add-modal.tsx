@@ -116,6 +116,9 @@ interface FormData {
   quantity?: string;
   unit?: string;
   liabilityType?: string;
+  interestRate?: string;
+  monthlyPayment?: string;
+  remainingTermMonths?: string;
   hasMortgage?: boolean;
   linkedAssetId?: string;
 }
@@ -262,6 +265,10 @@ export function AlternativeAssetQuickAddModal({
       if (formData.purchasePrice) metadata.original_amount = formData.purchasePrice;
       // Store "Origination Date" as origination_date in metadata
       if (formData.purchaseDate) metadata.origination_date = formatDateToISO(formData.purchaseDate);
+      if (formData.interestRate) metadata.interest_rate = formData.interestRate;
+      if (formData.monthlyPayment) metadata.monthly_payment = formData.monthlyPayment;
+      if (formData.remainingTermMonths)
+        metadata.original_term_months = formData.remainingTermMonths;
     }
 
     const request: CreateAlternativeAssetRequest = {
@@ -604,6 +611,60 @@ export function AlternativeAssetQuickAddModal({
                     </label>
                   </div>
                 )}
+
+                {formData.kind === AlternativeAssetKind.LIABILITY &&
+                  formData.liabilityType !== "credit_card" &&
+                  formData.liabilityType !== "heloc" && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-foreground text-sm font-medium">
+                          {t("asset:quickAdd.interest_rate")}
+                          <span className="text-muted-foreground ml-1 text-xs font-normal">
+                            {t("asset:quickAdd.optional")}
+                          </span>
+                        </Label>
+                        <QuantityInput
+                          value={formData.interestRate || ""}
+                          onValueChange={(value) => updateFormData("interestRate", value)}
+                          placeholder="3.50"
+                          maxDecimalPlaces={3}
+                          className="h-11"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-foreground text-sm font-medium">
+                          {t("asset:quickAdd.monthly_payment")}
+                          <span className="text-muted-foreground ml-1 text-xs font-normal">
+                            {t("asset:quickAdd.optional")}
+                          </span>
+                        </Label>
+                        <MoneyInput
+                          value={formData.monthlyPayment || ""}
+                          onValueChange={(value) => updateFormData("monthlyPayment", value)}
+                          placeholder="0.00"
+                          className="h-11"
+                        />
+                      </div>
+                      <div className="col-span-2 space-y-2">
+                        <Label className="text-foreground text-sm font-medium">
+                          {t("asset:quickAdd.remaining_term")}
+                          <span className="text-muted-foreground ml-1 text-xs font-normal">
+                            {t("asset:quickAdd.optional")}
+                          </span>
+                        </Label>
+                        <QuantityInput
+                          value={formData.remainingTermMonths || ""}
+                          onValueChange={(value) => updateFormData("remainingTermMonths", value)}
+                          placeholder="360"
+                          maxDecimalPlaces={0}
+                          className="h-11"
+                        />
+                        <p className="text-muted-foreground text-xs">
+                          {t("asset:quickAdd.amortization_hint")}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                 {/* Link to asset for liability - show if there are linkable assets and no pre-set link */}
                 {formData.kind === AlternativeAssetKind.LIABILITY &&

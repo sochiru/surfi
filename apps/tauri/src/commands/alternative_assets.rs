@@ -531,3 +531,20 @@ pub fn get_net_worth_history(
 
     Ok(response)
 }
+
+/// Regenerates CALCULATED installment quotes for one liability, or all of them.
+#[tauri::command]
+pub async fn sync_liability_amortization(
+    asset_id: Option<String>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<u32, String> {
+    let written = state
+        .alternative_asset_service()
+        .sync_liability_amortization(asset_id.as_deref())
+        .await
+        .map_err(|e| {
+            error!("Failed to sync liability amortization: {}", e);
+            format!("Failed to sync liability amortization: {}", e)
+        })?;
+    Ok(written as u32)
+}

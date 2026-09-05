@@ -123,6 +123,10 @@ pub trait AlternativeAssetServiceTrait: Send + Sync {
     /// # Returns
     /// A list of alternative holdings with current valuations and gain calculations
     fn get_alternative_holdings(&self) -> Result<Vec<AlternativeHolding>>;
+
+    /// Regenerates CALCULATED amortization quotes for one liability, or all installment
+    /// liabilities when `asset_id` is `None`. MANUAL statement quotes are never overwritten.
+    async fn sync_liability_amortization(&self, asset_id: Option<&str>) -> Result<usize>;
 }
 
 /// Trait for alternative asset repository operations.

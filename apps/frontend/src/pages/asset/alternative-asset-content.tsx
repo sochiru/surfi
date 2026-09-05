@@ -2,7 +2,9 @@ import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { format } from "date-fns";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import {
@@ -38,6 +40,11 @@ import { useLinkedLiabilities, useAlternativeHoldings } from "@/hooks/use-altern
 import type { AlternativeAssetHolding, Quote, Asset, TimePeriod, DateRange } from "@/lib/types";
 import { AlternativeAssetKind } from "@/lib/types";
 import { parseLocalDate } from "@/lib/utils";
+import { isAmortizationPaused } from "./alternative-assets/components/asset-details-sheet-schema";
+import { syncLiabilityAmortization } from "@/adapters";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { QueryKeys } from "@/lib/query-keys";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 
 interface AlternativeAssetContentProps {
   assetId: string;
@@ -159,6 +166,19 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
 
   const isLiability = holding.kind.toLowerCase() === "liability";
   const marketValue = parseFloat(holding.marketValue);
+  const queryClient = useQueryClient();
+  const amortizationPaused = isLiability && isAmortizationPaused(holding.metadata);
+  const syncAmortizationMutation = useMutation({
+    mutationFn: () => syncLiabilityAmortization(assetId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_DATA, assetId] });
+      toast({
+        title: t("asset:altContent.amortization_synced"),
+        variant: "success",
+      });
+    },
+  });
 
   // Calculate net equity for linkable assets
   const netEquity = useMemo(() => {
@@ -174,6 +194,24 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
   if (activeTab === "overview") {
     return (
       <div className="space-y-4">
+        {amortizationPaused && (
+          <Alert>
+            <Icons.AlertTriangle className="h-4 w-4" />
+            <AlertTitle>{t("asset:altContent.lock_in_ended_title")}</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span>{t("asset:altContent.lock_in_ended_description")}</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => syncAmortizationMutation.mutate()}
+                disabled={syncAmortizationMutation.isPending}
+              >
+                {t("asset:altContent.recalculate_balance")}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Main grid: Chart on left, Details on right */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {/* Left: Value history chart with value/gain/equity in header */}
@@ -760,6 +798,40 @@ function getDetailRows(
         rows.push({
           label: t("asset:altContent.origination_date"),
           value: format(parseLocalDate(originationDate), "MMM d, yyyy"),
+        });
+      }
+
+      const monthlyPayment = metadata.monthly_payment as string | undefined;
+      if (monthlyPayment) {
+        rows.push({
+          label: t("asset:altContent.monthly_payment"),
+          value: (
+            <AmountDisplay
+              value={parseFloat(monthlyPayment)}
+              currency={holding.currency}
+              isHidden={isBalanceHidden}
+            />
+          ),
+        });
+      }
+      const remainingTerm = metadata.original_term_months as string | undefined;
+      if (remainingTerm) {
+        rows.push({
+          label: t("asset:altContent.remaining_term"),
+          value: t("asset:altContent.remaining_term_value", { count: parseInt(remainingTerm, 10) }),
+        });
+      }
+      const lockIn = metadata.lock_in_end_date as string | undefined;
+      if (lockIn) {
+        rows.push({
+          label: t("asset:altContent.lock_in_end"),
+          value: format(parseLocalDate(lockIn), "MMM d, yyyy"),
+        });
+      }
+      if (monthlyPayment || remainingTerm) {
+        rows.push({
+          label: t("asset:altContent.auto_sync"),
+          value: t("asset:altContent.auto_sync_on"),
         });
       }
       break;

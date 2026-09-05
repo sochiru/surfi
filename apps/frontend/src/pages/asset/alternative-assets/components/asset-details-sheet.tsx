@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useForm, type Resolver } from "react-hook-form";
+import { useFieldArray, useForm, type Resolver } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,6 +45,7 @@ import {
   METAL_TYPES,
   WEIGHT_UNITS,
   LIABILITY_TYPES,
+  isRevolvingLiability,
 } from "./asset-details-sheet-schema";
 import { type LinkableAsset } from "./alternative-asset-quick-add-modal";
 import { AlternativeAssetKind, ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES } from "@/lib/types";
@@ -753,6 +754,8 @@ function LiabilityFields({
         )}
       />
 
+      {!isRevolvingLiability(form.watch("liabilityType")) && <InstallmentLoanFields form={form} />}
+
       {/* Linked Asset Display/Selector */}
       <FormField
         control={form.control}
@@ -785,6 +788,166 @@ function LiabilityFields({
           </FormItem>
         )}
       />
+    </div>
+  );
+}
+
+function InstallmentLoanFields({
+  form,
+}: {
+  form: ReturnType<typeof useForm<AssetDetailsFormValues>>;
+}) {
+  const { t } = useTranslation();
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "rateSchedule" as const,
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField
+          control={form.control}
+          name="monthlyPayment"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t("asset:detailsSheet.monthly_payment")}</FormLabel>
+              <FormControl>
+                <MoneyInput
+                  ref={field.ref}
+                  name={field.name}
+                  value={field.value}
+                  onValueChange={(value) => field.onChange(value ?? null)}
+                  placeholder="0.00"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="originalTermMonths"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t("asset:detailsSheet.remaining_term")}</FormLabel>
+              <FormControl>
+                <QuantityInput
+                  ref={field.ref}
+                  name={field.name}
+                  value={field.value}
+                  onValueChange={(value) => field.onChange(value ?? null)}
+                  placeholder="360"
+                  maxDecimalPlaces={0}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField
+          control={form.control}
+          name="paymentDay"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t("asset:detailsSheet.payment_day")}</FormLabel>
+              <FormControl>
+                <QuantityInput
+                  ref={field.ref}
+                  name={field.name}
+                  value={field.value}
+                  onValueChange={(value) => field.onChange(value ?? null)}
+                  placeholder="1"
+                  maxDecimalPlaces={0}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="lockInEndDate"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t("asset:detailsSheet.lock_in_end")}</FormLabel>
+              <FormControl>
+                <DatePickerInput
+                  value={field.value ?? undefined}
+                  onChange={(date) => field.onChange(date ?? null)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+      <div className="space-y-2">
+        <FormLabel>{t("asset:detailsSheet.rate_schedule")}</FormLabel>
+        <p className="text-muted-foreground text-xs">
+          {t("asset:detailsSheet.rate_schedule_help")}
+        </p>
+        {fields.map((row, index) => (
+          <div key={row.id} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+            <FormField
+              control={form.control}
+              name={`rateSchedule.${index}.effectiveFrom`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">
+                    {t("asset:detailsSheet.rate_effective_from")}
+                  </FormLabel>
+                  <FormControl>
+                    <DatePickerInput
+                      value={field.value ?? undefined}
+                      onChange={(date) => field.onChange(date ?? null)}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name={`rateSchedule.${index}.rate`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">{t("asset:detailsSheet.interest_rate")}</FormLabel>
+                  <FormControl>
+                    <QuantityInput
+                      ref={field.ref}
+                      name={field.name}
+                      value={field.value}
+                      onValueChange={(value) => field.onChange(value ?? null)}
+                      placeholder="0.00"
+                      maxDecimalPlaces={3}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => remove(index)}
+              aria-label={t("asset:detailsSheet.remove_rate_row")}
+            >
+              <Icons.Trash className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => append({ effectiveFrom: null, rate: null })}
+        >
+          <Icons.Plus className="mr-2 h-4 w-4" />
+          {t("asset:detailsSheet.add_rate_row")}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@
     "tab_overview": "Overview",
     "tab_performance": "Performance",
     "tab_income": "Income",
+    "tab_liabilities": "Debt",
     "back_to_allocation": "Back to allocation",
     "target_allocation": "Target allocation",
     "back_to_overview": "Back to overview",
@@ -65,6 +66,25 @@
       "accounts_count_one": "{{count}} account",
       "accounts_count_other": "{{count}} accounts"
     }
+  },
+  "liabilities": {
+    "empty_title": "No liabilities to analyze",
+    "empty_description": "Add a mortgage, loan, credit card, or other debt from Holdings.",
+    "add_liability": "Add liability",
+    "installment_loans": "Installment loans",
+    "average_paid_down": "Average paid down",
+    "rate_updates_due": "Rate updates due",
+    "monthly_payments": "Recorded monthly payments",
+    "snapshot_only": "Snapshot only",
+    "rate_due": "Rate due",
+    "auto_amortizing": "Auto-amortizing",
+    "current_balance": "Current balance",
+    "interest_rate": "Current interest rate",
+    "monthly_payment": "Monthly payment",
+    "loan_term": "Recorded term",
+    "months": "{{count}} months",
+    "next_rate_review": "Next rate review",
+    "paid_down": "Paid down"
   },
   "networth": {
     "failed_to_load": "Failed to load net worth",

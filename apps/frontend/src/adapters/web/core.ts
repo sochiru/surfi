@@ -420,6 +420,7 @@ export const COMMANDS: CommandMap = {
   unlink_liability: { method: "DELETE", path: "/alternative-assets" },
   update_alternative_asset_metadata: { method: "PUT", path: "/alternative-assets" },
   get_alternative_holdings: { method: "GET", path: "/alternative-holdings" },
+  sync_liability_amortization: { method: "POST", path: "/alternative-assets/amortization-sync" },
   // Agent Access (PATs + audit log)
   get_agent_access_status: { method: "GET", path: "/agent-access/status" },
   list_agent_access_tokens: { method: "GET", path: "/agent-access/tokens" },
@@ -1949,6 +1950,15 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     }
     case "get_alternative_holdings":
       break;
+    case "sync_liability_amortization": {
+      const { assetId } = (payload ?? {}) as { assetId?: string };
+      if (assetId) {
+        const params = new URLSearchParams();
+        params.set("assetId", assetId);
+        url += `?${params.toString()}`;
+      }
+      break;
+    }
     // Allocation Targets
     case "list_allocation_targets":
       break;
