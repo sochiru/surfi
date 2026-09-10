@@ -548,6 +548,31 @@ impl MarketDataClient {
         end: DateTime<Utc>,
     ) -> Result<Vec<DividendEvent>> {
         let context = self.build_quote_context(asset)?;
+
+        // EODHD is the only provider that reports dividend payment dates, but it
+        // ranks below Yahoo by default. Ask it first when it is configured and the
+        // asset has no provider of its own, then fall back to the normal order if
+        // it covers nothing for this instrument.
+        if context.preferred_provider.is_none()
+            && self
+                .registry
+                .providers()
+                .iter()
+                .any(|p| p.id() == DATA_SOURCE_EODHD)
+        {
+            let mut eodhd_context = context.clone();
+            eodhd_context.preferred_provider = Some(Cow::Borrowed(DATA_SOURCE_EODHD));
+            if let Ok(dividends) = self
+                .registry
+                .fetch_dividends(&eodhd_context, start, end)
+                .await
+            {
+                if !dividends.is_empty() {
+                    return Ok(dividends);
+                }
+            }
+        }
+
         let dividends = self
             .registry
             .fetch_dividends(&context, start, end)

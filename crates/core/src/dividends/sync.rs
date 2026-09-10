@@ -339,17 +339,26 @@ impl DividendSyncService {
                 }
             }
         }
-        let n = delete_ids.len();
-        if n > 0 {
-            self.activities
-                .bulk_mutate_activities(ActivityBulkMutationRequest {
-                    creates: vec![],
-                    updates: vec![],
-                    delete_ids,
-                })
-                .await?;
+        if delete_ids.is_empty() {
+            return Ok(0);
         }
-        Ok(n)
+        // A bulk mutation aborts the whole batch when any row fails, so the
+        // caller must hear about it rather than see the attempted count.
+        let outcome = self
+            .activities
+            .bulk_mutate_activities(ActivityBulkMutationRequest {
+                creates: vec![],
+                updates: vec![],
+                delete_ids,
+            })
+            .await?;
+        if let Some(err) = outcome.errors.first() {
+            return Err(Error::Unexpected(format!(
+                "Removing auto dividends failed, nothing was deleted: {}",
+                err.message
+            )));
+        }
+        Ok(outcome.deleted.len())
     }
 
     fn legacy_idempotency_key(symbol: &str, ex_unix: i64, rounded: &str) -> String {
