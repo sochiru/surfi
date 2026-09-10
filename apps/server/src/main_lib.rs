@@ -827,7 +827,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         token_lifecycle.clone(),
         spending_settings_service.clone(),
         categorization_rules_service.clone(),
-        dividend_sync_service.clone(),
     );
 
     let addon_storage_repository =

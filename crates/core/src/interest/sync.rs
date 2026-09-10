@@ -213,17 +213,26 @@ impl InterestAccrualService {
                 }
             }
         }
-        let n = delete_ids.len();
-        if n > 0 {
-            self.activities
-                .bulk_mutate_activities(ActivityBulkMutationRequest {
-                    creates: vec![],
-                    updates: vec![],
-                    delete_ids,
-                })
-                .await?;
+        if delete_ids.is_empty() {
+            return Ok(0);
         }
-        Ok(n)
+        // A bulk mutation aborts the whole batch when any row fails, so the
+        // caller must hear about it rather than see the attempted count.
+        let outcome = self
+            .activities
+            .bulk_mutate_activities(ActivityBulkMutationRequest {
+                creates: vec![],
+                updates: vec![],
+                delete_ids,
+            })
+            .await?;
+        if let Some(err) = outcome.errors.first() {
+            return Err(crate::errors::Error::Unexpected(format!(
+                "Removing auto interest failed, nothing was deleted: {}",
+                err.message
+            )));
+        }
+        Ok(outcome.deleted.len())
     }
 
     async fn sync_inner(&self, account_id: Option<&str>) -> Result<CashInterestSyncResult> {
