@@ -86,7 +86,6 @@ pub use provider::fixture::FixtureProvider;
 pub use provider::marketdata_app::MarketDataAppProvider;
 pub use provider::metal_price_api::MetalPriceApiProvider;
 pub use provider::openfigi::OpenFigiProvider;
-pub use provider::tradingview::TradingViewProvider;
 pub use provider::us_treasury_calc::{TreasuryBondDetails, UsTreasuryCalcProvider};
 pub use provider::yahoo::YahooProvider;
 pub use provider::{MarketDataProvider, ProviderCapabilities, RateLimit};

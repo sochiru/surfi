@@ -1,5 +1,6 @@
 import { createActivity, getAssetHoldings, getAssetLots, searchActivities } from "@/adapters";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
+import { AccountScopeSelector } from "@/components/account-filter-selector";
 import { AssetLogoDialog } from "@/components/asset-logo/asset-logo-dialog";
 import { EditableTickerAvatar } from "@/components/asset-logo/editable-ticker-avatar";
 import { useHapticFeedback } from "@/hooks";
@@ -15,7 +16,14 @@ import { ActivityStatus, ActivityType } from "@/lib/constants";
 import { generateId } from "@/lib/id";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
-import type { ActivityDetails, AssetKind, AssetLotView, Holding, Quote } from "@/lib/types";
+import type {
+  AccountScope,
+  ActivityDetails,
+  AssetKind,
+  AssetLotView,
+  Holding,
+  Quote,
+} from "@/lib/types";
 import { cn, normalizeCurrency } from "@/lib/utils";
 import { ActivityDeleteModal } from "@/pages/activity/components/activity-delete-modal";
 import { ActivityForm, type AccountSelectOption } from "@/pages/activity/components/activity-form";

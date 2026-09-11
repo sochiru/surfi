@@ -184,6 +184,7 @@ impl InterestAccrualService {
             tax: Some(Some(planned.tax)),
             amount: Some(Some(planned.amount)),
             status: Some(ActivityStatus::Posted),
+            needs_review: Some(false),
             notes: Some(Self::describe(planned)),
             fx_rate: None,
             metadata: Some(Self::metadata(planned, compounding)),

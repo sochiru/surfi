@@ -65,7 +65,7 @@ export default function PortfolioInsightsPage() {
         <DividendInsightsActions />
       </div>
     ),
-    [accountFilter],
+    [accountFilter, setAccountScope],
   );
 
   // Define the views with icons
