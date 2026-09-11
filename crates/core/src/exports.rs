@@ -715,6 +715,7 @@ mod tests {
             exchange_mic: None,
             asset_pricing_mode: "MARKET".into(),
             instrument_type: Some("EQUITY".into()),
+            asset_contract_multiplier: None,
             source_system: None,
             source_record_id: None,
             source_group_id: None,

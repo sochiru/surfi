@@ -33,6 +33,16 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 vi.mock("@/adapters", () => ({ updateAlternativeAssetMetadata: vi.fn() }));
+vi.mock("@/features/mp2/hooks/use-mp2-rates", () => ({
+  useMp2Rates: () => ({ data: undefined }),
+}));
+vi.mock("@/hooks/use-latest-valuations", () => ({
+  useLatestValuations: () => ({ latestValuations: [], isLoading: false }),
+}));
+vi.mock("./components/cash-holdings-table", () => ({ CashHoldingsTable: () => null }));
+vi.mock("./components/cash-holdings-list-mobile", () => ({
+  CashHoldingsListMobile: () => null,
+}));
 
 // Render only the active view's actions + content, as SwipablePage does on desktop.
 vi.mock("@/components/page", () => ({

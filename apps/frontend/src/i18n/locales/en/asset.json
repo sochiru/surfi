@@ -201,14 +201,14 @@
     "health": {
       "add_price_for_date": "Add a price for {{date}}",
       "manual_prices_need_review": "Manual prices need review",
-      "carrying_forward_add_date": "Wealthfolio is carrying forward the last price. Add this date only if it needs its own value.",
+      "carrying_forward_add_date": "SURfi is carrying forward the last price. Add this date only if it needs its own value.",
       "review_missing_dates": "Review the missing dates. Add prices that need their own value; carried-forward prices are still used between entries.",
       "price_missing_for_date": "Price missing for {{date}}",
       "price_history_needs_review": "Price history needs review",
-      "carrying_forward_refetch": "Wealthfolio is carrying forward the last available price. Refetch prices if this was a trading day.",
+      "carrying_forward_refetch": "SURfi is carrying forward the last available price. Refetch prices if this was a trading day.",
       "refetch_history": "Refetch provider history to restore missing or stale prices. Carried-forward prices are used until exact prices are available.",
       "cost_basis_needs_review": "Cost basis needs review",
-      "cost_basis_description": "Update what you paid for this holding so Wealthfolio can calculate gain/loss.",
+      "cost_basis_description": "Update what you paid for this holding so SURfi can calculate gain/loss.",
       "transactions_need_review": "Transactions need review",
       "transactions_description": "Review the transactions Health Center flagged for this investment.",
       "refetch_prices": "Refetch Prices"
