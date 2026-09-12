@@ -154,7 +154,8 @@
     "maturity": "Maturity",
     "type": "Type",
     "strike": "Strike",
-    "expiry": "Expiry"
+    "expiry": "Expiry",
+    "multiplier": "Multiplier"
   },
   "profile": {
     "overview": "Overview",
@@ -197,6 +198,21 @@
     "holding_fetch_error": "Holding fetch error.",
     "quote_fetch_error": "Quote fetch error.",
     "asset_profile_fetch_error": "Asset profile fetch error.",
+    "health": {
+      "add_price_for_date": "Add a price for {{date}}",
+      "manual_prices_need_review": "Manual prices need review",
+      "carrying_forward_add_date": "SURfi is carrying forward the last price. Add this date only if it needs its own value.",
+      "review_missing_dates": "Review the missing dates. Add prices that need their own value; carried-forward prices are still used between entries.",
+      "price_missing_for_date": "Price missing for {{date}}",
+      "price_history_needs_review": "Price history needs review",
+      "carrying_forward_refetch": "SURfi is carrying forward the last available price. Refetch prices if this was a trading day.",
+      "refetch_history": "Refetch provider history to restore missing or stale prices. Carried-forward prices are used until exact prices are available.",
+      "cost_basis_needs_review": "Cost basis needs review",
+      "cost_basis_description": "Update what you paid for this holding so SURfi can calculate gain/loss.",
+      "transactions_need_review": "Transactions need review",
+      "transactions_description": "Review the transactions Health Center flagged for this investment.",
+      "refetch_prices": "Refetch Prices"
+    },
     "confirm_option_expiry_title": "Confirm option expiry",
     "confirm_option_expiry_description": "This will record the option as expired worthless, removing the position with no cash effect. This action cannot be easily undone.",
     "kind": {
@@ -242,6 +258,18 @@
     "exchange": "Exchange",
     "select_exchange": "Select exchange",
     "search_exchanges": "Search exchanges...",
+    "contract_multiplier": "Contract Multiplier",
+    "contract_multiplier_hint": "Each contract represents this many underlying units. Leave empty to use the standard {{default}}.",
+    "maturity_date": "Maturity Date",
+    "coupon_rate": "Coupon Rate (%)",
+    "coupon_frequency": "Coupon Frequency",
+    "select_frequency": "Select frequency",
+    "couponFrequency": {
+      "ANNUAL": "Annual",
+      "SEMI_ANNUAL": "Semi-annual",
+      "QUARTERLY": "Quarterly",
+      "ZERO": "Zero-coupon"
+    },
     "saving": "Saving...",
     "saving_short": "Saving",
     "save_changes": "Save Changes",
@@ -386,7 +414,9 @@
     "to_auto_warning": "Your manually entered historical data may be lost.",
     "to_manual_description": "Switching to manual tracking will stop automatic data fetching from Market Data Provider. You'll need to enter and maintain price data manually.",
     "to_manual_warning": "Automatic price updates will be disabled.",
-    "confirm_change": "Confirm Change"
+    "confirm_change": "Confirm Change",
+    "delete_count_one": "Delete ({{count}})",
+    "delete_count_other": "Delete ({{count}})"
   },
   "quoteTable": {
     "date": "Date",
@@ -661,7 +691,6 @@
     "select_mortgage_to_link": "Select a mortgage to link",
     "link_mortgage": "Link Mortgage",
     "link_mortgage_description": "Select a mortgage to link to this property",
-    "cancel": "Cancel",
     "link": "Link",
     "sectionTitle": {
       "property": "Property",
@@ -690,7 +719,12 @@
     "date": "Date",
     "balance": "Balance",
     "value": "Value",
-    "notes": "Notes"
+    "notes": "Notes",
+    "edit_entry_aria": "Edit {{date}}, {{value}}",
+    "delete_entry_aria": "Delete {{date}}, {{value}}",
+    "delete_title": "Delete history entry?",
+    "delete_description": "This historical entry will be permanently deleted.",
+    "duplicate_date_error": "Each history entry must use a unique date."
   },
   "valueToolbar": {
     "add_balance": "Add Balance",
@@ -699,6 +733,41 @@
     "modified": "{{count}} modified",
     "to_delete": "{{count}} to delete",
     "cancel": "Cancel",
-    "save_changes": "Save Changes"
+    "save_changes": "Save Changes",
+    "delete_count_one": "Delete ({{count}})",
+    "delete_count_other": "Delete ({{count}})",
+    "modified_one": "{{count}} modified",
+    "modified_other": "{{count}} modified",
+    "to_delete_one": "{{count}} to delete",
+    "to_delete_other": "{{count}} to delete"
+  },
+  "logo": {
+    "change": "Change logo",
+    "title": "Asset logo",
+    "badge_default": "Default",
+    "badge_custom": "Custom",
+    "updated_at": "Updated {{date}}",
+    "dropzone_cta": "Choose an image",
+    "dropzone_or_drop": "or drag and drop it here",
+    "dropzone_hint": "PNG, JPEG, WebP or SVG · resized to a 256×256 PNG",
+    "processing": "Preparing image…",
+    "preview_title": "Preview",
+    "preview_new": "New logo",
+    "preview_current": "Current logo",
+    "preview_card": "Holding card",
+    "preview_table": "Holdings table",
+    "preview_list": "Activity list",
+    "preview_meta": "{{width}}×{{height}} · {{size}} (from {{original}})",
+    "choose_different": "Choose a different image",
+    "save": "Save logo",
+    "reset": "Reset to default",
+    "saved": "Logo saved.",
+    "reset_done": "Logo reset to default.",
+    "error_unsupported_type": "Unsupported file. Use a PNG, JPEG, WebP or SVG image.",
+    "error_too_large_input": "That file is too large. Choose an image under 10 MB.",
+    "error_decode_failed": "The file could not be read as an image.",
+    "error_encode_failed": "The image could not be converted to PNG.",
+    "error_too_large_output": "The image is too detailed to fit in 150 KB. Try a simpler or smaller image.",
+    "error_save_failed": "The logo could not be saved."
   }
 }

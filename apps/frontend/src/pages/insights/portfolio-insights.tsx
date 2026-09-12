@@ -5,7 +5,7 @@ import {
   DividendInsightsActions,
 } from "@/features/dividends/components/dividend-insights";
 
-import type { AccountScope } from "@/lib/types";
+import { useAccountScopeStore } from "@/lib/account-scope-store";
 import IncomePage from "@/pages/income/income-page";
 import PerformancePage from "@/pages/performance/performance-page";
 import { Icons } from "@wealthfolio/ui";
@@ -46,7 +46,8 @@ const DashboardLoader = () => {
 
 export default function PortfolioInsightsPage() {
   const { t } = useTranslation();
-  const [accountFilter, setAccountScope] = useState<AccountScope>({ type: "all" });
+  const accountFilter = useAccountScopeStore((state) => state.scope);
+  const setAccountScope = useAccountScopeStore((state) => state.setScope);
   const [overviewToolbarActions, setOverviewToolbarActions] = useState<ReactNode | null>(null);
 
   const holdingsActions = useMemo(
@@ -54,7 +55,7 @@ export default function PortfolioInsightsPage() {
       overviewToolbarActions ?? (
         <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
       ),
-    [accountFilter, overviewToolbarActions],
+    [accountFilter, overviewToolbarActions, setAccountScope],
   );
 
   const dividendActions = useMemo(
@@ -64,7 +65,7 @@ export default function PortfolioInsightsPage() {
         <DividendInsightsActions />
       </div>
     ),
-    [accountFilter],
+    [accountFilter, setAccountScope],
   );
 
   // Define the views with icons
@@ -127,7 +128,7 @@ export default function PortfolioInsightsPage() {
         ),
       },
     ],
-    [accountFilter, dividendActions, holdingsActions, t],
+    [accountFilter, dividendActions, holdingsActions, setAccountScope, t],
   );
 
   return <SwipablePage views={views} defaultView="overview" withPadding={true} />;

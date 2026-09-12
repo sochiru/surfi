@@ -16,6 +16,18 @@ pub struct AssetProfile {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quote_type: Option<String>,
 
+    /// Trading currency the provider reports for the listing it matched.
+    ///
+    /// Not stored on the asset - it exists so a caller can confirm the provider
+    /// answered for the instrument that was asked for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+
+    /// Provider-native exchange code for the listing it matched (Yahoo's "NEO",
+    /// "NGM", ...). Same purpose as `currency`: confirmation, not storage.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exchange: Option<String>,
+
     /// Business sector (e.g., "Technology") - single sector for stocks
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sector: Option<String>,
@@ -42,7 +54,13 @@ pub struct AssetProfile {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
-    /// Country of domicile (ISO 3166-1 alpha-2)
+    /// Country of domicile (ISO 3166-1 alpha-2).
+    ///
+    /// Providers send display names — Yahoo `"United States"`, Alpha Vantage
+    /// `"USA"` — and normalise them through
+    /// [`to_iso_alpha2`](super::to_iso_alpha2) on the way out. A spelling that
+    /// resolves to nothing is carried through unchanged rather than dropped, so
+    /// a consumer should read anything longer than two characters as a name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub country: Option<String>,
 

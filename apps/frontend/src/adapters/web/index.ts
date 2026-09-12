@@ -282,8 +282,23 @@ export {
   addExchangeRate,
   deleteExchangeRate,
   getExchangeRates,
+  getExchangeRatesForDates,
   updateExchangeRate,
 } from "../shared/exchange-rates";
+
+// Spending Categorization Commands
+export {
+  createCategorizationRule,
+  deleteCategorizationRule,
+  getSpendCategories,
+  isSpendingEnabled,
+  listCategorizationRules,
+  rerunCategorizationRules,
+  SPEND_CATEGORY_KIND_TO_TAXONOMY_ID,
+  TAXONOMY_ID_TO_SPEND_CATEGORY_KIND,
+  updateCategorizationRule,
+  upsertCategorizationRule,
+} from "../shared/spending";
 
 // Alternative Assets Commands
 export {
@@ -298,6 +313,14 @@ export {
   updateAlternativeAssetMetadata,
   updateAlternativeAssetValuation,
 } from "../shared/alternative-assets";
+
+// Asset Logo Commands
+export {
+  deleteAssetLogo,
+  getAssetLogo,
+  listAssetLogos,
+  upsertAssetLogo,
+} from "../shared/asset-logos";
 
 // Connect Commands (Broker + Device Sync + Auth)
 export {
@@ -388,6 +411,7 @@ export {
 export {
   archiveAllocationTarget,
   calculateRebalancePlan,
+  canonicalizeEligibleAssetIds,
   createAllocationTarget,
   deleteAllocationTarget,
   getAllocationTargetDrift,

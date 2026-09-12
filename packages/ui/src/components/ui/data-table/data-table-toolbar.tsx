@@ -1,7 +1,7 @@
 import { Table } from "@tanstack/react-table";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { cn } from "../../../lib/utils";
+import { cn, isKeyboardEventComposing } from "../../../lib/utils";
 import { Button } from "../button";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "../dropdown-menu";
 import { Icons } from "../icons";
@@ -16,6 +16,8 @@ interface DataTableToolbarProps<TData> {
   table: Table<TData>;
   searchBy?: string;
   filters?: DataTableFacetedFilterProps<TData, unknown>[];
+  viewControl?: React.ReactNode;
+  additionalFilters?: React.ReactNode;
   showColumnToggle?: boolean;
   actions?: React.ReactNode;
 }
@@ -24,6 +26,8 @@ export function DataTableToolbar<TData>({
   table,
   searchBy,
   filters,
+  viewControl,
+  additionalFilters,
   showColumnToggle = false,
   actions,
 }: DataTableToolbarProps<TData>) {
@@ -32,8 +36,9 @@ export function DataTableToolbar<TData>({
   const hideableColumns = table.getAllColumns().filter((column) => column.getCanHide());
 
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex flex-1 items-center space-x-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        {viewControl}
         {searchBy && (
           <SearchInput
             placeholder={t("ui:dataTable.search", "Search ...")}
@@ -51,6 +56,7 @@ export function DataTableToolbar<TData>({
             options={filter.options}
           />
         ))}
+        {additionalFilters}
         {isFiltered && (
           <Button
             variant="ghost"
@@ -119,6 +125,8 @@ function SearchInput({
   }, [initialValue]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (isKeyboardEventComposing(e.nativeEvent)) return;
+
     if (e.key === "Enter") {
       onChange(value);
     }

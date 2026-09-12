@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::collections::VecDeque;
 
 // Import Lot from its definition
-use crate::assets::{AssetClassifications, AssetKind};
+use crate::assets::{AssetClassifications, AssetKind, InstrumentType};
 use crate::portfolio::snapshot::Lot;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -30,6 +30,8 @@ pub struct Instrument {
     pub pricing_mode: String,
     pub preferred_provider: Option<String>,
     pub exchange_mic: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instrument_type: Option<InstrumentType>,
 
     // Taxonomy-based classifications
     pub classifications: Option<AssetClassifications>,
@@ -59,6 +61,10 @@ pub struct HoldingSummary {
     pub id: String,
     pub symbol: String,
     pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exchange_mic: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instrument_type: Option<InstrumentType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub account_name: Option<String>,
     pub holding_type: HoldingType,
@@ -82,6 +88,11 @@ pub struct Holding {
 
     // Position type and instrument info
     pub holding_type: HoldingType,
+    /// Whether the underlying account position has been fully closed.
+    /// This cannot be inferred from the aggregate quantity because open long
+    /// and short positions across accounts may net to zero.
+    #[serde(default)]
+    pub is_closed: bool,
     pub instrument: Option<Instrument>,
 
     /// The asset kind classification (Security, Crypto, Property, Vehicle, etc.)
@@ -157,6 +168,8 @@ pub struct HoldingListInstrument {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exchange_mic: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub instrument_type: Option<InstrumentType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub classifications: Option<AssetClassifications>,
 }
 
@@ -168,6 +181,7 @@ pub struct HoldingListItem {
     pub id: String,
     pub account_id: String,
     pub holding_type: HoldingType,
+    pub is_closed: bool,
     pub instrument: Option<HoldingListInstrument>,
     pub asset_kind: Option<AssetKind>,
     pub quantity: Decimal,
@@ -221,6 +235,7 @@ impl From<Holding> for HoldingListItem {
                 quote_mode: instrument.pricing_mode,
                 isin,
                 exchange_mic: instrument.exchange_mic,
+                instrument_type: instrument.instrument_type,
                 classifications,
             }
         });
@@ -229,6 +244,7 @@ impl From<Holding> for HoldingListItem {
             id: holding.id,
             account_id: holding.account_id,
             holding_type: holding.holding_type,
+            is_closed: holding.is_closed,
             instrument,
             asset_kind: holding.asset_kind,
             quantity: holding.quantity,

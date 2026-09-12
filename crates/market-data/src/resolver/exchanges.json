@@ -90,7 +90,7 @@
       "alpha_vantage": { "suffix": ".CNQ", "currency": "CAD" }
     },
     {
-      "mic": "XNEO",
+      "mic": "NEOE",
       "name": "Cboe Canada",
       "long_name": "Cboe Canada",
       "currency": "CAD",
@@ -711,13 +711,12 @@
       "currency": "PHP",
       "timezone": "Asia/Manila",
       "close": [14, 45],
-      "eodhd": { "suffix": ".PSE" },
-      "tradingview": { "prefix": "PSE" }
+      "eodhd": { "suffix": ".PSE" }
     }
   ],
   "currency_priority": {
     "USD": ["XNYS", "XNAS", "ARCX", "BATS", "XASE", "OTCM"],
-    "CAD": ["XTSE", "XTSX", "XCNQ", "XNEO"],
+    "CAD": ["XTSE", "XTSX", "XCNQ", "NEOE"],
     "GBP": ["XLON"],
     "GBX": ["XLON"],
     "GBp": ["XLON"],
@@ -740,7 +739,6 @@
     "ILS": ["XTAE"],
     "ILA": ["XTAE"],
     "ZAR": ["XJSE"],
-    "TWD": ["XTAI", "XTAI_OTC"],
-    "PHP": ["XPHS"]
+    "TWD": ["XTAI", "XTAI_OTC"]
   }
 }

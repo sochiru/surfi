@@ -40,8 +40,7 @@ WORKDIR /app
 # Install build tools for the HOST (to run cargo, build scripts)
 # clang/lld are needed for cross-linking
 # pkgconfig is required for openssl-sys to find the target libraries
-# perl is required when openssl-sys builds OpenSSL from source (OPENSSL_STATIC)
-RUN apk add --no-cache clang lld build-base git file pkgconfig perl
+RUN apk add --no-cache clang lld build-base git file pkgconfig
 
 # Install TARGET dependencies
 # xx-apk installs into /$(xx-info triple)/...
@@ -96,7 +95,7 @@ RUN apk add --no-cache su-exec \
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Persistence: mount /data (Railway Volume or compose named volume). No Dockerfile VOLUME — Railway rejects it.
+VOLUME ["/data"]
 EXPOSE 8088
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["/usr/local/bin/wealthfolio-server"]

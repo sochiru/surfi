@@ -26,6 +26,10 @@ interface AmountInputProps<TFieldValues extends FieldValues = FieldValues> {
   maxDecimalPlaces?: number;
   /** Currency code to display as adornment (e.g., "USD") */
   currency?: string;
+  /** Called only for direct user edits, not form.setValue updates. */
+  onValueChange?: (value: number | null | undefined) => void;
+  /** Called when the input loses focus. */
+  onBlur?: () => void;
 }
 
 function toInputTestId(name: string) {
@@ -39,10 +43,12 @@ export function AmountInput<TFieldValues extends FieldValues = FieldValues>({
   name,
   label,
   labelHelpText,
-  placeholder = "0.00",
+  placeholder,
   "data-testid": dataTestId,
   maxDecimalPlaces = 2,
   currency,
+  onValueChange,
+  onBlur,
 }: AmountInputProps<TFieldValues>) {
   const { t } = useTranslation(["activity"]);
   const resolvedLabel = label ?? t("activity:form.label_amount");
@@ -72,38 +78,48 @@ export function AmountInput<TFieldValues extends FieldValues = FieldValues>({
               </Tooltip>
             )}
           </div>
-          <FormControl>
-            {currency ? (
-              <InputGroup className="bg-input-bg h-input-height shadow-xs min-w-0 rounded-md">
+          {currency ? (
+            <InputGroup className="bg-input-bg h-input-height shadow-xs min-w-0 rounded-md">
+              <FormControl>
                 <MoneyInput
                   data-slot="input-group-control"
                   className="aria-invalid:ring-0 min-w-0 flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:ring-0"
                   ref={field.ref}
                   name={field.name}
                   value={field.value}
-                  onValueChange={field.onChange}
+                  onValueChange={(value, isUserEdit) => {
+                    field.onChange(value);
+                    if (isUserEdit) onValueChange?.(value);
+                  }}
+                  onBlur={onBlur}
                   placeholder={placeholder}
                   maxDecimalPlaces={maxDecimalPlaces}
                   aria-label={resolvedLabel}
                   data-testid={testId}
                 />
-                <InputGroupAddon align="inline-end" className="shrink-0">
-                  <InputGroupText className="shrink-0">{currency}</InputGroupText>
-                </InputGroupAddon>
-              </InputGroup>
-            ) : (
+              </FormControl>
+              <InputGroupAddon align="inline-end" className="shrink-0">
+                <InputGroupText className="shrink-0">{currency}</InputGroupText>
+              </InputGroupAddon>
+            </InputGroup>
+          ) : (
+            <FormControl>
               <MoneyInput
                 ref={field.ref}
                 name={field.name}
                 value={field.value}
-                onValueChange={field.onChange}
+                onValueChange={(value, isUserEdit) => {
+                  field.onChange(value);
+                  if (isUserEdit) onValueChange?.(value);
+                }}
+                onBlur={onBlur}
                 placeholder={placeholder}
                 maxDecimalPlaces={maxDecimalPlaces}
                 aria-label={resolvedLabel}
                 data-testid={testId}
               />
-            )}
-          </FormControl>
+            </FormControl>
+          )}
           <FormMessage />
         </FormItem>
       )}

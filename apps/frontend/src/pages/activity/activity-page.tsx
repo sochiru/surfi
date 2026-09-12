@@ -33,6 +33,7 @@ import { ActivityPagination } from "./components/activity-pagination";
 import ActivityTable from "./components/activity-table/activity-table";
 import ActivityTableMobile from "./components/activity-table/activity-table-mobile";
 import { ActivityViewControls, type ActivityViewMode } from "./components/activity-view-controls";
+import { NeedsReviewBanner } from "./components/needs-review-banner";
 import { BulkHoldingsModal } from "./components/forms/bulk-holdings-modal";
 import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-form";
 import { TransferMatchDialog } from "./components/transfer-match-dialog";
@@ -152,7 +153,6 @@ const ActivityPage = () => {
     "activity-mobile-view-compact",
     true,
   );
-
   // Pagination state for datagrid view
   const [pageIndex, setPageIndex] = usePersistentState("activity-datagrid-page-index", 0);
   const [pageSize, setPageSize] = usePersistentState("activity-datagrid-page-size", 50);
@@ -259,6 +259,11 @@ const ActivityPage = () => {
     [materializeInvestmentFilters],
   );
 
+  const handleReviewActivities = useCallback(() => {
+    setViewMode("datagrid");
+    setStatusFilter("pending");
+  }, [setStatusFilter, setViewMode]);
+
   const setInvestmentDateRange = useCallback(
     (range: DateRange | undefined) => {
       materializeInvestmentFilters({ dateRange: fromDateRange(range) });
@@ -282,11 +287,19 @@ const ActivityPage = () => {
 
   // handle filter changes in mobile form
   const setMobileFilters = useCallback(
-    (types: ActivityType[], range: DateRange | undefined, scope: AccountScope) => {
+    (next: {
+      activityTypes: ActivityType[];
+      dateRange: DateRange | undefined;
+      accountScope: AccountScope;
+      statusFilter: ActivityStatusFilter;
+      instrumentTypes: string[];
+    }) => {
       materializeInvestmentFilters({
-        accountScope: scope,
-        activityTypes: types,
-        dateRange: fromDateRange(range),
+        accountScope: next.accountScope,
+        activityTypes: next.activityTypes,
+        dateRange: fromDateRange(next.dateRange),
+        statusFilter: next.statusFilter,
+        instrumentTypes: next.instrumentTypes,
       });
     },
     [materializeInvestmentFilters],
@@ -359,7 +372,6 @@ const ActivityPage = () => {
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: () => getAccounts(),
   });
-
   const isDatagridView = viewMode === "datagrid";
   const shouldUseDatagridView = isDatagridView && !isCompactTableViewport;
 
@@ -397,7 +409,7 @@ const ActivityPage = () => {
         : source;
 
     return list
-      .filter((acc: Account) => !acc.isArchived)
+      .filter((acc: Account) => !acc.isArchived || acc.id === selectedActivity?.accountId)
       .map((account: Account) => ({
         value: account.id,
         label: account.name,
@@ -431,11 +443,21 @@ const ActivityPage = () => {
   // branch's work). Empty effectiveAccountIds means "all" — collapses to
   // the investment-only set.
   const effectiveInvestmentAccountIds = useMemo(() => {
+    // Review is a cross-cutting data-quality workflow. Spending-enabled
+    // accounts normally stay on the Spending tab, but hiding their flagged
+    // activity rows here would make migration review impossible.
+    if (statusFilter === "pending") return effectiveAccountIds;
     if (!isSpendingEnabled || spendingAccountIds.length === 0) return effectiveAccountIds;
     if (!effectiveAccountIds || effectiveAccountIds.length === 0) return investmentAccountIds;
     const allowed = new Set(investmentAccountIds);
     return effectiveAccountIds.filter((id) => allowed.has(id));
-  }, [effectiveAccountIds, investmentAccountIds, isSpendingEnabled, spendingAccountIds]);
+  }, [
+    effectiveAccountIds,
+    investmentAccountIds,
+    isSpendingEnabled,
+    spendingAccountIds,
+    statusFilter,
+  ]);
 
   // A health-check deep-link (?activity=<id>) pins the list to one transaction,
   // filtered server-side so it's found regardless of paging.
@@ -715,18 +737,24 @@ const ActivityPage = () => {
 
   const investmentContent = (
     <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
+      {statusFilter !== "pending" && (
+        <NeedsReviewBanner
+          accountIds={effectiveInvestmentAccountIds}
+          onReview={handleReviewActivities}
+        />
+      )}
       {isHealthActivityDeepLink && (
         <div className="border-border bg-muted/30 flex items-center justify-between gap-3 rounded-md border px-3 py-2">
           <div className="flex min-w-0 items-center gap-2">
             <Icons.Info className="text-muted-foreground h-4 w-4 shrink-0" />
             <p className="text-sm">
               {activityUrlFilters.activityId
-                ? "Showing the transaction flagged by Health Center"
-                : "Showing transactions flagged by Health Center"}
+                ? t("activity:page.health_filter_single")
+                : t("activity:page.health_filter_multiple")}
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={clearActivityUrlFilterParams}>
-            Clear
+            {t("common:clear")}
           </Button>
         </div>
       )}
@@ -739,7 +767,10 @@ const ActivityPage = () => {
           onSearchQueryChange={handleSearchChange}
           accountScope={accountScope}
           selectedActivityTypes={effectiveActivityTypes}
+          statusFilter={statusFilter}
+          selectedInstrumentTypes={effectiveInstrumentTypes}
           dateRange={effectiveDateRange}
+          onResetFilters={clearInvestmentsFilters}
           isCompactView={isCompactView}
           onCompactViewChange={setIsCompactView}
           onFilterChange={setMobileFilters}
@@ -783,6 +814,11 @@ const ActivityPage = () => {
           filtersActive={investmentsFiltersActive}
           onAdd={() => handleEdit(undefined)}
           onClearFilters={clearInvestmentsFilters}
+          onLoadMore={infiniteSearch.fetchNextPage}
+          hasNextPage={infiniteSearch.hasNextPage}
+          isFetching={infiniteSearch.isFetching}
+          isFetchingNextPage={infiniteSearch.isFetchingNextPage}
+          hasLoadMoreError={infiniteSearch.isFetchNextPageError}
         />
       ) : shouldUseDatagridView ? (
         <ActivityDataGrid
@@ -814,13 +850,16 @@ const ActivityPage = () => {
           filtersActive={investmentsFiltersActive}
           onAdd={() => handleEdit(undefined)}
           onClearFilters={clearInvestmentsFilters}
+          onLoadMore={infiniteSearch.fetchNextPage}
+          hasNextPage={infiniteSearch.hasNextPage}
+          isFetching={infiniteSearch.isFetching}
+          isFetchingNextPage={infiniteSearch.isFetchingNextPage}
+          hasLoadMoreError={infiniteSearch.isFetchNextPageError}
         />
       )}
 
       {!shouldUseDatagridView && (
         <ActivityPagination
-          hasMore={infiniteSearch.hasNextPage ?? false}
-          onLoadMore={infiniteSearch.fetchNextPage}
           isFetching={infiniteSearch.isFetchingNextPage}
           totalFetched={totalFetched}
           totalCount={infiniteSearch.totalRowCount}
@@ -914,7 +953,12 @@ const ActivityPage = () => {
 
   return (
     <>
-      <SwipablePage views={views} defaultView="investments" persistKey="activity-page-tab" />
+      <SwipablePage
+        views={views}
+        defaultView="investments"
+        persistKey="activity-page-tab"
+        desktopContentClassName="overflow-y-visible"
+      />
       {sharedModals}
     </>
   );

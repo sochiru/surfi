@@ -1,4 +1,9 @@
 {
+  "needs_review_alert": {
+    "title_other": "{{count}}件の取引に確認が必要です",
+    "description": "各取引の資産、タイプ、最終金額を確認してください。",
+    "action": "確認"
+  },
   "activities": "取引",
   "add_activity": "取引を追加",
   "add_holdings": "保有銘柄を追加",
@@ -20,8 +25,8 @@
   "type_interest": "利息",
   "type_deposit": "入金",
   "type_withdrawal": "出金",
-  "type_transfer_in": "振替入庫",
-  "type_transfer_out": "振替出庫",
+  "type_transfer_in": "振替受入",
+  "type_transfer_out": "振替払出",
   "type_conversion": "両替",
   "type_fee": "手数料",
   "type_tax": "税金",
@@ -100,6 +105,7 @@
   "delete_selected_confirm": "選択した{{count}}件の取引を削除してもよろしいですか?",
   "cash_balance_checking": "口座残高を確認中...",
   "cash_balance_insufficient": "残高不足:",
+  "cash_balance_warning": "現金残高が不足しています。必要額: {{required}}、利用可能額: {{available}}、不足額: {{shortfall}}",
   "cash_balance_shortfall_hint": "不足分を補う入金を記録するか、「保有銘柄を追加」(現金管理を経由しません)を使用してください。",
   "cash_balance_transaction_cost": "取引コスト: {{amount}} - 残高は十分です",
   "edit_activity": "取引を編集",
@@ -128,7 +134,6 @@
   "duplicate": "複製",
   "delete": "削除",
   "loading": "読み込み中…",
-  "load_more": "さらに読み込む...",
   "search_placeholder": "検索...",
   "clear_search": "検索をクリア",
   "filter_account": "口座",
@@ -286,7 +291,7 @@
   "import_help_docs_activity_ref": "取引リファレンスのドキュメント",
   "import_help_how_to_title": "CSVのインポート方法",
   "import_help_how_to_mobile": "CSVのインポート方法",
-  "pagination_count": "{{fetched}} / {{total}}件の取引",
+  "pagination_count": "{{fetched}}/{{total}}件の取引",
   "manager": {
     "add_to_account": "{{account}}に新しい取引を追加",
     "create_transaction": "口座の新しい取引を作成します",
@@ -303,7 +308,9 @@
     "add_activities": "取引を追加",
     "ask_ai_categorize": "AIに分類を依頼",
     "investments": "投資",
-    "spending": "支出"
+    "spending": "支出",
+    "health_filter_single": "ヘルスセンターが指摘した取引を表示しています",
+    "health_filter_multiple": "ヘルスセンターが指摘した取引を表示しています"
   },
   "delete_modal": {
     "title": "取引を削除しますか?",
@@ -321,7 +328,8 @@
   },
   "date_sheet": {
     "title": "{{date}}の取引",
-    "count": "この日付に記録された取引は{{count}}件です"
+    "count": "この日付に記録された取引は{{count}}件です",
+    "count_other": "この日付に記録された取引は{{count}}件です"
   },
   "picker": {
     "transfer": "振替",
@@ -335,7 +343,8 @@
     "status_all": "すべての取引",
     "status_pending": "確認待ち",
     "status_validated": "検証済み",
-    "instrument": "商品"
+    "instrument": "商品",
+    "instrument_all": "すべての商品"
   },
   "detail": {
     "status_posted": "確定済み",
@@ -449,7 +458,8 @@
     "warning_stale_link": "既存の古い振替リンクは置き換えられます。",
     "error_load_suggestions": "マッチ候補を読み込めませんでした。",
     "error_load_pair": "リンクされた振替ペアを読み込めませんでした。",
-    "error_search": "取引を検索できませんでした。"
+    "error_search": "取引を検索できませんでした。",
+    "within_days_other": "{{count}}日以内"
   },
   "form": {
     "section_asset_account": "資産と口座",
@@ -516,8 +526,8 @@
     "button_add_transfer": "振替を追加",
     "button_add_payment": "支払いを追加",
     "button_payment": "支払い",
-    "button_transfer_in": "振替入庫",
-    "button_transfer_out": "振替出庫",
+    "button_transfer_in": "振替受入",
+    "button_transfer_out": "振替払出",
     "button_transfer": "振替",
     "button_add_prefixed": "{{action}}を追加",
     "button_saving": "保存中...",
@@ -548,6 +558,9 @@
     "available_amount": "利用可能: {{amount}}",
     "total_debit": "出金合計",
     "total_credit": "入金合計",
+    "help_total_debit": "手数料と税金を含む最終的な支払額です。",
+    "help_total_credit": "手数料と税金を差し引いた最終的な受取額です。",
+    "use_calculated_total": "計算された合計を使用（{{amount}}）",
     "warn_buy_while_short": "この銘柄は現在ショートポジションです。買い戻しを使用してポジションを減らしてください。通常の買付は、ショートポジションを解消した後に入力してください。",
     "warn_cover_without_short": "買い戻しには、選択した口座にこの銘柄の既存のショートポジションが必要です。",
     "warn_cover_quantity_excess": "{{covering}}株を買い戻そうとしていますが、現在のショートポジションは{{short}}株です。超過分は別の買付取引として入力してください。",
@@ -595,6 +608,7 @@
     "err_amount_number": "金額は数値である必要があります。",
     "err_amount_positive_number": "金額は正の数値である必要があります。",
     "err_amount_gt_zero": "金額は0より大きい値である必要があります。",
+    "err_amount_non_negative": "金額は0以上である必要があります。",
     "err_enter_quantity": "数量を入力してください。",
     "err_quantity_number": "数量は数値である必要があります。",
     "err_quantity_gt_zero": "数量は0より大きい値である必要があります。",
@@ -676,14 +690,15 @@
       "first_page": "最初のページへ",
       "previous_page": "前のページ",
       "next_page": "次のページ",
-      "last_page": "最後のページへ"
+      "last_page": "最後のページへ",
+      "jump_hint_other": "1から{{count}}までのページ番号を入力してください"
     },
     "duplicated_comment": "複製",
     "save_edits_first": "先に編集を保存してください",
     "save_before_link": "この振替をリンクする前に、未保存の編集を保存または破棄してください。",
     "save_before_unlink": "この振替のリンクを解除する前に、未保存の編集を保存または破棄してください。",
     "link_reason_save_new": "リンクする前に新規の取引を保存してください",
-    "link_reason_save_pending": "リンクする前に未保存の編集を保存してください。為替両替のペアは振替出庫1件と振替入庫1件である必要があります",
+    "link_reason_save_pending": "リンクする前に未保存の編集を保存してください。為替両替のペアは振替払出1件と振替受入1件である必要があります",
     "link_reason_select_pair": "TRANSFER_INの取引1件とTRANSFER_OUTの取引1件を選択してください",
     "link_reason_already_linked": "選択した取引のいずれかは既にリンクされています",
     "link_reason_same_account_fx": "同一口座内のリンクは、異なる通貨間の現金の為替両替である必要があります",
@@ -729,7 +744,11 @@
     "select_all_rows": "すべての行を選択",
     "select_row": "行を選択",
     "instrument_auto": "自動",
-    "unit_price_help": "買付・売却では約定価格を入力してください。ステーキング報酬や現物配当では、受取時の1単位あたり公正市場価値を入力してください。収入額と取得原価の設定に使用されます。"
+    "unit_price_help": "買付・売却では約定価格を入力してください。ステーキング報酬や現物配当では、受取時の1単位あたり公正市場価値を入力してください。収入額と取得原価の設定に使用されます。",
+    "warn_dates_differ_other": "日付が{{count}}日ずれています。",
+    "approve_count_other": "{{count}}件を承認",
+    "approve_missing_amount_other": "{{count}}件の取引に最終現金額がまだありません",
+    "approve_missing_amount_description": "空欄またはゼロの取引には、正しい最終現金額を入力してから承認してください。"
   },
   "table": {
     "cash": "現金",
@@ -855,7 +874,9 @@
       "valueComma": "カンマ",
       "valueSemicolon": "セミコロン",
       "valueTab": "タブ",
-      "valuePeriod": "ピリオド"
+      "valuePeriod": "ピリオド",
+      "summarySkipTop_other": "先頭スキップ: {{count}}",
+      "summarySkipBottom_other": "末尾スキップ: {{count}}"
     },
     "template": {
       "label": "テンプレート",
@@ -914,7 +935,8 @@
       "mapType": "タイプをマッピング",
       "mapSymbol": "銘柄をマッピング",
       "missingAccount": "口座が未設定",
-      "emptySymbol": "銘柄が空"
+      "emptySymbol": "銘柄が空",
+      "accountAssignmentBlankRows_other": "すべてのCSV行を口座にマッピングしてください。{{count}}行がまだ未設定です。アップロードでデフォルト口座を選択するか、口座列を入力してください。"
     },
     "csvViewer": {
       "status": "ステータス",
@@ -928,7 +950,8 @@
       "emptyFile": "空のファイル",
       "emptyLine": "空行",
       "noContentFound": "内容が見つかりません",
-      "empty": "空"
+      "empty": "空",
+      "lines_other": "{{count}}行"
     },
     "columns": {
       "dateTime": "日時",
@@ -1020,7 +1043,9 @@
       "statusDuplicates": "重複",
       "statusSkipped": "スキップ済み",
       "statusValid": "有効",
-      "skipReason": "スキップ済み"
+      "skipReason": "スキップ済み",
+      "willBeImportedTitle_other": "{{all}}件中{{count}}件の取引がインポートされます",
+      "activitiesCount_other": "{{count}}件の取引"
     },
     "status": {
       "valid": "有効",
@@ -1062,14 +1087,16 @@
       "typeInterest": "利息",
       "typeDeposit": "入金",
       "typeWithdrawal": "出金",
-      "typeTransferIn": "振替入庫",
-      "typeTransferOut": "振替出庫",
+      "typeTransferIn": "振替受入",
+      "typeTransferOut": "振替払出",
       "typeFee": "手数料",
       "typeTax": "税金",
       "typeSplit": "株式分割",
       "typeUnknown": "不明",
       "skipReasonManual": "手動",
-      "validationError": "検証エラー"
+      "validationError": "検証エラー",
+      "readyTitle_other": "{{count}}件の取引をインポートする準備ができました",
+      "warningsDescription_other": "{{count}}件の取引に警告がありますが、そのままインポートされます。"
     },
     "result": {
       "loading": "インポート結果を読み込み中...",
@@ -1167,7 +1194,9 @@
       "importing": "インポート中...",
       "importSnapshots_one": "{{count}}件のスナップショットをインポート",
       "importSnapshots_other": "{{count}}件のスナップショットをインポート",
-      "failedToPrepareAssets": "インポート用の資産の準備に失敗しました。"
+      "failedToPrepareAssets": "インポート用の資産の準備に失敗しました。",
+      "positionsCount_other": "{{count}}件の保有銘柄",
+      "readyRows_other": "{{count}}行"
     },
     "symbolPanel": {
       "unrecognized_one": "認識できない銘柄が{{count}}件",
@@ -1180,7 +1209,8 @@
       "searchFor": "{{symbol}}を検索...",
       "markCustom": "カスタムに設定",
       "applyMappings_one": "{{count}}件のマッピングを適用",
-      "applyMappings_other": "{{count}}件のマッピングを適用"
+      "applyMappings_other": "{{count}}件のマッピングを適用",
+      "affectingRows_other": "({{count}}行に影響)"
     },
     "help": {
       "button": "CSVのインポート方法",
@@ -1278,7 +1308,8 @@
       "allValidDescriptionSuffix": "をクリックしてください。",
       "confirmImport": "インポートを確定",
       "cancel": "キャンセル",
-      "importing": "インポート中..."
+      "importing": "インポート中...",
+      "issuesTitle_other": "{{count}}件の取引エントリに問題があります。"
     }
   }
 }

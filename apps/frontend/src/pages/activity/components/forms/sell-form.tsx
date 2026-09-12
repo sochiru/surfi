@@ -4,14 +4,15 @@ import { ACTIVITY_SUBTYPES, ActivityType, QuoteMode } from "@/lib/constants";
 import { buildOccSymbol } from "@/lib/occ-symbol";
 import { normalizeCurrency } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useNumberFormatting } from "@wealthfolio/ui";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { useEffect, useMemo, useRef } from "react";
-import { useTranslation } from "react-i18next";
-import { FormProvider, useForm, type Resolver } from "react-hook-form";
-import { z } from "zod";
 import type { TFunction } from "i18next";
+import { useEffect, useMemo, useRef } from "react";
+import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { useTranslation } from "react-i18next";
+import { z } from "zod";
 import {
   AccountSelect,
   AdvancedOptionsSection,
@@ -26,9 +27,11 @@ import {
   QuantityInput,
   StockTradeIntentSelector,
   SymbolSearch,
-  type AssetType,
+  TradeTotalInput,
   type AccountSelectOption,
+  type AssetType,
 } from "./fields";
+import { useTradeTotal } from "./use-trade-total";
 
 // Asset metadata schema for custom assets
 const assetMetadataSchema = z
@@ -80,6 +83,7 @@ export const createSellFormSchema = (t?: TFunction) =>
         .positive({
           message: msg(t, "activity:form.err_price_gt_zero", "Price must be greater than 0."),
         }),
+      amount: z.coerce.number().min(0).optional(),
       fee: z.coerce
         .number({
           invalid_type_error: msg(t, "activity:form.err_fee_number", "Fee must be a number."),
@@ -219,6 +223,7 @@ export function SellForm({
   assetCurrency,
 }: SellFormProps) {
   const { t } = useTranslation(["activity"]);
+  const formatting = useNumberFormatting();
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
@@ -247,6 +252,7 @@ export function SellForm({
       })(),
       quantity: undefined,
       unitPrice: undefined,
+      amount: undefined,
       fee: 0,
       tax: 0,
       comment: null,
@@ -310,22 +316,23 @@ export function SellForm({
     ? t("activity:form.button_sell_short")
     : t("activity:form.button_add_sell");
 
-  // Option total calculation
+  // Trade total calculation
+  const symbolInstrumentType = watch("symbolInstrumentType");
   const optQuantity = watch("quantity");
-  const optUnitPrice = watch("unitPrice");
-  const optFee = watch("fee");
-  const optTax = watch("tax");
   const optMultiplier = watch("contractMultiplier");
-
-  const optionTotal = useMemo(() => {
-    if (!isOption) return 0;
-    const q = Number(optQuantity) || 0;
-    const p = Number(optUnitPrice) || 0;
-    const f = Number(optFee) || 0;
-    const tx = Number(optTax) || 0;
-    const m = Number(optMultiplier) || 100;
-    return q * p * m - f - tx;
-  }, [isOption, optQuantity, optUnitPrice, optFee, optTax, optMultiplier]);
+  const { isCustomAmount, onCustomChange, calculatedAmount, applyTradeTotal, isDebit } =
+    useTradeTotal({
+      side: "sell",
+      isEditing,
+      defaultAmount: defaultValues?.amount,
+      instrumentType: symbolInstrumentType ?? assetType,
+      quantity: optQuantity,
+      unitPrice: watch("unitPrice"),
+      fee: watch("fee"),
+      tax: watch("tax"),
+      isOption,
+      contractMultiplier: optMultiplier,
+    });
 
   const handleAssetTypeChange = (value: AssetType) => {
     if (value === "option") {
@@ -458,6 +465,7 @@ export function SellForm({
   }, [isEditing, isStock, isStockSellShort, effectiveAssetId, availableHoldingQuantity]);
 
   const handleSubmit = createValidatedSubmit(form, async (data) => {
+    applyTradeTotal(data as { amount?: number | null; needsReview?: boolean });
     // Ensure currency is set (required by backend) — fall back to account currency
     if (!data.currency && accountId) {
       data.currency = accounts.find((a) => a.value === accountId)?.currency ?? data.currency;
@@ -585,6 +593,7 @@ export function SellForm({
                   <input
                     type="number"
                     {...form.register("contractMultiplier", { valueAsNumber: true })}
+                    readOnly={isEditing}
                     className="hover:border-input focus:border-input focus:bg-background focus:ring-ring h-5 w-14 rounded border border-transparent bg-transparent px-1 text-center text-xs tabular-nums focus:outline-none focus:ring-1"
                     aria-label={t("activity:form.contract_multiplier")}
                   />
@@ -594,7 +603,7 @@ export function SellForm({
               {!isOption && availableHoldingQuantity > 0 && (
                 <p className="text-muted-foreground mt-1.5 text-xs">
                   {t("activity:form.available_amount", {
-                    amount: availableHoldingQuantity.toLocaleString(),
+                    amount: formatting.formatDecimal(availableHoldingQuantity),
                   })}
                 </p>
               )}
@@ -615,59 +624,14 @@ export function SellForm({
             <AmountInput name="tax" label={t("activity:form.label_tax")} currency={currency} />
           </div>
 
-          {/* Option Total Credit with formula breakdown */}
-          {isOption && optQuantity && optUnitPrice && (
-            <div className="bg-muted/50 border-border rounded-md border p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-muted-foreground text-xs font-medium uppercase">
-                    {t("activity:form.total_credit")}
-                  </span>
-                  <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">
-                    {Number(optQuantity)} ×{" "}
-                    {currency
-                      ? new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
-                          Number(optUnitPrice),
-                        )
-                      : Number(optUnitPrice)}{" "}
-                    × {Number(optMultiplier) || 100}
-                    {Number(optFee) > 0 && (
-                      <>
-                        {" "}
-                        −{" "}
-                        {currency
-                          ? new Intl.NumberFormat("en-US", {
-                              style: "currency",
-                              currency,
-                            }).format(Number(optFee))
-                          : Number(optFee)}
-                      </>
-                    )}
-                    {Number(optTax) > 0 && (
-                      <>
-                        {" "}
-                        −{" "}
-                        {currency
-                          ? new Intl.NumberFormat("en-US", {
-                              style: "currency",
-                              currency,
-                            }).format(Number(optTax))
-                          : Number(optTax)}
-                      </>
-                    )}
-                  </p>
-                </div>
-                <span className="text-lg font-semibold tabular-nums">
-                  {new Intl.NumberFormat("en-US", {
-                    style: currency ? "currency" : "decimal",
-                    currency: currency || undefined,
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  }).format(optionTotal)}
-                </span>
-              </div>
-            </div>
-          )}
+          <TradeTotalInput
+            side="sell"
+            calculatedAmount={calculatedAmount}
+            isCustom={isCustomAmount}
+            onCustomChange={onCustomChange}
+            currency={currency}
+            isDebit={isDebit}
+          />
 
           {/* Warning for selling more than holdings */}
           {isSellingMoreThanHoldings && (
@@ -676,12 +640,14 @@ export function SellForm({
               <AlertDescription className="text-warning text-sm">
                 {isOption
                   ? t("activity:form.warn_selling_more_contracts", {
-                      selling: optQuantity?.toLocaleString(),
-                      available: availableHoldingQuantity.toLocaleString(),
+                      selling:
+                        optQuantity == null ? undefined : formatting.formatDecimal(optQuantity),
+                      available: formatting.formatDecimal(availableHoldingQuantity),
                     })
                   : t("activity:form.warn_selling_more_shares", {
-                      selling: optQuantity?.toLocaleString(),
-                      available: availableHoldingQuantity.toLocaleString(),
+                      selling:
+                        optQuantity == null ? undefined : formatting.formatDecimal(optQuantity),
+                      available: formatting.formatDecimal(availableHoldingQuantity),
                     })}
               </AlertDescription>
             </Alert>
@@ -692,7 +658,7 @@ export function SellForm({
               <Icons.AlertTriangle className="text-warning h-4 w-4" />
               <AlertDescription className="text-warning text-sm">
                 {t("activity:form.warn_sell_short_while_long", {
-                  available: availableHoldingQuantity.toLocaleString(),
+                  available: formatting.formatDecimal(availableHoldingQuantity),
                 })}
               </AlertDescription>
             </Alert>

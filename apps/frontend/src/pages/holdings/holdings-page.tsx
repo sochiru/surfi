@@ -9,7 +9,8 @@ import { SwipablePage, SwipablePageView } from "@/components/page";
 import { AccountScopeSelector } from "@/components/account-filter-selector";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { useAccounts } from "@/hooks/use-accounts";
-import { useHoldings } from "@/hooks/use-holdings";
+import { useAccountScopeStore } from "@/lib/account-scope-store";
+import { useHoldingsWithClosedProbe } from "@/hooks/use-holdings";
 import { usePortfolios } from "@/hooks/use-portfolios";
 import {
   useAlternativeHoldings,
@@ -25,7 +26,6 @@ import {
   apiKindToAlternativeAssetKind,
 } from "@/lib/constants";
 import {
-  Account,
   AccountScope,
   HoldingType,
   AlternativeAssetHolding,
@@ -33,7 +33,6 @@ import {
 } from "@/lib/types";
 import { canAddHoldings } from "@/lib/activity-restrictions";
 import { useIsMobileViewport } from "@/hooks/use-platform";
-import { HoldingsMobileFilterSheet } from "./components/holdings-mobile-filter-sheet";
 import { HoldingsTable } from "./components/holdings-table";
 import { HoldingsTableMobile } from "./components/holdings-table-mobile";
 import { AlternativeHoldingsTable } from "./components/alternative-holdings-table";
@@ -44,6 +43,20 @@ import { accountIdsForScope, buildCashHoldingRows, type CashHoldingRow } from ".
 import { useMp2Rates } from "@/features/mp2/hooks/use-mp2-rates";
 import { useLatestValuations } from "@/hooks/use-latest-valuations";
 import { HoldingsEditMode } from "./components/holdings-edit-mode";
+import {
+  DEFAULT_HOLDINGS_VISIBILITY,
+  HOLDINGS_VISIBILITY_STORAGE_KEY,
+  filterHoldingsByVisibility,
+  getEffectiveHoldingsVisibility,
+  isClosedPosition,
+  type HoldingsVisibilityFilter,
+} from "./components/holdings-visibility";
+import {
+  filterHoldingsByType,
+  getHoldingTypeFilterOption,
+  getHoldingTypeFilterValue,
+  getHoldingTypeTranslationKey,
+} from "./components/holdings-type-filter";
 import {
   AlternativeAssetQuickAddModal,
   AssetDetailsSheet,
@@ -72,15 +85,47 @@ export const HoldingsPage = () => {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
 
-  const [accountFilter, setAccountScope] = useState<AccountScope>({ type: "all" });
+  const [visibilityFilters, setVisibilityFilters] = usePersistentState<HoldingsVisibilityFilter[]>(
+    HOLDINGS_VISIBILITY_STORAGE_KEY,
+    [...DEFAULT_HOLDINGS_VISIBILITY],
+  );
 
-  // Keep selectedAccount for edit/add functionality when a specific account is selected.
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-
-  const { holdings, isLoading } = useHoldings(accountFilter);
+  const accountFilter = useAccountScopeStore((state) => state.scope);
+  const setAccountScope = useAccountScopeStore((state) => state.setScope);
   const { accounts, isLoading: isAccountsLoading } = useAccounts({
     accountPurpose: AccountPurpose.HOLDINGS,
   });
+
+  // Keep selectedAccount for edit/add functionality when a specific account is selected.
+  // Derived rather than stored so a scope picked on another page applies on mount.
+  const selectedAccount = useMemo(
+    () =>
+      accountFilter.type === "account"
+        ? (accounts.find((account) => account.id === accountFilter.accountId) ?? null)
+        : null,
+    [accountFilter, accounts],
+  );
+
+  const showClosedPositions = selectedAccount?.trackingMode !== "HOLDINGS";
+  const effectiveVisibilityFilters = useMemo(
+    () => getEffectiveHoldingsVisibility(visibilityFilters, showClosedPositions),
+    [showClosedPositions, visibilityFilters],
+  );
+  const handleVisibilityFiltersChange = useCallback(
+    (nextFilters: HoldingsVisibilityFilter[]) => {
+      setVisibilityFilters(getEffectiveHoldingsVisibility(nextFilters, showClosedPositions));
+    },
+    [setVisibilityFilters, showClosedPositions],
+  );
+
+  const includeClosed = effectiveVisibilityFilters.includes("closed");
+  const { holdings, isLoading, hasHiddenClosedPositions } = useHoldingsWithClosedProbe(
+    accountFilter,
+    {
+      includeClosed,
+      probeClosedWhenEmpty: showClosedPositions,
+    },
+  );
   const { data: portfolios = [] } = usePortfolios();
   const { data: alternativeHoldings, isLoading: isAlternativeHoldingsLoading } =
     useAlternativeHoldings();
@@ -109,7 +154,6 @@ export const HoldingsPage = () => {
 
   // Mobile filter state
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isAlternativeAssetModalOpen, setIsAlternativeAssetModalOpen] = useState(false);
   const [sortBy, setSortBy] = usePersistentState<"symbol" | "marketValue">(
     "holdings-sort-by",
@@ -143,6 +187,8 @@ export const HoldingsPage = () => {
     id: string;
     symbol: string;
     name?: string;
+    exchangeMic?: string | null;
+    instrumentType?: string | null;
   } | null>(null);
 
   // Edit mode state for HOLDINGS-mode accounts
@@ -159,13 +205,8 @@ export const HoldingsPage = () => {
     (filter: AccountScope) => {
       setAccountScope(filter);
       setIsEditMode(false);
-      setSelectedAccount(
-        filter.type === "account"
-          ? (accounts.find((account) => account.id === filter.accountId) ?? null)
-          : null,
-      );
     },
-    [accounts],
+    [setAccountScope],
   );
 
   const clearHealthContext = useCallback(() => {
@@ -349,57 +390,100 @@ export const HoldingsPage = () => {
   );
 
   // Process investment holdings
-  const { nonCashHoldings, filteredHoldings, availableTypeOptions } = useMemo(() => {
-    const nonCash =
-      holdings?.filter((holding) => holding.holdingType?.toLowerCase() !== HoldingType.CASH) ?? [];
+  const { filteredHoldings, availableTypeOptions } = useMemo(() => {
+    const allHoldings = holdings ?? [];
 
-    let filtered = nonCash;
+    let scopedHoldings = allHoldings;
     if (investmentsFilter?.assetKinds) {
       const allowedKinds = investmentsFilter.assetKinds as readonly string[];
-      filtered = nonCash.filter((holding) => {
-        return holding.assetKind && allowedKinds.includes(holding.assetKind);
+      scopedHoldings = allHoldings.filter((holding) => {
+        return (
+          holding.holdingType?.toLowerCase() === HoldingType.CASH ||
+          (holding.assetKind && allowedKinds.includes(holding.assetKind))
+        );
       });
     }
 
     // Build available type options from taxonomy classifications
     const typeSet = new Set<string>();
     const typeOptions: { value: string; label: string }[] = [];
-    for (const h of filtered) {
-      const name = h.instrument?.classifications?.assetType?.name;
-      if (name && !typeSet.has(name)) {
-        typeSet.add(name);
-        typeOptions.push({ value: name, label: name });
+    for (const h of scopedHoldings) {
+      const option = getHoldingTypeFilterOption(h, t("holdings:cash"));
+      if (option && !typeSet.has(option.value)) {
+        typeSet.add(option.value);
+        typeOptions.push({
+          value: option.value,
+          label: t(getHoldingTypeTranslationKey(option.value), {
+            defaultValue: option.fallbackLabel,
+          }),
+        });
       }
     }
 
-    if (selectedTypes.length > 0) {
-      filtered = filtered.filter((holding) => {
-        const assetType = holding.instrument?.classifications?.assetType?.name;
-        return assetType && selectedTypes.includes(assetType);
-      });
-    }
+    let filtered = filterHoldingsByVisibility(scopedHoldings, effectiveVisibilityFilters);
+    filtered = filterHoldingsByType(filtered, selectedTypes);
 
     // Health-center deep-link filters.
     if (healthFilter === "negative") {
       filtered = filtered.filter((holding) => holding.quantity < 0);
     } else if (healthFilter === "unclassified") {
-      filtered = filtered.filter((holding) => !holding.instrument?.classifications?.assetType);
+      filtered = filtered.filter((holding) => !getHoldingTypeFilterValue(holding));
     }
 
     return {
-      nonCashHoldings: nonCash,
       filteredHoldings: filtered,
       availableTypeOptions: typeOptions,
     };
-  }, [holdings, selectedTypes, investmentsFilter, healthFilter]);
+  }, [holdings, effectiveVisibilityFilters, selectedTypes, investmentsFilter, healthFilter, t]);
 
   // Combined loading state
   const isDataLoading = isLoading || isAccountsLoading || isAlternativeHoldingsLoading;
+  const hasHiddenInvestmentPositions =
+    hasHiddenClosedPositions || (holdings.length > 0 && filteredHoldings.length === 0);
 
   // Empty state checks
-  const hasNoInvestments = !isDataLoading && (!nonCashHoldings || nonCashHoldings.length === 0);
+  const hasNoInvestments = !isDataLoading && holdings.length === 0 && !hasHiddenClosedPositions;
   const hasNoAssets = !isDataLoading && assetsHoldings.length === 0;
   const hasNoLiabilities = !isDataLoading && liabilitiesHoldings.length === 0;
+  const hasMobileInvestmentsToolbar =
+    isMobileViewport && currentTab === "investments" && !hasNoInvestments;
+
+  // Action palette groups
+  const actionPaletteGroups: ActionPaletteGroup[] = useMemo(
+    () => [
+      {
+        items: [
+          {
+            icon: Icons.Wallet,
+            label: t("holdings:add_asset"),
+            onClick: () => {
+              setModalDefaultKind(undefined);
+              setIsAlternativeAssetModalOpen(true);
+            },
+          },
+          {
+            icon: Icons.CreditCard,
+            label: t("holdings:add_liability"),
+            onClick: () => {
+              setModalDefaultKind(AlternativeAssetKind.LIABILITY);
+              setIsAlternativeAssetModalOpen(true);
+            },
+          },
+          {
+            icon: Icons.Plus,
+            label: t("holdings:add_activity"),
+            onClick: () => navigate("/activities/manage"),
+          },
+          {
+            icon: Icons.Refresh,
+            label: t("holdings:update_prices"),
+            onClick: () => updatePortfolioMutation.mutate(),
+          },
+        ],
+      },
+    ],
+    [navigate, updatePortfolioMutation, t],
+  );
 
   // Investments content
   const investmentsContent = (
@@ -408,10 +492,10 @@ export const HoldingsPage = () => {
         <div className="border-border bg-muted/30 mb-4 flex items-center justify-between gap-3 rounded-md border px-3 py-2">
           <div className="flex min-w-0 items-center gap-2">
             <Icons.Info className="text-muted-foreground h-4 w-4 shrink-0" />
-            <p className="text-sm">Showing holdings flagged by Health Center</p>
+            <p className="text-sm">{t("holdings:health_filter_active")}</p>
           </div>
           <Button variant="ghost" size="sm" onClick={clearHealthContext}>
-            Clear
+            {t("common:clear")}
           </Button>
         </div>
       )}
@@ -419,7 +503,7 @@ export const HoldingsPage = () => {
       {/* Edit Mode for HOLDINGS-mode accounts */}
       {isEditMode && selectedAccount && canEditHoldings ? (
         <HoldingsEditMode
-          holdings={holdings ?? []}
+          holdings={(holdings ?? []).filter((holding) => !isClosedPosition(holding))}
           account={selectedAccount}
           isLoading={isDataLoading}
           onClose={() => setIsEditMode(false)}
@@ -469,11 +553,16 @@ export const HoldingsPage = () => {
             <HoldingsTable
               holdings={filteredHoldings ?? []}
               isLoading={isDataLoading}
+              visibilityFilters={effectiveVisibilityFilters}
+              setVisibilityFilters={handleVisibilityFiltersChange}
+              showClosedPositions={showClosedPositions}
               onClassify={(holding) =>
                 setClassifyAsset({
                   id: holding.instrument?.id ?? holding.id,
                   symbol: holding.instrument?.symbol ?? holding.id,
                   name: holding.instrument?.name ?? undefined,
+                  exchangeMic: holding.instrument?.exchangeMic,
+                  instrumentType: holding.instrument?.instrumentType,
                 })
               }
             />
@@ -482,7 +571,7 @@ export const HoldingsPage = () => {
           {/* Mobile View */}
           <div className="block md:hidden">
             <HoldingsTableMobile
-              holdings={nonCashHoldings ?? []}
+              holdings={filteredHoldings ?? []}
               isLoading={isDataLoading}
               selectedTypes={selectedTypes}
               setSelectedTypes={setSelectedTypes}
@@ -491,11 +580,35 @@ export const HoldingsPage = () => {
               accounts={accounts ?? []}
               portfolios={portfolios}
               showSearch={true}
-              showFilterButton={false}
+              showFilterButton={true}
               sortBy={sortBy}
+              setSortBy={setSortBy}
               performanceMode={performanceMode}
               setPerformanceMode={setPerformanceMode}
               typeOptions={availableTypeOptions}
+              visibilityFilters={effectiveVisibilityFilters}
+              setVisibilityFilters={handleVisibilityFiltersChange}
+              showClosedPositions={showClosedPositions}
+              hasHiddenPositions={hasHiddenInvestmentPositions}
+              toolbarActions={
+                isMobileViewport && currentTab === "investments" ? (
+                  <ActionPalette
+                    open={isActionPaletteOpen}
+                    onOpenChange={setIsActionPaletteOpen}
+                    groups={actionPaletteGroups}
+                    trigger={
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="size-10 shrink-0 rounded-full"
+                        aria-label={t("holdings:open_actions")}
+                      >
+                        <Icons.DotsThreeVertical className="h-5 w-5" weight="fill" />
+                      </Button>
+                    }
+                  />
+                ) : undefined
+              }
             />
           </div>
         </>
@@ -639,58 +752,11 @@ export const HoldingsPage = () => {
     </>
   );
 
-  // Action palette groups
-  const actionPaletteGroups: ActionPaletteGroup[] = useMemo(
-    () => [
-      {
-        items: [
-          {
-            icon: Icons.Wallet,
-            label: t("holdings:add_asset"),
-            onClick: () => {
-              setModalDefaultKind(undefined);
-              setIsAlternativeAssetModalOpen(true);
-            },
-          },
-          {
-            icon: Icons.CreditCard,
-            label: t("holdings:add_liability"),
-            onClick: () => {
-              setModalDefaultKind(AlternativeAssetKind.LIABILITY);
-              setIsAlternativeAssetModalOpen(true);
-            },
-          },
-          {
-            icon: Icons.Plus,
-            label: t("holdings:add_activity"),
-            onClick: () => navigate("/activities/manage"),
-          },
-          {
-            icon: Icons.Refresh,
-            label: t("holdings:update_prices"),
-            onClick: () => updatePortfolioMutation.mutate(),
-          },
-        ],
-      },
-    ],
-    [navigate, updatePortfolioMutation, t],
-  );
-
   // Shared actions for header
   const sharedActions = useMemo(
     () => (
       <>
-        {isMobileViewport && currentTab === "investments" ? (
-          <Button
-            size="icon-sm"
-            variant="outline"
-            className="h-9 w-9 rounded-full"
-            onClick={() => setIsFilterSheetOpen(true)}
-            aria-label={t("holdings:open_holdings_filters")}
-          >
-            <Icons.ListFilter className="h-4 w-4" />
-          </Button>
-        ) : (
+        {!hasMobileInvestmentsToolbar && (
           <AccountScopeSelector value={accountFilter} onChange={handleAccountScopeChange} />
         )}
         {/* Show Update button for HOLDINGS-mode manual accounts (only on investments tab) */}
@@ -700,16 +766,17 @@ export const HoldingsPage = () => {
             {t("holdings:update")}
           </Button>
         )}
-        <ActionPalette
-          open={isActionPaletteOpen}
-          onOpenChange={setIsActionPaletteOpen}
-          groups={actionPaletteGroups}
-        />
+        {!hasMobileInvestmentsToolbar && (
+          <ActionPalette
+            open={isActionPaletteOpen}
+            onOpenChange={setIsActionPaletteOpen}
+            groups={actionPaletteGroups}
+          />
+        )}
       </>
     ),
     [
-      isMobileViewport,
-      setIsFilterSheetOpen,
+      hasMobileInvestmentsToolbar,
       accountFilter,
       handleAccountScopeChange,
       canEditHoldings,
@@ -767,23 +834,6 @@ export const HoldingsPage = () => {
     <>
       <SwipablePage views={views} defaultView="investments" />
 
-      {/* Mobile Filter Sheet */}
-      <HoldingsMobileFilterSheet
-        open={isFilterSheetOpen}
-        onOpenChange={setIsFilterSheetOpen}
-        accountFilter={accountFilter}
-        onAccountScopeChange={handleAccountScopeChange}
-        accounts={accounts ?? []}
-        portfolios={portfolios}
-        selectedTypes={selectedTypes}
-        setSelectedTypes={setSelectedTypes}
-        sortBy={sortBy}
-        setSortBy={setSortBy}
-        performanceMode={performanceMode}
-        setPerformanceMode={setPerformanceMode}
-        typeOptions={availableTypeOptions}
-      />
-
       {/* Alternative Asset Quick Add Modal */}
       <AlternativeAssetQuickAddModal
         open={isAlternativeAssetModalOpen}
@@ -839,6 +889,8 @@ export const HoldingsPage = () => {
         assetId={classifyAsset?.id ?? ""}
         assetSymbol={classifyAsset?.symbol}
         assetName={classifyAsset?.name}
+        assetExchangeMic={classifyAsset?.exchangeMic}
+        assetInstrumentType={classifyAsset?.instrumentType}
       />
     </>
   );

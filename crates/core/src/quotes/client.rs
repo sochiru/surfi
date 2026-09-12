@@ -43,7 +43,7 @@ use wealthfolio_market_data::{
     EodhdProvider, ExchangeMap, FinnhubProvider, FixtureProvider, MarketDataAppProvider,
     MetalPriceApiProvider, OpenFigiProvider, ProviderId, ProviderRegistry, Quote as MarketQuote,
     QuoteContext, QuoteIdentifiers, ResolverChain, SearchResult as MarketSearchResult, SplitEvent,
-    TradingViewProvider, UsTreasuryCalcProvider, YahooProvider,
+    UsTreasuryCalcProvider, YahooProvider,
 };
 
 /// Market data error types.
@@ -216,7 +216,6 @@ impl MarketDataClient {
             | DATA_SOURCE_ALPHA_VANTAGE
             | DATA_SOURCE_METAL_PRICE_API
             | DATA_SOURCE_FINNHUB
-            | DATA_SOURCE_TRADINGVIEW
             | DATA_SOURCE_EODHD
             | DATA_SOURCE_OPENFIGI
             | DATA_SOURCE_US_TREASURY_CALC
@@ -283,15 +282,6 @@ impl MarketDataClient {
                 if let Ok(Some(key)) = secret_store.get_secret(provider_id) {
                     if !key.is_empty() {
                         let provider = FinnhubProvider::new(key);
-                        return Ok(Some(Arc::new(provider)));
-                    }
-                }
-                Ok(None)
-            }
-            DATA_SOURCE_TRADINGVIEW => {
-                if let Ok(Some(key)) = secret_store.get_secret(provider_id) {
-                    if !key.is_empty() {
-                        let provider = TradingViewProvider::new(key);
                         return Ok(Some(Arc::new(provider)));
                     }
                 }
@@ -990,7 +980,6 @@ mod tests {
             "MARKETDATA_APP",
             "METAL_PRICE_API",
             "FINNHUB",
-            "TRADINGVIEW",
             "EODHD",
             "MANUAL",
             "CUSTOM_SCRAPER:coingecko", // Custom provider with code

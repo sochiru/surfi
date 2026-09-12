@@ -1,6 +1,7 @@
 import { useNetWorth, useNetWorthHistory } from "@/hooks/use-alternative-assets";
 import { usePortfolioAllocations } from "@/hooks/use-portfolio-allocations";
 import { useIsMobileViewport } from "@/hooks/use-platform";
+import { getNetWorthCategoryLabel } from "@/lib/net-worth-category-label";
 import { useSettingsContext } from "@/lib/settings-provider";
 import type { DateRange } from "@/lib/types";
 import { formatDateISO } from "@/lib/utils";
@@ -12,6 +13,7 @@ import {
   GainPercent,
   IntervalSelector,
   getInitialIntervalData,
+  useNumberFormatting,
   usePersistentState,
   type TimePeriod,
 } from "@wealthfolio/ui";
@@ -35,8 +37,12 @@ import {
   averageMonthlyChange,
   computeMomentum,
   computeVelocity,
+  deriveChange,
+  formatChangePercent,
   investmentAllocation,
+  isPlainPercent,
   parseHistory,
+  toneClass,
   type ParsedNetWorth,
   type SelectedCategory,
 } from "./components/utils";
@@ -49,6 +55,7 @@ const MS_PER_DAY = 86_400_000;
 
 export function NetWorthContent() {
   const { t } = useTranslation();
+  const formatting = useNumberFormatting();
   const { settings } = useSettingsContext();
   const { data: netWorthData, isLoading, isError, error } = useNetWorth();
   const isMobile = useIsMobileViewport();
@@ -110,7 +117,7 @@ export function NetWorthContent() {
         total: parseFloat(netWorthData.assets.total) || 0,
         breakdown: (netWorthData.assets.breakdown || []).map((item) => ({
           category: item.category,
-          name: item.name,
+          name: getNetWorthCategoryLabel(t, item.category, item.name),
           value: parseFloat(item.value) || 0,
           assetId: item.assetId,
           children: (item.children ?? []).map((child) => ({
@@ -131,7 +138,7 @@ export function NetWorthContent() {
         })),
       },
     };
-  }, [netWorthData]);
+  }, [netWorthData, t]);
 
   const parsedHistory = useMemo(() => parseHistory(historyData), [historyData]);
   const longHistory = useMemo(() => parseHistory(longHistoryData), [longHistoryData]);
@@ -147,19 +154,21 @@ export function NetWorthContent() {
     return computeMomentum(longHistory, historyDates.startDate, historyDates.endDate);
   }, [longHistory, historyDates, periodCode]);
 
-  // Net worth change over the selected range (simple delta).
-  const { gainLossAmount, gainLossPercent } = useMemo(() => {
-    if (parsedHistory.length < 2) return { gainLossAmount: 0, gainLossPercent: 0 };
-    const first = parsedHistory[0].netWorth;
-    const last = parsedHistory[parsedHistory.length - 1].netWorth;
-    const change = last - first;
-    const base = first !== 0 ? Math.abs(first) : 1;
-    return { gainLossAmount: change, gainLossPercent: change / base };
-  }, [parsedHistory]);
+  // Net worth change over the selected range, on the same baseline rules as the
+  // breakdown rows so the header and the table agree.
+  const netWorthChange = useMemo(
+    () =>
+      deriveChange(
+        parsedHistory.map((point) => point.netWorth),
+        false,
+      ),
+    [parsedHistory],
+  );
 
   const currency = netWorthData?.currency || settings?.baseCurrency || "USD";
   const hasStaleValuations = netWorthData && netWorthData.staleAssets.length > 0;
   const periodLabel = periodCode;
+  const localizedPeriodLabel = t(`ui:interval.${periodCode}`);
 
   // Breakdown row → detail drawer. Investments open the existing asset-class
   // allocation sheet; every other row opens the category detail sheet.
@@ -244,16 +253,28 @@ export function NetWorthContent() {
                 <>
                   <GainAmount
                     className="lg:text-md text-sm font-light"
-                    value={gainLossAmount}
+                    value={netWorthChange.amount}
                     currency={currency}
                     displayCurrency={false}
                   />
                   <div className="border-secondary my-1 border-r pr-2" />
-                  <GainPercent
-                    className="lg:text-md text-sm font-light"
-                    value={gainLossPercent}
-                    animated={true}
-                  />
+                  {isPlainPercent(netWorthChange.percent) ? (
+                    <GainPercent
+                      className="lg:text-md text-sm font-light"
+                      value={netWorthChange.percent}
+                      animated={true}
+                    />
+                  ) : (
+                    <span
+                      className={`lg:text-md text-sm font-light ${toneClass(netWorthChange.amount)}`}
+                    >
+                      {formatChangePercent(
+                        netWorthChange,
+                        t("insights:networth.breakdown_table.new"),
+                        formatting,
+                      )}
+                    </span>
+                  )}
                 </>
               )}
               {periodCode && (
@@ -353,7 +374,7 @@ export function NetWorthContent() {
                   velocity={velocity}
                   trailingYearMonthly={trailingYearMonthly}
                   currency={currency}
-                  periodLabel={periodLabel}
+                  periodLabel={localizedPeriodLabel}
                 />
               )}
 

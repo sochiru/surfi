@@ -1,4 +1,10 @@
 {
+  "needs_review_alert": {
+    "title_one": "{{count}} Aktivität muss geprüft werden",
+    "title_other": "{{count}} Aktivitäten müssen geprüft werden",
+    "description": "Prüfen Sie bei jeder Transaktion Vermögenswert, Typ und Endbetrag.",
+    "action": "Prüfen"
+  },
   "activities": "Aktivitäten",
   "add_activity": "Aktivität hinzufügen",
   "add_holdings": "Bestände hinzufügen",
@@ -57,6 +63,7 @@
   "cancel": "Abbrechen",
   "delete_selected": "Ausgewählte löschen",
   "cash_balance_insufficient": "Unzureichende Mittel:",
+  "cash_balance_warning": "Unzureichender Barbestand. Erforderlich: {{required}}, verfügbar: {{available}}, Fehlbetrag: {{shortfall}}",
   "cash_balance_shortfall_hint": "Erfassen Sie Einzahlungen, um die Lücke zu schließen, oder nutzen Sie „Bestand hinzufügen“ (ohne Bargeldverfolgung).",
   "no_data": "Keine CSV-Daten",
   "activity_details": "Aktivitätsdetails",
@@ -73,7 +80,6 @@
   "duplicate": "Duplizieren",
   "delete": "Löschen",
   "loading": "Wird geladen...",
-  "load_more": "Mehr laden",
   "search_placeholder": "Suchen...",
   "clear_search": "Suche löschen",
   "filter_account": "Konto",
@@ -181,7 +187,7 @@
   "import_help_docs_activity_ref": "Dokumentation zu Aktivitätstypen",
   "import_help_how_to_title": "CSV-Import Hilfe?",
   "import_help_how_to_mobile": "CSV-Import Hilfe?",
-  "pagination_count": "{{fetched}} / {{total}} Aktivitäten",
+  "pagination_count": "{{fetched}}/{{total}} Aktivitäten",
   "manager": {
     "add_to_account": "Eine neue Transaktion zu {{account}} hinzufügen",
     "create_transaction": "Eine neue Transaktion oder Aktivität für Ihr Konto erstellen",
@@ -198,7 +204,9 @@
     "add_activities": "Aktivitäten hinzufügen",
     "ask_ai_categorize": "KI um Kategorisierung bitten",
     "investments": "Investitionen",
-    "spending": "Ausgaben"
+    "spending": "Ausgaben",
+    "health_filter_single": "Die vom Health Center markierte Transaktion wird angezeigt",
+    "health_filter_multiple": "Vom Health Center markierte Transaktionen werden angezeigt"
   },
   "delete_modal": {
     "title": "Aktivität löschen?",
@@ -216,7 +224,9 @@
   },
   "date_sheet": {
     "title": "Aktivitäten am {{date}}",
-    "count": "{{count}} Aktivitäten an diesem Datum erfasst"
+    "count": "{{count}} Aktivitäten an diesem Datum erfasst",
+    "count_one": "{{count}} Aktivität an diesem Datum erfasst",
+    "count_other": "{{count}} Aktivitäten an diesem Datum erfasst"
   },
   "picker": {
     "transfer": "Übertragung",
@@ -230,7 +240,8 @@
     "status_all": "Alle Aktivitäten",
     "status_pending": "Prüfung ausstehend",
     "status_validated": "Validiert",
-    "instrument": "Instrument"
+    "instrument": "Instrument",
+    "instrument_all": "Alle Instrumente"
   },
   "detail": {
     "status_posted": "Gebucht",
@@ -344,7 +355,9 @@
     "warning_stale_link": "Die vorhandene veraltete Übertragungsverknüpfung wird ersetzt.",
     "error_load_suggestions": "Vorgeschlagene Übereinstimmungen konnten nicht geladen werden.",
     "error_load_pair": "Das verknüpfte Übertragungspaar konnte nicht geladen werden.",
-    "error_search": "Aktivitäten konnten nicht durchsucht werden."
+    "error_search": "Aktivitäten konnten nicht durchsucht werden.",
+    "within_days_one": "Innerhalb von {{count}} Tag",
+    "within_days_other": "Innerhalb von {{count}} Tagen"
   },
   "form": {
     "section_asset_account": "Wertpapier & Konto",
@@ -443,6 +456,9 @@
     "available_amount": "Verfügbar: {{amount}}",
     "total_debit": "Gesamtbelastung",
     "total_credit": "Gesamtgutschrift",
+    "help_total_debit": "Endgültig gezahlter Betrag einschließlich Gebühren und Steuern.",
+    "help_total_credit": "Endgültig erhaltener Betrag nach Gebühren und Steuern.",
+    "use_calculated_total": "Berechneten Gesamtbetrag verwenden ({{amount}})",
     "warn_buy_while_short": "Sie halten aktuell eine Short-Position in dieser Aktie. Nutzen Sie den Deckungskauf, um sie zu reduzieren; einen normalen Kauf erst nach Schließung der Short-Position erfassen.",
     "warn_cover_without_short": "Ein Deckungskauf erfordert eine bestehende Short-Position für diese Aktie im ausgewählten Konto.",
     "warn_cover_quantity_excess": "Sie decken {{covering}} Anteile, aber die aktuelle Short-Position beträgt {{short}} Anteile. Erfassen Sie einen Überschuss als separaten Kauf.",
@@ -490,6 +506,7 @@
     "err_amount_number": "Der Betrag muss eine Zahl sein.",
     "err_amount_positive_number": "Der Betrag muss eine positive Zahl sein.",
     "err_amount_gt_zero": "Der Betrag muss größer als 0 sein.",
+    "err_amount_non_negative": "Der Betrag darf nicht negativ sein.",
     "err_enter_quantity": "Bitte geben Sie eine Menge ein.",
     "err_quantity_number": "Die Menge muss eine Zahl sein.",
     "err_quantity_gt_zero": "Die Menge muss größer als 0 sein.",
@@ -571,7 +588,9 @@
       "first_page": "Zur ersten Seite",
       "previous_page": "Vorherige Seite",
       "next_page": "Nächste Seite",
-      "last_page": "Zur letzten Seite"
+      "last_page": "Zur letzten Seite",
+      "jump_hint_one": "Geben Sie eine Seitenzahl zwischen 1 und {{count}} ein",
+      "jump_hint_other": "Geben Sie eine Seitenzahl zwischen 1 und {{count}} ein"
     },
     "duplicated_comment": "Dupliziert",
     "save_edits_first": "Änderungen zuerst speichern",
@@ -624,7 +643,14 @@
     "select_all_rows": "Alle Zeilen auswählen",
     "select_row": "Zeile auswählen",
     "instrument_auto": "Auto",
-    "unit_price_help": "Geben Sie bei Käufen und Verkäufen den Handelskurs ein. Geben Sie bei Staking-Prämien und Sachdividenden den Marktwert pro Einheit bei Erhalt ein; er legt den Ertragsbetrag und die Anschaffungskosten fest."
+    "unit_price_help": "Geben Sie bei Käufen und Verkäufen den Handelskurs ein. Geben Sie bei Staking-Prämien und Sachdividenden den Marktwert pro Einheit bei Erhalt ein; er legt den Ertragsbetrag und die Anschaffungskosten fest.",
+    "warn_dates_differ_one": "Die Daten unterscheiden sich um {{count}} Tag.",
+    "warn_dates_differ_other": "Die Daten unterscheiden sich um {{count}} Tage.",
+    "approve_count_one": "{{count}} genehmigen",
+    "approve_count_other": "{{count}} genehmigen",
+    "approve_missing_amount_one": "Für {{count}} Aktivität fehlt noch der endgültige Barbetrag",
+    "approve_missing_amount_other": "Für {{count}} Aktivitäten fehlen noch die endgültigen Barbeträge",
+    "approve_missing_amount_description": "Geben Sie für jeden leeren oder nullwertigen Trade den korrekten endgültigen Barbetrag ein, bevor Sie ihn genehmigen."
   },
   "table": {
     "cash": "Bargeld",
@@ -855,7 +881,11 @@
       "valueComma": "Komma",
       "valueSemicolon": "Semikolon",
       "valueTab": "Tabulator",
-      "valuePeriod": "Punkt"
+      "valuePeriod": "Punkt",
+      "summarySkipTop_one": "Oben überspringen: {{count}}",
+      "summarySkipTop_other": "Oben überspringen: {{count}}",
+      "summarySkipBottom_one": "Unten überspringen: {{count}}",
+      "summarySkipBottom_other": "Unten überspringen: {{count}}"
     },
     "template": {
       "label": "Vorlage",
@@ -914,7 +944,9 @@
       "mapType": "Typ zuordnen",
       "mapSymbol": "Symbol zuordnen",
       "missingAccount": "Fehlendes Konto",
-      "emptySymbol": "Leeres Symbol"
+      "emptySymbol": "Leeres Symbol",
+      "accountAssignmentBlankRows_one": "Ordnen Sie jede CSV-Zeile einem Konto zu. {{count}} Zeile ist noch leer. Wählen Sie ein Standardkonto beim Hochladen oder füllen Sie die Kontospalte aus.",
+      "accountAssignmentBlankRows_other": "Ordnen Sie jede CSV-Zeile einem Konto zu. {{count}} Zeilen sind noch leer. Wählen Sie ein Standardkonto beim Hochladen oder füllen Sie die Kontospalte aus."
     },
     "csvViewer": {
       "status": "Status",
@@ -928,7 +960,9 @@
       "emptyFile": "Leere Datei",
       "emptyLine": "leere Zeile",
       "noContentFound": "Kein Inhalt gefunden",
-      "empty": "leer"
+      "empty": "leer",
+      "lines_one": "{{count}} Zeile",
+      "lines_other": "{{count}} Zeilen"
     },
     "columns": {
       "dateTime": "Datum & Uhrzeit",
@@ -1020,7 +1054,11 @@
       "statusDuplicates": "Duplikate",
       "statusSkipped": "Übersprungen",
       "statusValid": "Gültig",
-      "skipReason": "Übersprungen"
+      "skipReason": "Übersprungen",
+      "willBeImportedTitle_one": "{{count}} von {{all}} Aktivitäten wird importiert",
+      "willBeImportedTitle_other": "{{count}} von {{all}} Aktivitäten werden importiert",
+      "activitiesCount_one": "{{count}} Aktivität",
+      "activitiesCount_other": "{{count}} Aktivitäten"
     },
     "status": {
       "valid": "Gültig",
@@ -1069,7 +1107,11 @@
       "typeSplit": "Split",
       "typeUnknown": "Unbekannt",
       "skipReasonManual": "Manuell",
-      "validationError": "Validierungsfehler"
+      "validationError": "Validierungsfehler",
+      "readyTitle_one": "{{count}} Aktivität importbereit",
+      "readyTitle_other": "{{count}} Aktivitäten importbereit",
+      "warningsDescription_one": "{{count}} Aktivität weist Warnungen auf, wird aber trotzdem importiert.",
+      "warningsDescription_other": "{{count}} Aktivitäten weisen Warnungen auf, werden aber trotzdem importiert."
     },
     "result": {
       "loading": "Importergebnisse werden geladen…",
@@ -1167,7 +1209,11 @@
       "importing": "Wird importiert…",
       "importSnapshots_one": "{{count}} Momentaufnahme importieren",
       "importSnapshots_other": "{{count}} Momentaufnahmen importieren",
-      "failedToPrepareAssets": "Vorbereitung der Vermögenswerte für den Import fehlgeschlagen."
+      "failedToPrepareAssets": "Vorbereitung der Vermögenswerte für den Import fehlgeschlagen.",
+      "positionsCount_one": "{{count}} Bestand",
+      "positionsCount_other": "{{count}} Bestände",
+      "readyRows_one": "{{count}} Zeile",
+      "readyRows_other": "{{count}} Zeilen"
     },
     "symbolPanel": {
       "unrecognized_one": "{{count}} nicht erkanntes Symbol",
@@ -1180,7 +1226,9 @@
       "searchFor": "Suche nach {{symbol}}…",
       "markCustom": "Als benutzerdefiniert markieren",
       "applyMappings_one": "{{count}} Zuordnung anwenden",
-      "applyMappings_other": "{{count}} Zuordnungen anwenden"
+      "applyMappings_other": "{{count}} Zuordnungen anwenden",
+      "affectingRows_one": " betrifft {{count}} Zeile",
+      "affectingRows_other": " betrifft {{count}} Zeilen"
     },
     "help": {
       "button": "Wie importiere ich eine CSV?",
@@ -1278,7 +1326,9 @@
       "allValidDescriptionSuffix": ", um mit dem Import fortzufahren.",
       "confirmImport": "Import bestätigen",
       "cancel": "Abbrechen",
-      "importing": "Wird importiert…"
+      "importing": "Wird importiert…",
+      "issuesTitle_one": "Es gibt Probleme mit {{count}} Aktivitätseintrag.",
+      "issuesTitle_other": "Es gibt Probleme mit {{count}} Aktivitätseinträgen."
     }
   }
 }

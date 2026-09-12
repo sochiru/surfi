@@ -99,6 +99,11 @@
     "tab": "스냅샷",
     "deleted": "스냅샷이 삭제되었습니다",
     "delete_failed": "스냅샷 삭제에 실패했습니다",
+    "invalid_date_title": "이 보유 종목 날짜는 사용할 수 없습니다",
+    "invalid_date_desc": "포트폴리오 기록은 변경되지 않았습니다. 강조 표시된 항목을 삭제하면 포트폴리오가 자동으로 업데이트됩니다.",
+    "invalid_date_update_failed": "일부 기록이 업데이트되지 않았습니다",
+    "invalid_date_update_desc": "지원되지 않는 날짜가 포함된 계좌는 건너뛰었습니다. 다른 계좌는 정상적으로 업데이트되었습니다.",
+    "review_health": "문제 검토",
     "history_title": "스냅샷 기록",
     "history_desc": "날짜별로 저장된 보유 종목과 현금 잔액을 확인하세요.",
     "add": "스냅샷 추가",
@@ -117,7 +122,6 @@
     "source_csv": "CSV",
     "source_broker": "증권사",
     "source_calculated": "계산됨",
-    "source_synthetic": "합성",
     "summary_one": "포지션 {{count}}개, 현금 {{cash}}",
     "summary_other": "포지션 {{count}}개, 현금 {{cash}}"
   },
@@ -147,5 +151,6 @@
     "period_irr": "기간 IRR",
     "twr_hover_hint": " 값 위에 마우스를 올리면 누적 TWR을 볼 수 있습니다.",
     "irr_hover_hint": " 값 위에 마우스를 올리면 선택한 기간의 IRR을 볼 수 있습니다."
-  }
+  },
+  "more_count_other": "+{{count}}개 더보기"
 }

@@ -153,7 +153,8 @@
     "maturity": "到期",
     "type": "类型",
     "strike": "行权价",
-    "expiry": "到期日"
+    "expiry": "到期日",
+    "multiplier": "乘数"
   },
   "profile": {
     "overview": "概览",
@@ -196,6 +197,21 @@
     "holding_fetch_error": "持仓获取错误。",
     "quote_fetch_error": "报价获取错误。",
     "asset_profile_fetch_error": "资产概况获取错误。",
+    "health": {
+      "add_price_for_date": "添加 {{date}} 的价格",
+      "manual_prices_need_review": "手动价格需要检查",
+      "carrying_forward_add_date": "Wealthfolio 正在沿用上一个价格。仅当该日期需要独立价格时才添加。",
+      "review_missing_dates": "请检查缺失的日期，并为需要独立价格的日期添加价格；在条目之间仍会使用沿用价格。",
+      "price_missing_for_date": "缺少 {{date}} 的价格",
+      "price_history_needs_review": "价格历史需要检查",
+      "carrying_forward_refetch": "Wealthfolio 正在沿用最近的可用价格。如果当天是交易日，请重新获取价格。",
+      "refetch_history": "重新获取提供商历史记录以恢复缺失或过期的价格。在精确价格可用之前，将继续使用沿用价格。",
+      "cost_basis_needs_review": "成本基础需要检查",
+      "cost_basis_description": "更新此持仓的买入成本，以便 Wealthfolio 计算盈亏。",
+      "transactions_need_review": "交易需要检查",
+      "transactions_description": "检查健康中心为此投资标记的交易。",
+      "refetch_prices": "重新获取价格"
+    },
     "confirm_option_expiry_title": "确认期权到期",
     "confirm_option_expiry_description": "这将把该期权记录为到期无价值，在不产生现金影响的情况下移除持仓。此操作不易撤销。",
     "kind": {
@@ -241,6 +257,18 @@
     "exchange": "交易所",
     "select_exchange": "选择交易所",
     "search_exchanges": "搜索交易所……",
+    "contract_multiplier": "合约乘数",
+    "contract_multiplier_hint": "每份合约代表的标的单位数。留空则使用标准值 {{default}}。",
+    "maturity_date": "到期日",
+    "coupon_rate": "票息率 (%)",
+    "coupon_frequency": "付息频率",
+    "select_frequency": "选择频率",
+    "couponFrequency": {
+      "ANNUAL": "每年",
+      "SEMI_ANNUAL": "每半年",
+      "QUARTERLY": "每季度",
+      "ZERO": "零息"
+    },
     "saving": "正在保存……",
     "saving_short": "保存中",
     "save_changes": "保存更改",
@@ -385,7 +413,8 @@
     "to_auto_warning": "您手动输入的历史数据可能会丢失。",
     "to_manual_description": "切换到手动跟踪将停止从市场数据提供商自动获取数据。您需要手动输入并维护价格数据。",
     "to_manual_warning": "自动价格更新将被禁用。",
-    "confirm_change": "确认更改"
+    "confirm_change": "确认更改",
+    "delete_count_other": "删除（{{count}}）"
   },
   "quoteTable": {
     "date": "日期",
@@ -637,7 +666,6 @@
     "select_mortgage_to_link": "选择要关联的抵押贷款",
     "link_mortgage": "关联抵押贷款",
     "link_mortgage_description": "选择要关联至此房产的抵押贷款",
-    "cancel": "取消",
     "link": "关联",
     "sectionTitle": {
       "property": "房产",
@@ -666,7 +694,12 @@
     "date": "日期",
     "balance": "余额",
     "value": "价值",
-    "notes": "备注"
+    "notes": "备注",
+    "edit_entry_aria": "编辑 {{date}}，{{value}}",
+    "delete_entry_aria": "删除 {{date}}，{{value}}",
+    "delete_title": "删除历史记录？",
+    "delete_description": "此历史记录将被永久删除。",
+    "duplicate_date_error": "每条历史记录必须使用唯一日期。"
   },
   "valueToolbar": {
     "add_balance": "添加余额",
@@ -675,6 +708,38 @@
     "modified": "{{count}} 项已修改",
     "to_delete": "{{count}} 项待删除",
     "cancel": "取消",
-    "save_changes": "保存更改"
+    "save_changes": "保存更改",
+    "delete_count_other": "删除（{{count}}）",
+    "modified_other": "{{count}} 项已修改",
+    "to_delete_other": "{{count}} 项待删除"
+  },
+  "logo": {
+    "change": "更换 Logo",
+    "title": "资产 Logo",
+    "badge_default": "默认",
+    "badge_custom": "自定义",
+    "updated_at": "更新于 {{date}}",
+    "dropzone_cta": "选择图片",
+    "dropzone_or_drop": "或将图片拖放到此处",
+    "dropzone_hint": "支持 PNG、JPEG、WebP 或 SVG · 将缩放为 256×256 PNG",
+    "processing": "正在处理图片…",
+    "preview_title": "预览",
+    "preview_new": "新徽标",
+    "preview_current": "当前徽标",
+    "preview_card": "持仓卡片",
+    "preview_table": "持仓表格",
+    "preview_list": "活动列表",
+    "preview_meta": "{{width}}×{{height}} · {{size}}（原始 {{original}}）",
+    "choose_different": "选择其他图片",
+    "save": "保存 Logo",
+    "reset": "恢复默认",
+    "saved": "Logo 已保存。",
+    "reset_done": "Logo 已恢复为默认。",
+    "error_unsupported_type": "不支持的文件。请使用 PNG、JPEG、WebP 或 SVG 图片。",
+    "error_too_large_input": "文件过大。请选择小于 10 MB 的图片。",
+    "error_decode_failed": "无法将该文件读取为图片。",
+    "error_encode_failed": "无法将图片转换为 PNG。",
+    "error_too_large_output": "图片过于复杂，无法压缩到 150 KB 以内。请尝试更简单或更小的图片。",
+    "error_save_failed": "无法保存 Logo。"
   }
 }

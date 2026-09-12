@@ -40,6 +40,17 @@ import {
   parseCellKey,
   scrollCellIntoView,
 } from "./data-grid-utils";
+import {
+  useDateFormatting,
+  useLocalizationSettings,
+  useNumberFormatting,
+} from "../formatting-provider";
+import {
+  calendarDateFromLocalDate,
+  parseDateTimeInTimezone,
+  parseLocalizedDecimalString,
+} from "../../lib/formatting";
+import { isKeyboardEventComposing } from "../../lib/utils";
 
 const DEFAULT_ROW_HEIGHT = "short";
 const OVERSCAN = 6;
@@ -55,6 +66,11 @@ const DOMAIN_REGEX = /^[\w.-]+\.[a-z]{2,}(\/\S*)?$/i;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}.*)?$/;
 const TRUTHY_BOOLEANS = new Set(["true", "1", "yes", "checked"]);
 const VALID_BOOLEANS = new Set(["true", "false", "1", "0", "yes", "no", "checked", "unchecked"]);
+
+function toCalendarDateString(date: Date): string {
+  const { year, month, day } = calendarDateFromLocalDate(date);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
@@ -153,6 +169,9 @@ function useDataGrid<TData>({
   initialState,
   ...props
 }: UseDataGridProps<TData>) {
+  const numberFormatting = useNumberFormatting();
+  const dateFormatting = useDateFormatting();
+  const { locale, timezone } = useLocalizationSettings();
   const dir = useDirection(dirProp);
   const dataGridRef = React.useRef<HTMLDivElement>(null);
   const tableRef = React.useRef<ReturnType<typeof useReactTable<TData>>>(null);
@@ -781,8 +800,11 @@ function useDataGrid<TData>({
                 if (!trimmedClipboard) {
                   processedValue = null;
                 } else {
-                  const num = Number.parseFloat(trimmedClipboard);
-                  if (Number.isNaN(num)) shouldSkip = true;
+                  const num =
+                    cellOpts?.variant === "number" && cellOpts.valueType === "string"
+                      ? parseLocalizedDecimalString(trimmedClipboard, locale)
+                      : numberFormatting.parseNumber(trimmedClipboard);
+                  if (num === undefined) shouldSkip = true;
                   else processedValue = num;
                 }
                 break;
@@ -804,9 +826,9 @@ function useDataGrid<TData>({
                 if (!trimmedClipboard) {
                   processedValue = null;
                 } else {
-                  const date = new Date(trimmedClipboard);
-                  if (Number.isNaN(date.getTime())) shouldSkip = true;
-                  else processedValue = date;
+                  const date = dateFormatting.parseDate(trimmedClipboard);
+                  if (!date) shouldSkip = true;
+                  else processedValue = toCalendarDateString(date);
                 }
                 break;
               }
@@ -814,8 +836,8 @@ function useDataGrid<TData>({
                 if (!trimmedClipboard) {
                   processedValue = null;
                 } else {
-                  const date = new Date(trimmedClipboard);
-                  if (Number.isNaN(date.getTime())) shouldSkip = true;
+                  const date = dateFormatting.parseDate(trimmedClipboard);
+                  if (!date) shouldSkip = true;
                   else processedValue = date;
                 }
                 break;
@@ -824,12 +846,8 @@ function useDataGrid<TData>({
                 if (!trimmedClipboard) {
                   processedValue = null;
                 } else {
-                  const normalized =
-                    trimmedClipboard.includes(" ") && !trimmedClipboard.includes("T")
-                      ? trimmedClipboard.replace(" ", "T")
-                      : trimmedClipboard;
-                  const date = new Date(normalized);
-                  if (Number.isNaN(date.getTime())) shouldSkip = true;
+                  const date = parseDateTimeInTimezone(trimmedClipboard, timezone);
+                  if (!date) shouldSkip = true;
                   else processedValue = date;
                 }
                 break;
@@ -968,8 +986,11 @@ function useDataGrid<TData>({
                 if (!pastedValue) {
                   processedValue = null;
                 } else {
-                  const num = Number.parseFloat(pastedValue);
-                  if (Number.isNaN(num)) shouldSkip = true;
+                  const num =
+                    cellOpts?.variant === "number" && cellOpts.valueType === "string"
+                      ? parseLocalizedDecimalString(pastedValue, locale)
+                      : numberFormatting.parseNumber(pastedValue);
+                  if (num === undefined) shouldSkip = true;
                   else processedValue = num;
                 }
                 break;
@@ -993,9 +1014,9 @@ function useDataGrid<TData>({
                 if (!pastedValue) {
                   processedValue = null;
                 } else {
-                  const date = new Date(pastedValue);
-                  if (Number.isNaN(date.getTime())) shouldSkip = true;
-                  else processedValue = date;
+                  const date = dateFormatting.parseDate(pastedValue);
+                  if (!date) shouldSkip = true;
+                  else processedValue = toCalendarDateString(date);
                 }
                 break;
               }
@@ -1003,8 +1024,8 @@ function useDataGrid<TData>({
                 if (!pastedValue) {
                   processedValue = null;
                 } else {
-                  const date = new Date(pastedValue);
-                  if (Number.isNaN(date.getTime())) shouldSkip = true;
+                  const date = dateFormatting.parseDate(pastedValue);
+                  if (!date) shouldSkip = true;
                   else processedValue = date;
                 }
                 break;
@@ -1013,12 +1034,8 @@ function useDataGrid<TData>({
                 if (!pastedValue) {
                   processedValue = null;
                 } else {
-                  const normalized =
-                    pastedValue.includes(" ") && !pastedValue.includes("T")
-                      ? pastedValue.replace(" ", "T")
-                      : pastedValue;
-                  const date = new Date(normalized);
-                  if (Number.isNaN(date.getTime())) shouldSkip = true;
+                  const date = parseDateTimeInTimezone(pastedValue, timezone);
+                  if (!date) shouldSkip = true;
                   else processedValue = date;
                 }
                 break;
@@ -1117,7 +1134,7 @@ function useDataGrid<TData>({
                 if (ISO_DATE_REGEX.test(pastedValue)) {
                   const date = new Date(pastedValue);
                   if (!Number.isNaN(date.getTime())) {
-                    processedValue = date.toLocaleDateString();
+                    processedValue = pastedValue;
                     break;
                   }
                 }
@@ -1230,7 +1247,18 @@ function useDataGrid<TData>({
         toast.error(error instanceof Error ? error.message : "Failed to paste. Please try again.");
       }
     },
-    [store, navigableColumnIds, propsRef, onDataUpdate, selectRange, restoreFocus],
+    [
+      store,
+      navigableColumnIds,
+      propsRef,
+      onDataUpdate,
+      selectRange,
+      restoreFocus,
+      numberFormatting,
+      dateFormatting,
+      locale,
+      timezone,
+    ],
   );
 
   // Release focus guard after delay to allow async data re-renders to settle.
@@ -2444,6 +2472,10 @@ function useDataGrid<TData>({
 
   const onDataGridKeyDown = React.useCallback(
     (event: KeyboardEvent) => {
+      // This native listener runs before React's per-cell handlers. Composition
+      // keys belong to the input method and must not end or navigate the grid edit.
+      if (isKeyboardEventComposing(event)) return;
+
       const currentState = store.getState();
       const { key, ctrlKey, metaKey, shiftKey, altKey } = event;
       const isCtrlPressed = ctrlKey || metaKey;
@@ -2983,6 +3015,8 @@ function useDataGrid<TData>({
 
   React.useEffect(() => {
     function onGlobalKeyDown(event: KeyboardEvent) {
+      if (isKeyboardEventComposing(event)) return;
+
       const dataGridElement = dataGridRef.current;
       if (!dataGridElement) return;
 

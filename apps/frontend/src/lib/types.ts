@@ -1,33 +1,33 @@
 import { importActivitySchema, importMappingSchema, parseConfigSchema } from "@/lib/schemas";
-export { ImportType } from "@/lib/schemas";
 import * as z from "zod";
 import {
   AccountType,
+  ACTIVITY_TYPE_DISPLAY_NAMES,
   ActivityStatus,
   ActivityType,
-  ACTIVITY_TYPE_DISPLAY_NAMES,
   AssetKind,
   HoldingType,
   QuoteMode,
   SUBTYPE_DISPLAY_NAMES,
 } from "./constants";
+export { ImportType } from "@/lib/schemas";
 
 export {
   accountCapabilities,
-  accountPurposeAccountTypes,
   AccountPurpose,
+  accountPurposeAccountTypes,
   accountSupportsPurpose,
   AccountType,
-  ActivityStatus,
-  ActivityType,
   ACTIVITY_SUBTYPES,
   ACTIVITY_TYPE_DISPLAY_NAMES,
   ACTIVITY_TYPES,
-  AlternativeAssetKind,
+  ActivityStatus,
+  ActivityType,
   ALTERNATIVE_ASSET_DEFAULT_GROUPS,
   ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES,
-  AssetKind,
+  AlternativeAssetKind,
   ASSET_KIND_DISPLAY_NAMES,
+  AssetKind,
   createPortfolioAccount,
   DataSource,
   defaultGroupForAccountType,
@@ -227,6 +227,8 @@ export interface ActivityDetails {
   /** Canonical exchange MIC code for asset identification */
   exchangeMic?: string;
   instrumentType?: string;
+  /** Effective multiplier owned by the resolved asset. */
+  assetContractMultiplier?: string | null;
   // Sync/source metadata
   sourceSystem?: string;
   sourceRecordId?: string;
@@ -291,6 +293,8 @@ export interface ActivityCreate {
   currency?: string;
   fee?: string | number | null;
   tax?: string | number | null;
+  status?: ActivityStatus;
+  needsReview?: boolean;
   comment?: string | null;
   fxRate?: string | number | null;
   metadata?: string | Record<string, unknown>; // Metadata (serialized to JSON string before sending)
@@ -307,6 +311,7 @@ export interface ActivityUpdate {
   activityDate: string | Date;
   /** Optional grouping key (links paired transfer legs). */
   sourceGroupId?: string;
+  /** Omit to preserve the current asset; pass an empty object to clear it. */
   asset?: AssetResolutionInput;
   /** @deprecated Use asset. */
   symbol?: AssetResolutionInput;
@@ -316,6 +321,8 @@ export interface ActivityUpdate {
   currency?: string;
   fee?: string | number | null;
   tax?: string | number | null;
+  status?: ActivityStatus;
+  needsReview?: boolean;
   comment?: string | null;
   fxRate?: string | number | null;
   metadata?: string | Record<string, unknown>; // Metadata (serialized to JSON string before sending)
@@ -624,6 +631,8 @@ export interface Instrument {
   preferredProvider?: string | null;
   isin?: string | null;
   exchangeMic?: string | null;
+  /** Canonical market instrument type (for example EQUITY or BOND). */
+  instrumentType?: string | null;
 
   // Taxonomy-based classifications
   classifications?: AssetClassifications | null;
@@ -705,6 +714,8 @@ export interface CashHolding {
 export interface Holding {
   id: string;
   holdingType: HoldingType;
+  /** Explicit lifecycle state; aggregate quantity alone may net to zero. */
+  isClosed?: boolean;
   accountId: string;
   instrument?: Instrument | null;
   assetKind?: AssetKind | null;
@@ -745,6 +756,8 @@ export interface HoldingSummary {
   id: string;
   symbol: string;
   name?: string | null;
+  exchangeMic?: string | null;
+  instrumentType?: string | null;
   accountName?: string | null;
   holdingType: HoldingType;
   quantity: number;
@@ -811,6 +824,30 @@ export interface Asset {
   updatedAt: string; // ISO date string
 }
 
+/** One row of the custom-logo index (no image bytes). */
+export interface AssetLogoSummary {
+  assetId: string;
+  displayCode: string | null;
+  sha256: string;
+  updatedAt: string;
+}
+
+/** A custom logo override for an asset, including the PNG bytes as base64. */
+export interface AssetLogo {
+  assetId: string;
+  mimeType: string;
+  dataBase64: string;
+  sha256: string;
+  width: number;
+  height: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertAssetLogoInput {
+  dataBase64: string;
+}
+
 export interface Quote {
   id: string;
   createdAt: string;
@@ -853,6 +890,7 @@ export interface Settings {
   theme: string;
   font: string;
   language: string;
+  formattingRegion: string;
   baseCurrency: string;
   defaultReturnMetric: "twr" | "irr" | "valueReturn";
   timezone: string;
@@ -1021,7 +1059,8 @@ export interface AccountValuation {
     | "ACTIVITY_DERIVED"
     | "STORED_GROSS"
     | "NET_CONTRIBUTION_FALLBACK"
-    | "MIXED";
+    | "MIXED"
+    | "MIXED_EXACT";
   performanceEligibleValueBase: number;
   valueStatus: ValuationStatus;
   basisStatus: BasisStatus;
@@ -1120,6 +1159,21 @@ export interface ExchangeRate {
   source: string;
   isLoading?: boolean;
   timestamp: string;
+}
+
+export interface ExchangeRateDateQuery {
+  fromCurrency: string;
+  toCurrency: string;
+  /** Requested date in YYYY-MM-DD format. */
+  date: string;
+}
+
+export interface ExchangeRateDateResult {
+  fromCurrency: string;
+  toCurrency: string;
+  date: string;
+  rate: number | null;
+  error: string | null;
 }
 
 export interface ContributionLimit {
@@ -1882,6 +1936,7 @@ export interface CategoryAllocation {
   value: number; // Base currency value
   percentage: number; // 0-100
   children?: CategoryAllocation[]; // Child allocations for drill-down
+  isResidual?: boolean; // True for the synthetic "rest of the parent" drill-down child
 }
 
 export interface TaxonomyAllocation {
@@ -2427,11 +2482,14 @@ export interface RetirementOverview {
   portfolioAtGoalAge: number;
   requiredCapitalReachable: boolean;
   requiredCapitalAtGoalAge: number;
+  leanRequiredCapitalAtGoalAge?: number | null;
+  fatRequiredCapitalAtGoalAge?: number | null;
   shortfallAtGoalAge: number;
   surplusAtGoalAge: number;
   fundedThroughAge: number | null;
   failureAge: number | null;
   spendingShortfallAge: number | null;
+  incomeStreamExhaustion?: IncomeStreamExhaustion[];
   requiredAdditionalMonthlyContribution: number;
   suggestedGoalAgeIfUnchanged: number | null;
   coastAmountToday: number;
@@ -2441,6 +2499,13 @@ export interface RetirementOverview {
   budgetBreakdown: BudgetBreakdown;
   targetReconciliation: TargetReconciliation;
   trajectory: RetirementTrajectoryPoint[];
+}
+
+/** A drawdown fund that runs out, and the age its balance reaches zero. */
+export interface IncomeStreamExhaustion {
+  streamId: string;
+  label: string;
+  exhaustedAge: number;
 }
 
 export interface RetirementTrajectoryPoint {
@@ -2659,6 +2724,8 @@ export interface DriftHoldingRow {
   sourceAccountIds?: string[];
   symbol: string;
   name: string;
+  exchangeMic?: string | null;
+  instrumentType?: string | null;
   categoryId: string;
   categoryName: string;
   categoryColor?: string | null;

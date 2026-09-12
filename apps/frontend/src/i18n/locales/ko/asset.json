@@ -153,11 +153,12 @@
     "maturity": "만기",
     "type": "유형",
     "strike": "행사가",
-    "expiry": "만료"
+    "expiry": "만료",
+    "multiplier": "승수"
   },
   "profile": {
     "overview": "개요",
-    "quotes": "시세",
+    "quotes": "가격 이력",
     "history": "가치 추이",
     "about": "정보",
     "holdings": "보유 종목",
@@ -196,6 +197,21 @@
     "holding_fetch_error": "보유 종목을 불러오는 중 오류가 발생했습니다.",
     "quote_fetch_error": "시세를 불러오는 중 오류가 발생했습니다.",
     "asset_profile_fetch_error": "자산 프로필을 불러오는 중 오류가 발생했습니다.",
+    "health": {
+      "add_price_for_date": "{{date}} 가격 추가",
+      "manual_prices_need_review": "수동 가격을 검토해야 합니다",
+      "carrying_forward_add_date": "Wealthfolio가 마지막 가격을 이어서 사용하고 있습니다. 이 날짜에 별도 값이 필요한 경우에만 추가하세요.",
+      "review_missing_dates": "누락된 날짜를 검토하세요. 별도 값이 필요한 가격을 추가하며, 항목 사이에는 이어진 가격이 계속 사용됩니다.",
+      "price_missing_for_date": "{{date}} 가격 누락",
+      "price_history_needs_review": "가격 내역을 검토해야 합니다",
+      "carrying_forward_refetch": "Wealthfolio가 마지막으로 사용 가능한 가격을 이어서 사용하고 있습니다. 거래일이었다면 가격을 다시 가져오세요.",
+      "refetch_history": "공급자 내역을 다시 가져와 누락되거나 오래된 가격을 복원하세요. 정확한 가격이 제공될 때까지 이어진 가격이 사용됩니다.",
+      "cost_basis_needs_review": "원가 기준을 검토해야 합니다",
+      "cost_basis_description": "Wealthfolio가 손익을 계산할 수 있도록 이 보유 자산의 매입 금액을 업데이트하세요.",
+      "transactions_need_review": "거래를 검토해야 합니다",
+      "transactions_description": "건강 센터가 이 투자에 대해 표시한 거래를 검토하세요.",
+      "refetch_prices": "가격 다시 가져오기"
+    },
     "confirm_option_expiry_title": "옵션 만료 확인",
     "confirm_option_expiry_description": "옵션을 무가치로 만료 처리하고 현금 영향 없이 포지션을 제거합니다. 이 작업은 쉽게 되돌릴 수 없습니다.",
     "kind": {
@@ -226,7 +242,7 @@
     "cancel": "취소",
     "currency_required": "통화를 선택해주세요",
     "base_currency": "기준 통화",
-    "quote_currency": "상대통화",
+    "quote_currency": "호가 통화",
     "name": "이름",
     "name_placeholder": "자산 표시 이름",
     "isin": "ISIN",
@@ -241,6 +257,18 @@
     "exchange": "거래소",
     "select_exchange": "거래소 선택",
     "search_exchanges": "거래소 검색...",
+    "contract_multiplier": "계약 승수",
+    "contract_multiplier_hint": "계약 하나가 나타내는 기초자산 단위 수입니다. 비워 두면 표준값 {{default}}을(를) 사용합니다.",
+    "maturity_date": "만기일",
+    "coupon_rate": "쿠폰 금리 (%)",
+    "coupon_frequency": "쿠폰 지급 주기",
+    "select_frequency": "주기 선택",
+    "couponFrequency": {
+      "ANNUAL": "연 1회",
+      "SEMI_ANNUAL": "연 2회",
+      "QUARTERLY": "분기별",
+      "ZERO": "무이표"
+    },
     "saving": "저장하는 중...",
     "saving_short": "저장 중",
     "save_changes": "변경사항 저장",
@@ -295,11 +323,11 @@
     "as_of": "기준일:",
     "refreshing_quotes": "시세를 새로고침하는 중...",
     "refresh_quotes": "시세 새로고침",
-    "hide_activity_markers": "활동 마커 숨기기",
-    "show_activity_markers": "활동 마커 표시",
+    "hide_activity_markers": "활동 마커와 평균 매입가 선 숨기기",
+    "show_activity_markers": "활동 마커와 평균 매입가 선 표시",
     "hide": "숨기기",
     "show": "표시",
-    "activity_markers_suffix": "활동 마커"
+    "activity_markers_suffix": "활동 마커와 평균 매입가 선"
   },
   "lots": {
     "lots_by_account": "계좌별 로트",
@@ -385,7 +413,8 @@
     "to_auto_warning": "수동으로 입력한 과거 데이터가 사라질 수 있습니다.",
     "to_manual_description": "수동 추적으로 전환하면 시장 데이터 제공업체로부터의 자동 데이터 수집이 중지됩니다. 가격 데이터를 직접 입력하고 관리해야 합니다.",
     "to_manual_warning": "자동 가격 업데이트가 비활성화됩니다.",
-    "confirm_change": "변경 확인"
+    "confirm_change": "변경 확인",
+    "delete_count_other": "삭제 ({{count}})"
   },
   "quoteTable": {
     "date": "날짜",
@@ -637,7 +666,6 @@
     "select_mortgage_to_link": "연결할 담보대출 선택",
     "link_mortgage": "담보대출 연결",
     "link_mortgage_description": "이 부동산에 연결할 담보대출을 선택하세요",
-    "cancel": "취소",
     "link": "연결",
     "sectionTitle": {
       "property": "부동산",
@@ -666,7 +694,12 @@
     "date": "날짜",
     "balance": "잔액",
     "value": "가치",
-    "notes": "메모"
+    "notes": "메모",
+    "edit_entry_aria": "{{date}}, {{value}} 기록 편집",
+    "delete_entry_aria": "{{date}}, {{value}} 기록 삭제",
+    "delete_title": "기록 항목을 삭제할까요?",
+    "delete_description": "이 기록 항목은 영구적으로 삭제됩니다.",
+    "duplicate_date_error": "각 기록 항목에는 중복되지 않는 날짜를 사용해야 합니다."
   },
   "valueToolbar": {
     "add_balance": "잔액 추가",
@@ -675,6 +708,38 @@
     "modified": "{{count}}개 수정됨",
     "to_delete": "{{count}}개 삭제 예정",
     "cancel": "취소",
-    "save_changes": "변경사항 저장"
+    "save_changes": "변경사항 저장",
+    "delete_count_other": "삭제 ({{count}})",
+    "modified_other": "{{count}}개 수정됨",
+    "to_delete_other": "{{count}}개 삭제 예정"
+  },
+  "logo": {
+    "change": "로고 변경",
+    "title": "자산 로고",
+    "badge_default": "기본",
+    "badge_custom": "사용자 지정",
+    "updated_at": "{{date}} 업데이트됨",
+    "dropzone_cta": "이미지 선택",
+    "dropzone_or_drop": "또는 여기에 끌어다 놓기",
+    "dropzone_hint": "PNG, JPEG, WebP 또는 SVG · 256×256 PNG로 크기 조정됨",
+    "processing": "이미지 준비 중…",
+    "preview_title": "미리보기",
+    "preview_new": "새 로고",
+    "preview_current": "현재 로고",
+    "preview_card": "보유 카드",
+    "preview_table": "보유 종목 표",
+    "preview_list": "활동 목록",
+    "preview_meta": "{{width}}×{{height}} · {{size}} (원본 {{original}})",
+    "choose_different": "다른 이미지 선택",
+    "save": "로고 저장",
+    "reset": "기본값으로 재설정",
+    "saved": "로고가 저장되었습니다.",
+    "reset_done": "로고가 기본값으로 재설정되었습니다.",
+    "error_unsupported_type": "지원되지 않는 파일입니다. PNG, JPEG, WebP 또는 SVG 이미지를 사용하세요.",
+    "error_too_large_input": "파일이 너무 큽니다. 10 MB 미만의 이미지를 선택하세요.",
+    "error_decode_failed": "파일을 이미지로 읽을 수 없습니다.",
+    "error_encode_failed": "이미지를 PNG로 변환할 수 없습니다.",
+    "error_too_large_output": "이미지가 너무 복잡하여 150 KB에 맞출 수 없습니다. 더 단순하거나 작은 이미지를 사용해 보세요.",
+    "error_save_failed": "로고를 저장할 수 없습니다."
   }
 }

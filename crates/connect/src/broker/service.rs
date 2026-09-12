@@ -28,8 +28,8 @@ use wealthfolio_core::activities::{
     NewActivity, ACTIVITY_TYPE_BUY, ACTIVITY_TYPE_SELL,
 };
 use wealthfolio_core::assets::{
-    build_option_metadata, parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, Asset,
-    AssetServiceTrait, AssetSpec, InstrumentType, OptionSpec, CONTRACT_MULTIPLIER_METADATA_KEY,
+    build_option_metadata, Asset, AssetServiceTrait, AssetSpec, InstrumentType, OptionSpec,
+    CONTRACT_MULTIPLIER_METADATA_KEY,
 };
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
@@ -72,6 +72,33 @@ fn normalize_regular_average_cost(
 ) -> Decimal {
     let normalized = normalize_holdings_money(amount, currency).0;
     (normalized * contract_multiplier).round_dp(HOLDINGS_DECIMAL_PRECISION)
+}
+
+/// Applies the asset's declared multiplier to a position the broker supplied
+/// none for.
+///
+/// Without this the position is stored with a bare default — 1 for regular
+/// holdings, 100/10 for options — and since valuation reads the position rather
+/// than the asset, every sync silently reverts a user-set multiplier. CFDs hit
+/// this on every sync: the upstream contract has no multiplier field for them
+/// at all, so a hand-entered value is the only one that will ever exist.
+///
+/// Average cost is rescaled exactly as the broker's own value would have been,
+/// so the per-position-unit basis stays consistent with the new multiplier.
+fn apply_declared_contract_multiplier(position: &mut HoldingsPositionData, declared: Decimal) {
+    if declared <= Decimal::ZERO
+        || declared == position.contract_multiplier
+        || position.contract_multiplier <= Decimal::ZERO
+    {
+        return;
+    }
+
+    if position.rescale_average_cost_with_multiplier {
+        position.average_cost = position.average_cost.map(|cost| {
+            (cost * declared / position.contract_multiplier).round_dp(HOLDINGS_DECIMAL_PRECISION)
+        });
+    }
+    position.contract_multiplier = declared;
 }
 
 fn option_contract_multiplier(option: &HoldingsOptionSymbol) -> Decimal {
@@ -187,13 +214,25 @@ fn contract_multiplier_metadata_update(
     }
 
     if asset.is_option() {
-        if let Some(option) = metadata
-            .get_mut("option")
-            .and_then(serde_json::Value::as_object_mut)
-        {
+        // Test the shape the reader will actually see. `OptionSpec` fields are
+        // non-Option with no serde defaults, so a partial spec fails to
+        // deserialize and `Asset::contract_multiplier()` silently falls back to
+        // the 100 default. Writing into such a spec — and dropping the
+        // top-level key with it — would lose this value entirely.
+        let mut candidate = metadata
+            .get("option")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        if let Some(option) = candidate.as_object_mut() {
             option.insert("multiplier".to_string(), serde_json::json!(multiplier));
+        }
+
+        if serde_json::from_value::<OptionSpec>(candidate.clone()).is_ok() {
+            metadata.insert("option".to_string(), candidate);
             metadata.remove(CONTRACT_MULTIPLIER_METADATA_KEY);
         } else {
+            // Leave the partial spec alone — it still carries strike/expiry for
+            // display — and keep the multiplier where the resolver will find it.
             metadata.insert(
                 CONTRACT_MULTIPLIER_METADATA_KEY.to_string(),
                 serde_json::json!(multiplier),
@@ -221,6 +260,10 @@ struct HoldingsPositionData {
     position_currency: String,
     contract_multiplier: Decimal,
     rescale_average_cost_with_multiplier: bool,
+    /// False when the broker supplied no multiplier and this value is only a
+    /// default. The asset's declared multiplier then wins — see
+    /// `apply_declared_contract_multiplier`.
+    multiplier_from_broker: bool,
 }
 
 /// Service for syncing broker data to the local database
@@ -871,13 +914,21 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .and_then(|s| s.symbol.clone())
                 .filter(|s| !s.trim().is_empty());
 
-            let normalized_symbol = Self::normalize_holdings_symbol(
-                raw_symbol.as_deref(),
+            // Same normalization as the activity path, so a position and a trade in
+            // the same instrument resolve to one asset. See `normalize_broker_symbol`.
+            let normalized_symbol = mapping::normalize_broker_symbol(
                 api_symbol.as_deref(),
+                raw_symbol.as_deref(),
+                symbol_info
+                    .and_then(|s| s.exchange.as_ref())
+                    .and_then(|e| {
+                        mapping::broker_exchange_mic(e.mic_code.as_deref(), e.code.as_deref())
+                    })
+                    .as_deref(),
                 is_crypto_asset,
             );
-            let (symbol, mut exchange_mic) = match normalized_symbol {
-                Some(pair) => pair,
+            let (symbol, exchange_mic) = match normalized_symbol {
+                Some(normalized) => (normalized.symbol, normalized.exchange_mic),
                 None if is_crypto_asset => {
                     debug!("Skipping crypto position without symbol");
                     continue;
@@ -887,16 +938,6 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     continue;
                 }
             };
-
-            // Fallback: use exchange MIC from broker API data when suffix parsing didn't yield one
-            if exchange_mic.is_none() && !is_crypto_asset {
-                exchange_mic = symbol_info.and_then(|s| s.exchange.as_ref()).and_then(|e| {
-                    e.mic_code
-                        .clone()
-                        .filter(|c| !c.trim().is_empty())
-                        .or_else(|| e.code.clone().filter(|c| !c.trim().is_empty()))
-                });
-            }
 
             let units = pos.units.unwrap_or(0.0);
             if units == 0.0 {
@@ -978,6 +1019,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 position_currency,
                 contract_multiplier,
                 rescale_average_cost_with_multiplier: true,
+                multiplier_from_broker: exact_multiplier.is_some(),
             });
         }
 
@@ -1084,6 +1126,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 position_currency,
                 contract_multiplier: multiplier,
                 rescale_average_cost_with_multiplier: false,
+                multiplier_from_broker: exact_multiplier.is_some(),
             });
         }
 
@@ -1220,6 +1263,35 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         // that splits one holding across rows (margin/cash) and omits average_purchase_price
         // would otherwise never match the prior quantity, skip the "quantity unchanged -> reuse
         // prior cost" fallback, and overwrite a previously known basis with zero.
+        // Positions the broker gave no multiplier for fall back to the asset's
+        // declared value rather than a bare default, so a user-set multiplier
+        // survives the sync instead of being overwritten on the position that
+        // valuation actually reads.
+        for position in &mut position_data {
+            if position.multiplier_from_broker {
+                continue;
+            }
+            // `authoritative_multipliers` first: it holds the value this sync
+            // just persisted, while `ensure_result.assets` still holds the
+            // asset as it was before that write. A broker that splits one
+            // holding across rows supplies the multiplier on only some of them,
+            // and reading the stale map would give those rows a different
+            // multiplier from their siblings.
+            let declared = authoritative_multipliers
+                .get(&position.spec_key)
+                .copied()
+                .or_else(|| {
+                    spec_key_to_asset_id
+                        .get(&position.spec_key)
+                        .and_then(|asset_id| ensure_result.assets.get(asset_id))
+                        .map(|asset| asset.contract_multiplier())
+                });
+            let Some(declared) = declared else {
+                continue;
+            };
+            apply_declared_contract_multiplier(position, declared);
+        }
+
         let combined_quantities =
             Self::combined_quantities_by_asset(&position_data, &spec_key_to_asset_id);
         let mut positions_map: HashMap<String, Position> = HashMap::new();
@@ -1519,46 +1591,6 @@ impl BrokerSyncService {
                 == b.contract_multiplier.round_dp(HOLDINGS_DECIMAL_PRECISION)
     }
 
-    fn normalize_holdings_symbol(
-        raw_symbol: Option<&str>,
-        api_symbol: Option<&str>,
-        is_crypto: bool,
-    ) -> Option<(String, Option<String>)> {
-        let raw_symbol = raw_symbol.map(str::trim).filter(|s| !s.is_empty());
-        let api_symbol = api_symbol.map(str::trim).filter(|s| !s.is_empty());
-
-        if is_crypto {
-            let symbol = raw_symbol.map(str::to_string).or_else(|| {
-                api_symbol.map(|sym| {
-                    parse_crypto_pair_symbol(sym)
-                        .map(|(base, _)| base)
-                        .unwrap_or_else(|| sym.to_string())
-                })
-            })?;
-            return Some((symbol, None));
-        }
-
-        let raw_parsed = raw_symbol.map(|sym| {
-            let (base, mic) = parse_symbol_with_exchange_suffix(sym);
-            (base.to_string(), mic.map(|m| m.to_string()))
-        });
-        let api_parsed = api_symbol.map(|sym| {
-            let (base, mic) = parse_symbol_with_exchange_suffix(sym);
-            (base.to_string(), mic.map(|m| m.to_string()))
-        });
-
-        let symbol = raw_parsed
-            .as_ref()
-            .map(|(base, _)| base.clone())
-            .or_else(|| api_parsed.as_ref().map(|(base, _)| base.clone()))?;
-        let exchange_mic = raw_parsed
-            .as_ref()
-            .and_then(|(_, mic)| mic.clone())
-            .or_else(|| api_parsed.as_ref().and_then(|(_, mic)| mic.clone()));
-
-        Some((symbol, exchange_mic))
-    }
-
     /// Find the platform ID for a broker account using institution/broker metadata.
     fn find_platform_for_account(&self, broker_account: &BrokerAccount) -> Result<Option<String>> {
         let platforms = self.platform_repository.list()?;
@@ -1741,6 +1773,72 @@ mod tests {
         Decimal::from_str(value).expect("valid decimal")
     }
 
+    fn position_without_broker_multiplier(
+        multiplier: Decimal,
+        average_cost: Option<Decimal>,
+        rescale: bool,
+    ) -> super::HoldingsPositionData {
+        super::HoldingsPositionData {
+            spec_key: "SEC:CFD".to_string(),
+            quantity: decimal("10"),
+            quote_price: decimal("100"),
+            quote_currency: "USD".to_string(),
+            average_cost,
+            position_currency: "USD".to_string(),
+            contract_multiplier: multiplier,
+            rescale_average_cost_with_multiplier: rescale,
+            multiplier_from_broker: false,
+        }
+    }
+
+    #[test]
+    fn declared_multiplier_replaces_the_default_and_rescales_cost() {
+        // A CFD: the upstream contract has no multiplier field at all, so the
+        // position lands on 1 and would silently revert a user-set value.
+        let mut position =
+            position_without_broker_multiplier(Decimal::ONE, Some(decimal("20")), true);
+
+        super::apply_declared_contract_multiplier(&mut position, decimal("50"));
+
+        assert_eq!(position.contract_multiplier, decimal("50"));
+        assert_eq!(position.average_cost, Some(decimal("1000")));
+    }
+
+    #[test]
+    fn declared_multiplier_leaves_option_cost_alone() {
+        // Option average cost is already per contract, so it must not rescale.
+        let mut position =
+            position_without_broker_multiplier(decimal("100"), Some(decimal("250")), false);
+
+        super::apply_declared_contract_multiplier(&mut position, decimal("115"));
+
+        assert_eq!(position.contract_multiplier, decimal("115"));
+        assert_eq!(position.average_cost, Some(decimal("250")));
+    }
+
+    #[test]
+    fn declared_multiplier_is_a_noop_when_it_matches_or_is_invalid() {
+        let mut position =
+            position_without_broker_multiplier(decimal("50"), Some(decimal("20")), true);
+
+        super::apply_declared_contract_multiplier(&mut position, decimal("50"));
+        assert_eq!(position.average_cost, Some(decimal("20")));
+
+        super::apply_declared_contract_multiplier(&mut position, Decimal::ZERO);
+        assert_eq!(position.contract_multiplier, decimal("50"));
+        assert_eq!(position.average_cost, Some(decimal("20")));
+    }
+
+    #[test]
+    fn declared_multiplier_handles_a_missing_average_cost() {
+        let mut position = position_without_broker_multiplier(Decimal::ONE, None, true);
+
+        super::apply_declared_contract_multiplier(&mut position, decimal("50"));
+
+        assert_eq!(position.contract_multiplier, decimal("50"));
+        assert_eq!(position.average_cost, None);
+    }
+
     #[test]
     fn normalize_holdings_money_converts_gbp_minor_units_to_major_units() {
         let (price, currency) = normalize_holdings_money(decimal("85"), "GBp");
@@ -1784,6 +1882,7 @@ mod tests {
             position_currency,
             contract_multiplier: Decimal::ONE,
             rescale_average_cost_with_multiplier: true,
+            multiplier_from_broker: true,
         };
 
         assert_eq!(position.quote_price, decimal("85"));
@@ -1882,6 +1981,82 @@ mod tests {
             asset.metadata.unwrap()["identifiers"]
         );
         assert!(updated.get(CONTRACT_MULTIPLIER_METADATA_KEY).is_none());
+    }
+
+    #[test]
+    fn partial_option_spec_keeps_multiplier_at_top_level() {
+        // A broker identifier that is not valid OCC can yield an option asset
+        // whose spec is missing contract fields. Writing the multiplier inside
+        // it — and removing the top-level key — would make the spec fail to
+        // parse and silently resolve back to the 100 default.
+        let asset = Asset {
+            instrument_type: Some(InstrumentType::Option),
+            metadata: Some(serde_json::json!({
+                "option": { "right": "CALL", "multiplier": "100" }
+            })),
+            ..Default::default()
+        };
+
+        let updated = contract_multiplier_metadata_update(&asset, None, decimal("10"))
+            .expect("changed multiplier");
+
+        assert_eq!(
+            updated[CONTRACT_MULTIPLIER_METADATA_KEY],
+            serde_json::json!(decimal("10"))
+        );
+        // The partial spec is left intact for display.
+        assert_eq!(updated["option"]["right"], serde_json::json!("CALL"));
+
+        let resolved = Asset {
+            metadata: Some(updated),
+            ..asset
+        };
+        assert_eq!(resolved.contract_multiplier(), decimal("10"));
+    }
+
+    #[test]
+    fn option_spec_completed_by_the_multiplier_write_goes_nested() {
+        // Only `multiplier` is missing, so writing it produces a spec the
+        // resolver can parse — the nested key is the right home.
+        let asset = Asset {
+            instrument_type: Some(InstrumentType::Option),
+            metadata: Some(serde_json::json!({
+                "option": {
+                    "underlyingAssetId": "AAPL",
+                    "expiration": "2026-12-18",
+                    "right": "CALL",
+                    "strike": "150"
+                }
+            })),
+            ..Default::default()
+        };
+
+        let updated = contract_multiplier_metadata_update(&asset, None, decimal("50"))
+            .expect("changed multiplier");
+
+        assert!(updated.get(CONTRACT_MULTIPLIER_METADATA_KEY).is_none());
+        let resolved = Asset {
+            metadata: Some(updated),
+            ..asset
+        };
+        assert_eq!(resolved.contract_multiplier(), decimal("50"));
+    }
+
+    #[test]
+    fn option_without_any_spec_keeps_multiplier_at_top_level() {
+        let asset = Asset {
+            instrument_type: Some(InstrumentType::Option),
+            metadata: None,
+            ..Default::default()
+        };
+
+        let updated = contract_multiplier_metadata_update(&asset, None, decimal("10"))
+            .expect("changed multiplier");
+
+        assert_eq!(
+            updated[CONTRACT_MULTIPLIER_METADATA_KEY],
+            serde_json::json!(decimal("10"))
+        );
     }
 
     #[test]
@@ -2032,35 +2207,6 @@ mod tests {
             default_tracking_mode_for_broker_account_type(account_types::SECURITIES),
             TrackingMode::Holdings
         );
-    }
-
-    #[test]
-    fn normalize_holdings_symbol_uses_api_suffix_when_raw_has_no_suffix() {
-        let normalized =
-            BrokerSyncService::normalize_holdings_symbol(Some("SHOP"), Some("SHOP.TO"), false)
-                .unwrap();
-
-        assert_eq!(normalized.0, "SHOP");
-        assert_eq!(normalized.1.as_deref(), Some("XTSE"));
-    }
-
-    #[test]
-    fn normalize_holdings_symbol_parses_suffix_from_raw_symbol() {
-        let normalized =
-            BrokerSyncService::normalize_holdings_symbol(Some("VOD.L"), Some("VOD"), false)
-                .unwrap();
-
-        assert_eq!(normalized.0, "VOD");
-        assert_eq!(normalized.1.as_deref(), Some("XLON"));
-    }
-
-    #[test]
-    fn normalize_holdings_symbol_normalizes_crypto_pairs() {
-        let normalized =
-            BrokerSyncService::normalize_holdings_symbol(None, Some("BTC-USD"), true).unwrap();
-
-        assert_eq!(normalized.0, "BTC");
-        assert_eq!(normalized.1, None);
     }
 
     #[test]
@@ -2371,6 +2517,7 @@ mod tests {
             position_currency: "USD".to_string(),
             contract_multiplier: Decimal::ONE,
             rescale_average_cost_with_multiplier: true,
+            multiplier_from_broker: true,
         };
         let position_data = vec![
             row("EQUITY:VTI", "32.005"),

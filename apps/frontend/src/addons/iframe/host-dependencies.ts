@@ -26,10 +26,26 @@ interface HostDependencyModule {
 declare global {
   // Host-provided ESM bridge used by generated blob modules in the sandbox.
   var __wealthfolioHostModules: Record<string, HostDependencyModule> | undefined;
+  var __wealthfolioWrapAddonReactNode: ((children: React.ReactNode) => React.ReactNode) | undefined;
 }
 
 const emptyModule: Record<string, unknown> = {};
 const sandboxWealthfolioUI = { ...WealthfolioUI, TickerAvatar: SandboxTickerAvatar };
+const sandboxReactDOMClient = {
+  ...ReactDOMClient,
+  createRoot(...args: Parameters<typeof ReactDOMClient.createRoot>): ReactDOMClient.Root {
+    const root = ReactDOMClient.createRoot(...args);
+    return {
+      render(children) {
+        const wrap = globalThis.__wealthfolioWrapAddonReactNode;
+        root.render(wrap ? wrap(children) : children);
+      },
+      unmount() {
+        root.unmount();
+      },
+    };
+  },
+};
 
 const HOST_DEPENDENCIES: Record<string, HostDependencyModule> = {
   "@tanstack/react-query": { module: ReactQuery },
@@ -48,7 +64,7 @@ const HOST_DEPENDENCIES: Record<string, HostDependencyModule> = {
   "lucide-react": { module: LucideReact },
   react: { defaultExport: React, module: React },
   "react-dom": { defaultExport: ReactDOM, module: ReactDOM },
-  "react-dom/client": { defaultExport: ReactDOMClient, module: ReactDOMClient },
+  "react-dom/client": { defaultExport: sandboxReactDOMClient, module: sandboxReactDOMClient },
   "react/jsx-dev-runtime": { module: ReactJSXDevRuntime },
   "react/jsx-runtime": { module: ReactJSXRuntime },
   recharts: { module: Recharts },
@@ -59,14 +75,14 @@ const validExportName = /^[$A-Z_a-z][$\w]*$/;
 Object.assign(globalThis, {
   React,
   ReactDOM,
-  ReactDOMClient,
+  ReactDOMClient: sandboxReactDOMClient,
   __wealthfolioHostModules: HOST_DEPENDENCIES,
 });
 
 export const HOST_DEPENDENCY_VERSION_RANGES = {
   "@tanstack/react-query": "^5.90.0",
-  "@wealthfolio/addon-sdk": "^3.7.0",
-  "@wealthfolio/ui": "^3.7.0",
+  "@wealthfolio/addon-sdk": "^3.8.0",
+  "@wealthfolio/ui": "^3.8.0",
   "date-fns": "^4.1.0",
   "lucide-react": "^0.561.0",
   react: "^19.2.0",

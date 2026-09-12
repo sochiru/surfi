@@ -1,15 +1,133 @@
-import { de, enUS, es, fr, ja, zhCN, type Locale } from "date-fns/locale";
-import { useTranslation } from "react-i18next";
+import {
+  de,
+  enCA,
+  enGB,
+  enUS,
+  es,
+  fr,
+  frCA,
+  ja,
+  ko,
+  pt,
+  ptBR,
+  zhCN,
+  zhTW,
+  type Locale,
+} from "date-fns/locale";
+import { useLocalizationSettings } from "../components/formatting-provider";
 
-// Maps the active i18next language to a date-fns locale so calendars and date
-// formatting follow the user's chosen app language. Falls back to English.
-const DATE_FNS_LOCALES: Record<string, Locale> = { en: enUS, fr, de, es, zh: zhCN, ja };
+const DATE_FNS_LOCALES: Record<string, Locale> = {
+  "en-CA": enCA,
+  "en-US": enUS,
+  "en-GB": enGB,
+  "fr-CA": frCA,
+  "fr-FR": fr,
+  "de-DE": de,
+  "es-ES": es,
+  "pt-BR": ptBR,
+  "pt-PT": pt,
+  "zh-CN": zhCN,
+  "ja-JP": ja,
+  "ko-KR": ko,
+};
 
-export function dateFnsLocaleFor(language: string | undefined): Locale {
-  return DATE_FNS_LOCALES[(language ?? "en").split("-")[0]] ?? enUS;
+const LANGUAGE_LOCALES: Record<string, Locale> = {
+  en: enUS,
+  fr,
+  de,
+  es,
+  pt: ptBR,
+  zh: zhCN,
+  ja,
+  ko,
+};
+
+const REGION_LOCALES: Record<string, Locale> = {
+  CA: enCA,
+  US: enUS,
+  GB: enGB,
+  FR: fr,
+  DE: de,
+  ES: es,
+  MX: es,
+  BR: ptBR,
+  PT: pt,
+  CN: zhCN,
+  JP: ja,
+  KR: ko,
+};
+
+const generatedLocales = new Map<string, Locale>();
+
+function intlWidth(width: string | undefined) {
+  if (width === "narrow") return "narrow" as const;
+  if (width === "short" || width === "abbreviated") return "short" as const;
+  return "long" as const;
+}
+
+function createIntlLocale(locale: string, options: Locale["options"]): Locale {
+  const cached = generatedLocales.get(locale);
+  if (cached) return cached;
+
+  const generated: Locale = {
+    ...enUS,
+    code: locale,
+    options,
+    localize: {
+      ...enUS.localize,
+      month: (month, localizeOptions) =>
+        new Intl.DateTimeFormat(locale, {
+          calendar: "gregory",
+          month: intlWidth(localizeOptions?.width),
+          timeZone: "UTC",
+        }).format(new Date(Date.UTC(2020, Number(month), 1))),
+      day: (day, localizeOptions) =>
+        new Intl.DateTimeFormat(locale, {
+          weekday: intlWidth(localizeOptions?.width),
+          timeZone: "UTC",
+        }).format(new Date(Date.UTC(2020, 7, 2 + Number(day)))),
+    },
+  };
+  generatedLocales.set(locale, generated);
+  return generated;
+}
+
+export function dateFnsLocaleFor(locale: string | undefined): Locale {
+  if (!locale) throw new Error("A resolved formatting locale is required for date-fns");
+  const exact = DATE_FNS_LOCALES[locale];
+  if (exact) return exact;
+
+  const resolved = new Intl.Locale(locale);
+
+  // Traditional script needs zhTW's calendar text (大約 3 小時, not 大约 3 小时), but
+  // date-fns ships Taiwan with a Monday week start while CLDR says Sunday. Take the
+  // text from zhTW and let the week-info path below own the conventions, exactly as
+  // every other non-exact locale does. Hong Kong and Macau write Traditional too.
+  const traditionalChinese =
+    resolved.language === "zh" &&
+    (resolved.script === "Hant" || ["TW", "HK", "MO"].includes(resolved.region ?? ""));
+
+  const languageLocale = traditionalChinese ? zhTW : LANGUAGE_LOCALES[resolved.language];
+  const regionLocale = resolved.region ? REGION_LOCALES[resolved.region] : undefined;
+  const localeWithWeekInfo = resolved as Intl.Locale & {
+    getWeekInfo?: () => { firstDay: number; minimalDays: number };
+    weekInfo?: { firstDay: number; minimalDays: number };
+  };
+  const weekInfo = localeWithWeekInfo.getWeekInfo?.() ?? localeWithWeekInfo.weekInfo;
+  const options: Locale["options"] = weekInfo
+    ? {
+        weekStartsOn: (weekInfo.firstDay % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+        firstWeekContainsDate: weekInfo.minimalDays === 4 ? 4 : 1,
+      }
+    : regionLocale?.options;
+  if (!languageLocale) return createIntlLocale(locale, options);
+  if (!options) return languageLocale;
+
+  // date-fns owns calendar text while the selected region owns week conventions.
+  return { ...languageLocale, code: locale, options };
 }
 
 export function useDateFnsLocale(): Locale {
-  const { i18n } = useTranslation();
-  return dateFnsLocaleFor(i18n.language);
+  const { locale } = useLocalizationSettings();
+  return dateFnsLocaleFor(locale);
 }

@@ -1,25 +1,38 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Button, Card, CardContent, formatPrice, Icons, Skeleton } from "@wealthfolio/ui";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
-import { cn, formatAmount } from "@/lib/utils";
-import { toast } from "sonner";
 import type {
   AccountScope,
+  AllocationTarget,
   DriftReport,
+  Holding,
   RebalancePlan,
   RebalanceWarning,
   ScenarioMode,
   SuggestedManualTrade,
-  AllocationTarget,
 } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import {
+  Button,
+  Card,
+  CardContent,
+  Icons,
+  Skeleton,
+  calendarDateFromLocalDate,
+  useAmountFormatting,
+  useDateFormatting,
+  type FormattingApi,
+} from "@wealthfolio/ui";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
+import type { TFunction } from "i18next";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import { useEligibleHoldingsSelection } from "../hooks/use-eligible-holdings";
+import { useRebalancePlan } from "../hooks/use-rebalance";
 import {
   allocationTargetColorForRow,
   buildAllocationTargetColorMap,
 } from "./allocation-target-colors";
+import { EligibleHoldingsSelector } from "./eligible-holdings-selector";
 import { accountScopeKey } from "./target-scope";
-import { useRebalancePlan } from "../hooks/use-rebalance";
 
 // Drift direction colors — clay for overweight (+), slate-blue for underweight (−).
 const DRIFT_OVER = "#b4664a";
@@ -41,49 +54,44 @@ function ppSigned(bps: number) {
   return `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}`;
 }
 
-function currencySymbol(code: string): string {
-  try {
-    return (
-      new Intl.NumberFormat(undefined, { style: "currency", currency: code })
-        .formatToParts(0)
-        .find((p) => p.type === "currency")?.value ?? code
-    );
-  } catch {
-    return code;
-  }
+function currencySymbol(
+  code: string,
+  formatting: Pick<FormattingApi, "formatCurrencySymbol">,
+): string {
+  return formatting.formatCurrencySymbol(code);
 }
 
-function currencyFractionDigits(code: string): number {
-  try {
-    return (
-      new Intl.NumberFormat(undefined, { style: "currency", currency: code }).resolvedOptions()
-        .maximumFractionDigits ?? 2
-    );
-  } catch {
-    return 2;
-  }
+function currencyFractionDigits(
+  code: string,
+  formatting: Pick<FormattingApi, "currencyFractionDigits">,
+): number {
+  return formatting.currencyFractionDigits(code);
 }
 
-function roundedCurrency(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  } catch {
-    return Math.round(amount).toLocaleString();
-  }
+function roundedCurrency(
+  amount: number,
+  currency: string,
+  formatting: Pick<FormattingApi, "formatRoundedAmount">,
+): string {
+  return formatting.formatRoundedAmount(amount, currency);
 }
 
-function cashInputLimit(availableCash: number, currency: string): number {
-  const factor = 10 ** currencyFractionDigits(currency);
+function cashInputLimit(
+  availableCash: number,
+  currency: string,
+  formatting: Pick<FormattingApi, "currencyFractionDigits">,
+): number {
+  const factor = 10 ** currencyFractionDigits(currency, formatting);
   return Math.round((availableCash + Number.EPSILON) * factor) / factor;
 }
 
-function cashValueFromAvailable(availableCash: number, currency: string): string {
-  const amount = cashInputLimit(availableCash, currency);
-  return amount > 0 ? amount.toFixed(currencyFractionDigits(currency)) : "";
+function cashValueFromAvailable(
+  availableCash: number,
+  currency: string,
+  formatting: Pick<FormattingApi, "currencyFractionDigits">,
+): string {
+  const amount = cashInputLimit(availableCash, currency, formatting);
+  return amount > 0 ? amount.toFixed(currencyFractionDigits(currency, formatting)) : "";
 }
 
 function parseCashValue(value: string): number {
@@ -167,7 +175,7 @@ function computeSleeveSummary(driftReport: DriftReport, plan: RebalancePlan): Sl
     .filter((s) => s.currentBps > 0 || s.targetBps > 0 || s.afterBps > 0);
 }
 
-/** "Cash sits 42% over a 0% target." — describes the largest current drift driver. */
+/** "Cash is at 42%, above a 0% target." — describes the largest current drift driver. */
 function driftDriverSentence(driftReport: DriftReport, t: TFunction): string | null {
   let top: { name: string; drift: number; cur: number; tgt: number } | null = null;
   for (const r of driftReport.rows) {
@@ -184,8 +192,11 @@ function driftDriverSentence(driftReport: DriftReport, t: TFunction): string | n
       : "allocation:planner.driverSentenceUnder",
     {
       name: top.name,
-      current: (top.cur / 100).toFixed(0),
-      target: (top.tgt / 100).toFixed(0),
+      // 1 decimal, matching the drift figures shown beside this sentence —
+      // at 0 decimals "is at 20%, above a 20% target" reads as a contradiction
+      // whenever current and target round to the same integer.
+      current: pp1(top.cur),
+      target: pp1(top.tgt),
     },
   );
 }
@@ -258,9 +269,15 @@ function csvCell(value: string): string {
   return `"${escaped}"`;
 }
 
-function exportCsv(plan: RebalancePlan, currency: string, profileName: string, t: TFunction) {
+function exportCsv(
+  plan: RebalancePlan,
+  currency: string,
+  profileName: string,
+  t: TFunction,
+  formatting: Pick<FormattingApi, "currencyFractionDigits">,
+) {
   const generated = new Date().toISOString().slice(0, 10);
-  const fractionDigits = currencyFractionDigits(currency);
+  const fractionDigits = currencyFractionDigits(currency, formatting);
   const cashTotals = planCashTotals(plan);
   const cashRows = cashTotals.hasSells
     ? [
@@ -329,20 +346,27 @@ function exportCsv(plan: RebalancePlan, currency: string, profileName: string, t
   URL.revokeObjectURL(url);
 }
 
-function copyToText(plan: RebalancePlan, currency: string, t: TFunction) {
+function copyToText(
+  plan: RebalancePlan,
+  currency: string,
+  t: TFunction,
+  formatting: Pick<FormattingApi, "formatAmount" | "formatPrice" | "formatCalendarDate">,
+) {
   const cashTotals = planCashTotals(plan);
   const lines = [
-    t("allocation:copyText.header", { date: new Date().toLocaleDateString() }),
+    t("allocation:copyText.header", {
+      date: formatting.formatCalendarDate(calendarDateFromLocalDate(new Date())),
+    }),
     cashTotals.hasSells
       ? t("allocation:copyText.newCashUsed", {
-          used: formatAmount(cashTotals.newCashUsed, currency),
-          buyTotal: formatAmount(cashTotals.buyTotal, currency),
-          sellProceeds: formatAmount(cashTotals.sellProceeds, currency),
-          cashRemaining: formatAmount(plan.cashRemaining, currency),
+          used: formatting.formatAmount(cashTotals.newCashUsed, currency),
+          buyTotal: formatting.formatAmount(cashTotals.buyTotal, currency),
+          sellProceeds: formatting.formatAmount(cashTotals.sellProceeds, currency),
+          cashRemaining: formatting.formatAmount(plan.cashRemaining, currency),
         })
       : t("allocation:copyText.cashDeployed", {
-          used: formatAmount(plan.cashUsed, currency),
-          available: formatAmount(plan.availableCash, currency),
+          used: formatting.formatAmount(plan.cashUsed, currency),
+          available: formatting.formatAmount(plan.availableCash, currency),
         }),
     t("allocation:copyText.maxDrift", {
       before: fmtBps(plan.maxDriftBpsBefore),
@@ -352,14 +376,16 @@ function copyToText(plan: RebalancePlan, currency: string, t: TFunction) {
     t("allocation:copyText.proposedTrades"),
     ...plan.trades.map(
       (trade) =>
-        `${trade.action.toUpperCase()}  ${trade.symbol ?? trade.categoryName}  ${formatAmount(trade.estimatedAmount, currency)}` +
+        `${trade.action.toUpperCase()}  ${trade.symbol ?? trade.categoryName}  ${formatting.formatAmount(trade.estimatedAmount, currency)}` +
         (trade.accountId
           ? `  ${t("allocation:copyText.account", { account: trade.accountId })}`
           : "") +
         (trade.quantity != null
           ? `  ${t("allocation:copyText.shares", { qty: trade.quantity.toFixed(trade.quantity % 1 === 0 ? 0 : 4) })}`
           : "") +
-        (trade.estimatedPrice != null ? ` @ ${formatPrice(trade.estimatedPrice, currency)}` : ""),
+        (trade.estimatedPrice != null
+          ? ` @ ${formatting.formatPrice(trade.estimatedPrice, currency)}`
+          : ""),
     ),
   ];
   if (plan.warnings.length) {
@@ -398,12 +424,13 @@ function ModeSwitch({
   onChange: (mode: ScenarioMode) => void;
 }) {
   const { t } = useTranslation();
+  const formatting = useAmountFormatting();
   const modes: { id: ScenarioMode; label: string; shortLabel: string; hint: string }[] = [
     {
       id: "cash_flow_only",
       label: t("allocation:mode.cashFlowOnly"),
       shortLabel: t("allocation:mode.cashFlowShort"),
-      hint: t("allocation:mode.cashFlowHint", { symbol: currencySymbol(currency) }),
+      hint: t("allocation:mode.cashFlowHint", { symbol: currencySymbol(currency, formatting) }),
     },
     {
       id: "sell_to_rebalance",
@@ -465,7 +492,7 @@ function ModeSwitch({
 
 // ── Cash deploy controls (left panel) ─────────────────────────────────────────
 
-function PlannerInput({
+export function PlannerInput({
   description,
   cashValue,
   availableCash,
@@ -475,6 +502,8 @@ function PlannerInput({
   hasPlan,
   isCalculating,
   isSourceLoading,
+  hasEligibleHoldings,
+  eligibleHoldingsSelector,
 }: {
   description: string;
   cashValue: string;
@@ -485,13 +514,17 @@ function PlannerInput({
   hasPlan: boolean;
   isCalculating: boolean;
   isSourceLoading: boolean;
+  hasEligibleHoldings: boolean;
+  eligibleHoldingsSelector: ReactNode;
 }) {
   const { t } = useTranslation();
-  const limit = cashInputLimit(availableCash, currency);
+  const amountFormatting = useAmountFormatting();
+
+  const limit = cashInputLimit(availableCash, currency, amountFormatting);
   const deploy = parseCashValue(cashValue);
   const overBudget = deploy > limit;
   const pct = limit > 0 ? Math.min(100, Math.max(0, (deploy / limit) * 100)) : 0;
-  const fraction = currencyFractionDigits(currency);
+  const fraction = currencyFractionDigits(currency, amountFormatting);
 
   const presets: { id: string; label: string; value: number }[] = [
     { id: "25", label: "25%", value: limit * 0.25 },
@@ -501,14 +534,22 @@ function PlannerInput({
   ];
   const activePreset = presets.find((p) => Math.abs(p.value - deploy) <= 0.5 + limit * 0.001)?.id;
 
-  const canCalculate = !isCalculating && !isSourceLoading && limit > 0 && deploy > 0 && !overBudget;
+  const canCalculate =
+    !isCalculating &&
+    !isSourceLoading &&
+    limit > 0 &&
+    deploy > 0 &&
+    !overBudget &&
+    hasEligibleHoldings;
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
         <Eyebrow>{t("allocation:planner.cashToDeploy")}</Eyebrow>
         <span className="text-muted-foreground font-mono text-[11px] sm:text-xs">
-          {t("allocation:planner.ofInScope", { amount: roundedCurrency(availableCash, currency) })}
+          {t("allocation:planner.ofInScope", {
+            amount: roundedCurrency(availableCash, currency, amountFormatting),
+          })}
         </span>
       </div>
 
@@ -519,7 +560,7 @@ function PlannerInput({
         )}
       >
         <span className="text-muted-foreground mr-0.5 text-sm font-normal">
-          {currencySymbol(currency)}
+          {currencySymbol(currency, amountFormatting)}
         </span>
         <input
           value={cashValue}
@@ -572,6 +613,8 @@ function PlannerInput({
           {t("allocation:planner.exceedsAvailableCash")}
         </p>
       )}
+
+      {eligibleHoldingsSelector}
 
       <div className="mt-auto pt-4 sm:pt-5">
         <Button
@@ -734,6 +777,7 @@ function PlannerResult({
   onReview: () => void;
 }) {
   const { t } = useTranslation();
+  const formatting = useAmountFormatting();
   if (!plan) {
     // ── Before Calculate ──
     const driver = driftDriverSentence(driftReport, t);
@@ -842,7 +886,7 @@ function PlannerResult({
             <span className="hidden sm:inline">{t("allocation:result.cashDeployed")}</span>
           </Eyebrow>
           <div className="text-foreground mt-1 font-mono text-sm font-semibold tabular-nums leading-none sm:text-base">
-            {roundedCurrency(deployed, currency)}
+            {roundedCurrency(deployed, currency, formatting)}
           </div>
           <div className="text-muted-foreground mt-1 font-mono text-xs">
             {t("allocation:result.percentOfScope", { pct: scopePct })}
@@ -854,7 +898,7 @@ function PlannerResult({
             <span className="hidden sm:inline">{t("allocation:result.cashRemaining")}</span>
           </Eyebrow>
           <div className="text-foreground mt-1 font-mono text-sm font-semibold tabular-nums leading-none sm:text-base">
-            {roundedCurrency(plan.cashRemaining, currency)}
+            {roundedCurrency(plan.cashRemaining, currency, formatting)}
           </div>
           <div className="text-muted-foreground mt-1 font-mono text-xs">
             {sells > 0
@@ -866,7 +910,7 @@ function PlannerResult({
 
       <p className="text-foreground/80 mt-4 hidden font-mono text-xs leading-relaxed sm:block">
         {t("allocation:result.deployNarrative", {
-          amount: roundedCurrency(deployed, currency),
+          amount: roundedCurrency(deployed, currency, formatting),
           actions: tradesActionSummary,
           before: fmtBps(plan.maxDriftBpsBefore),
           after: fmtBps(plan.maxDriftBpsAfter),
@@ -1128,6 +1172,7 @@ function TradeActionBadge({ action }: { action: string }) {
 }
 
 function TradesTable({ trades, currency }: { trades: SuggestedManualTrade[]; currency: string }) {
+  const formatting = useAmountFormatting();
   const { t } = useTranslation();
   const buys = trades.filter((trade) => trade.action === "buy");
   const sells = trades.filter((trade) => trade.action === "sell");
@@ -1164,7 +1209,7 @@ function TradesTable({ trades, currency }: { trades: SuggestedManualTrade[]; cur
               </div>
               <div className="shrink-0 text-right">
                 <div className="text-foreground font-mono text-sm font-semibold tabular-nums">
-                  {formatAmount(trade.estimatedAmount, currency)}
+                  {formatting.formatAmount(trade.estimatedAmount, currency)}
                 </div>
                 <div className="text-muted-foreground mt-1 font-mono text-xs tabular-nums">
                   {t("allocation:trades.sharesLabel", { qty: tradeQuantityLabel(trade.quantity) })}
@@ -1178,7 +1223,9 @@ function TradesTable({ trades, currency }: { trades: SuggestedManualTrade[]; cur
                   {t("allocation:trades.price")}
                 </div>
                 <div className="text-foreground mt-1 tabular-nums">
-                  {trade.estimatedPrice != null ? formatPrice(trade.estimatedPrice, currency) : "—"}
+                  {trade.estimatedPrice != null
+                    ? formatting.formatPrice(trade.estimatedPrice, currency)
+                    : "—"}
                 </div>
               </div>
               <div className="min-w-0">
@@ -1195,7 +1242,7 @@ function TradesTable({ trades, currency }: { trades: SuggestedManualTrade[]; cur
         <div className="bg-muted/20 flex items-center justify-between gap-3 px-4 py-3 font-mono text-xs">
           <span className="text-muted-foreground">{countSummary}</span>
           <span className="text-foreground font-semibold tabular-nums">
-            {formatAmount(buyTotal, currency)}
+            {formatting.formatAmount(buyTotal, currency)}
           </span>
         </div>
       </div>
@@ -1265,13 +1312,15 @@ function TradesTable({ trades, currency }: { trades: SuggestedManualTrade[]; cur
                   )}
                 </td>
                 <td className="text-foreground pr-3 text-right font-semibold tabular-nums">
-                  {formatAmount(trade.estimatedAmount, currency)}
+                  {formatting.formatAmount(trade.estimatedAmount, currency)}
                 </td>
                 <td className="text-muted-foreground pr-3 text-right tabular-nums">
                   {tradeQuantityLabel(trade.quantity)}
                 </td>
                 <td className="text-muted-foreground pr-7 text-right tabular-nums">
-                  {trade.estimatedPrice != null ? formatPrice(trade.estimatedPrice, currency) : "—"}
+                  {trade.estimatedPrice != null
+                    ? formatting.formatPrice(trade.estimatedPrice, currency)
+                    : "—"}
                 </td>
                 <td
                   className="text-muted-foreground max-w-0 truncate pl-10 pr-5 text-xs"
@@ -1288,7 +1337,7 @@ function TradesTable({ trades, currency }: { trades: SuggestedManualTrade[]; cur
                 {countSummary}
               </td>
               <td className="text-foreground py-3 pr-3 text-right font-semibold tabular-nums">
-                {formatAmount(buyTotal, currency)}
+                {formatting.formatAmount(buyTotal, currency)}
               </td>
               <td colSpan={3} />
             </tr>
@@ -1305,6 +1354,7 @@ interface RebalanceTabProps {
   profile: AllocationTarget | null;
   driftReport: DriftReport | null;
   accountScope: AccountScope;
+  holdings: Holding[];
   availableCash: number;
   sourceVersion: string;
   isSourceLoading: boolean;
@@ -1314,22 +1364,36 @@ export function RebalanceTab({
   profile,
   driftReport,
   accountScope,
+  holdings,
   availableCash,
   sourceVersion,
   isSourceLoading,
 }: RebalanceTabProps) {
+  const amountFormatting = useAmountFormatting();
+  const dateFormatting = useDateFormatting();
+
+  const formatting = { ...amountFormatting, ...dateFormatting };
+
   const { t } = useTranslation();
   const [cashDraft, setCashDraft] = useState<{ key: string; value: string } | null>(null);
   const [scenarioMode, setScenarioMode] = useState<ScenarioMode>("cash_flow_only");
   const tradesRef = useRef<HTMLDivElement>(null);
   const currency = driftReport?.baseCurrency ?? "USD";
   const inputContextKey = `${profile?.id ?? "no-profile"}:${accountScopeKey(accountScope)}:${currency}`;
+  const {
+    excludedAssetIds,
+    eligibleAssetIds: canonicalEligibleAssetIds,
+    hasEligibleHoldings,
+    toggle: toggleEligibleAsset,
+    selectAll: selectAllEligibleAssets,
+    clear: clearEligibleAssets,
+  } = useEligibleHoldingsSelection(holdings, inputContextKey);
   const cashValue =
     cashDraft?.key === inputContextKey
       ? cashDraft.value
-      : cashValueFromAvailable(availableCash, currency);
+      : cashValueFromAvailable(availableCash, currency, amountFormatting);
   const cash = parseCashValue(cashValue);
-  const availableCashLimit = cashInputLimit(availableCash, currency);
+  const availableCashLimit = cashInputLimit(availableCash, currency, amountFormatting);
   const sourceReady = !isSourceLoading && !!driftReport;
   const sourceKey = `${inputContextKey}:${availableCash}:${sourceVersion}`;
 
@@ -1339,6 +1403,7 @@ export function RebalanceTab({
     filter: accountScope,
     scenarioMode,
     sourceKey,
+    eligibleAssetIds: scenarioMode === "cash_flow_only" ? canonicalEligibleAssetIds : undefined,
   });
   const cachedPlan = planQuery.data ?? null;
   const hasStalePlan = !!cachedPlan && cachedPlan.sourceKey !== sourceKey;
@@ -1359,6 +1424,10 @@ export function RebalanceTab({
     if (!profile) return;
     if (!sourceReady) {
       toast.error(t("allocation:toast.dataLoading"));
+      return;
+    }
+    if (!hasEligibleHoldings && !isSellMode) {
+      toast.error(t("allocation:eligibleHoldings.emptyGuidance"));
       return;
     }
     if (availableCashLimit <= 0 && !isSellMode) {
@@ -1435,6 +1504,18 @@ export function RebalanceTab({
                 hasPlan={!!plan || hasStalePlan}
                 isCalculating={isCalculating}
                 isSourceLoading={!sourceReady}
+                hasEligibleHoldings={isSellMode || hasEligibleHoldings}
+                eligibleHoldingsSelector={
+                  scenarioMode === "cash_flow_only" ? (
+                    <EligibleHoldingsSelector
+                      holdings={holdings}
+                      excludedAssetIds={excludedAssetIds}
+                      onToggle={toggleEligibleAsset}
+                      onSelectAll={selectAllEligibleAssets}
+                      onClear={clearEligibleAssets}
+                    />
+                  ) : null
+                }
               />
             </div>
             <div className="px-4 py-4 sm:px-5 sm:py-5">
@@ -1498,11 +1579,11 @@ export function RebalanceTab({
                       ? t("allocation:rebalance.tradesSummarySells", {
                           buys: buysWord,
                           sells: t("allocation:result.sellsCount", { count: sells }),
-                          cash: formatAmount(cashTotals.newCashUsed, currency),
+                          cash: amountFormatting.formatAmount(cashTotals.newCashUsed, currency),
                         })
                       : t("allocation:rebalance.tradesSummaryDeployed", {
                           buys: buysWord,
-                          cash: formatAmount(plan.cashUsed, currency),
+                          cash: amountFormatting.formatAmount(plan.cashUsed, currency),
                         });
                   })()}
                 </p>
@@ -1524,7 +1605,7 @@ export function RebalanceTab({
             <span className="text-muted-foreground font-mono text-xs leading-relaxed">
               {t("allocation:rebalance.calculatedFooter", {
                 name: profile.name,
-                date: new Date().toLocaleDateString(undefined, {
+                date: dateFormatting.formatDate(new Date(), {
                   year: "numeric",
                   month: "short",
                   day: "numeric",
@@ -1537,7 +1618,7 @@ export function RebalanceTab({
                 size="sm"
                 className="min-w-0 justify-center"
                 onClick={() => {
-                  copyToText(plan, currency, t);
+                  copyToText(plan, currency, t, formatting);
                   toast.success(t("allocation:toast.copiedToClipboard"));
                 }}
               >
@@ -1548,7 +1629,7 @@ export function RebalanceTab({
                 size="sm"
                 className="min-w-0 justify-center"
                 onClick={() => {
-                  exportCsv(plan, currency, profile.name, t);
+                  exportCsv(plan, currency, profile.name, t, amountFormatting);
                   toast.success(t("allocation:toast.csvDownloaded"));
                 }}
               >

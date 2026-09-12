@@ -153,7 +153,8 @@
     "maturity": "Échéance",
     "type": "Type",
     "strike": "Prix d'exercice",
-    "expiry": "Expiration"
+    "expiry": "Expiration",
+    "multiplier": "Multiplicateur"
   },
   "profile": {
     "overview": "Aperçu",
@@ -196,6 +197,21 @@
     "holding_fetch_error": "Erreur de récupération de la position.",
     "quote_fetch_error": "Erreur de récupération de la cotation.",
     "asset_profile_fetch_error": "Erreur de récupération du profil de l'actif.",
+    "health": {
+      "add_price_for_date": "Ajouter un prix pour le {{date}}",
+      "manual_prices_need_review": "Les prix manuels doivent être vérifiés",
+      "carrying_forward_add_date": "Wealthfolio reporte le dernier prix. Ajoutez cette date uniquement si elle nécessite sa propre valeur.",
+      "review_missing_dates": "Vérifiez les dates manquantes. Ajoutez les prix qui nécessitent leur propre valeur ; les prix reportés restent utilisés entre les entrées.",
+      "price_missing_for_date": "Prix manquant pour le {{date}}",
+      "price_history_needs_review": "L’historique des prix doit être vérifié",
+      "carrying_forward_refetch": "Wealthfolio reporte le dernier prix disponible. Rechargez les prix s’il s’agissait d’un jour de bourse.",
+      "refetch_history": "Rechargez l’historique du fournisseur pour restaurer les prix manquants ou obsolètes. Les prix reportés sont utilisés jusqu’à ce que les prix exacts soient disponibles.",
+      "cost_basis_needs_review": "Le prix de revient doit être vérifié",
+      "cost_basis_description": "Mettez à jour le montant payé pour que Wealthfolio puisse calculer le gain ou la perte.",
+      "transactions_need_review": "Les transactions doivent être vérifiées",
+      "transactions_description": "Vérifiez les transactions signalées par le Centre de santé pour cet investissement.",
+      "refetch_prices": "Recharger les prix"
+    },
     "confirm_option_expiry_title": "Confirmer l'expiration de l'option",
     "confirm_option_expiry_description": "Cela enregistrera l'option comme expirée sans valeur, supprimant la position sans effet de trésorerie. Cette action ne peut pas être facilement annulée.",
     "kind": {
@@ -241,6 +257,18 @@
     "exchange": "Bourse",
     "select_exchange": "Sélectionner une bourse",
     "search_exchanges": "Rechercher des bourses...",
+    "contract_multiplier": "Multiplicateur du contrat",
+    "contract_multiplier_hint": "Chaque contrat représente ce nombre d'unités sous-jacentes. Laissez vide pour utiliser la valeur standard de {{default}}.",
+    "maturity_date": "Date d’échéance",
+    "coupon_rate": "Taux du coupon (%)",
+    "coupon_frequency": "Fréquence du coupon",
+    "select_frequency": "Sélectionner la fréquence",
+    "couponFrequency": {
+      "ANNUAL": "Annuelle",
+      "SEMI_ANNUAL": "Semestrielle",
+      "QUARTERLY": "Trimestrielle",
+      "ZERO": "Coupon zéro"
+    },
     "saving": "Enregistrement...",
     "saving_short": "Enregistrement",
     "save_changes": "Enregistrer les modifications",
@@ -305,12 +333,15 @@
     "lots_by_account": "Lots par compte",
     "account_one": "{{count}} compte",
     "account_other": "{{count}} comptes",
+    "account_many": "{{count}} comptes",
     "lot_one": "{{count}} lot",
     "lot_other": "{{count}} lots",
+    "lot_many": "{{count}} lots",
     "collapse_all": "Tout réduire",
     "expand_all": "Tout développer",
     "share_one": "part",
     "share_other": "parts",
+    "share_many": "parts",
     "market_value": "Valeur de marché",
     "shares_suffix": "parts",
     "cost_basis": "Prix de revient",
@@ -385,7 +416,10 @@
     "to_auto_warning": "Vos données historiques saisies manuellement pourraient être perdues.",
     "to_manual_description": "Le passage au suivi manuel arrêtera la récupération automatique des données depuis le fournisseur de données de marché. Vous devrez saisir et maintenir les données de prix manuellement.",
     "to_manual_warning": "Les mises à jour automatiques des prix seront désactivées.",
-    "confirm_change": "Confirmer le changement"
+    "confirm_change": "Confirmer le changement",
+    "delete_count_one": "Supprimer ({{count}})",
+    "delete_count_other": "Supprimer ({{count}})",
+    "delete_count_many": "Supprimer ({{count}})"
   },
   "quoteTable": {
     "date": "Date",
@@ -637,7 +671,6 @@
     "select_mortgage_to_link": "Sélectionner un prêt hypothécaire à lier",
     "link_mortgage": "Lier un prêt hypothécaire",
     "link_mortgage_description": "Sélectionnez un prêt hypothécaire à lier à ce bien",
-    "cancel": "Annuler",
     "link": "Lier",
     "sectionTitle": {
       "property": "Bien immobilier",
@@ -666,7 +699,12 @@
     "date": "Date",
     "balance": "Solde",
     "value": "Valeur",
-    "notes": "Notes"
+    "notes": "Notes",
+    "edit_entry_aria": "Modifier l’entrée du {{date}}, {{value}}",
+    "delete_entry_aria": "Supprimer l’entrée du {{date}}, {{value}}",
+    "delete_title": "Supprimer cette entrée d’historique ?",
+    "delete_description": "Cette entrée d’historique sera définitivement supprimée.",
+    "duplicate_date_error": "Chaque entrée d’historique doit utiliser une date unique."
   },
   "valueToolbar": {
     "add_balance": "Ajouter un solde",
@@ -675,6 +713,44 @@
     "modified": "{{count}} modifié(s)",
     "to_delete": "{{count}} à supprimer",
     "cancel": "Annuler",
-    "save_changes": "Enregistrer les modifications"
+    "save_changes": "Enregistrer les modifications",
+    "delete_count_one": "Supprimer ({{count}})",
+    "delete_count_other": "Supprimer ({{count}})",
+    "delete_count_many": "Supprimer ({{count}})",
+    "modified_one": "{{count}} modifié",
+    "modified_other": "{{count}} modifié(s)",
+    "modified_many": "{{count}} modifié(s)",
+    "to_delete_one": "{{count}} à supprimer",
+    "to_delete_other": "{{count}} à supprimer",
+    "to_delete_many": "{{count}} à supprimer"
+  },
+  "logo": {
+    "change": "Changer le logo",
+    "title": "Logo de l'actif",
+    "badge_default": "Par défaut",
+    "badge_custom": "Personnalisé",
+    "updated_at": "Mis à jour le {{date}}",
+    "dropzone_cta": "Choisir une image",
+    "dropzone_or_drop": "ou glissez-déposez-la ici",
+    "dropzone_hint": "PNG, JPEG, WebP ou SVG · redimensionnée en PNG 256×256",
+    "processing": "Préparation de l'image…",
+    "preview_title": "Aperçu",
+    "preview_new": "Nouveau logo",
+    "preview_current": "Logo actuel",
+    "preview_card": "Carte de position",
+    "preview_table": "Tableau des positions",
+    "preview_list": "Liste des activités",
+    "preview_meta": "{{width}}×{{height}} · {{size}} (au lieu de {{original}})",
+    "choose_different": "Choisir une autre image",
+    "save": "Enregistrer le logo",
+    "reset": "Rétablir le logo par défaut",
+    "saved": "Logo enregistré.",
+    "reset_done": "Logo par défaut rétabli.",
+    "error_unsupported_type": "Fichier non pris en charge. Utilisez une image PNG, JPEG, WebP ou SVG.",
+    "error_too_large_input": "Ce fichier est trop volumineux. Choisissez une image de moins de 10 Mo.",
+    "error_decode_failed": "Le fichier n'a pas pu être lu comme une image.",
+    "error_encode_failed": "L'image n'a pas pu être convertie en PNG.",
+    "error_too_large_output": "L'image est trop détaillée pour tenir dans 150 Ko. Essayez une image plus simple ou plus petite.",
+    "error_save_failed": "Le logo n'a pas pu être enregistré."
   }
 }

@@ -259,7 +259,6 @@ const AccountPage = () => {
 
   // Check if account has any holdings (including cash)
   const hasHoldings = useMemo(() => {
-    if (!holdings) return false;
     return holdings.length > 0;
   }, [holdings]);
 
@@ -557,8 +556,14 @@ const AccountPage = () => {
   });
 
   const negativeCashAuditTarget = useMemo(
-    () => buildCashAuditReviewTarget(currentNegativeCashRun, cashAuditActivities, appTimezone),
-    [appTimezone, cashAuditActivities, currentNegativeCashRun],
+    () =>
+      buildCashAuditReviewTarget(
+        currentNegativeCashRun,
+        cashAuditActivities,
+        appTimezone,
+        isLiabilityAccount,
+      ),
+    [appTimezone, cashAuditActivities, currentNegativeCashRun, isLiabilityAccount],
   );
 
   const selectedCashAuditTarget =
@@ -669,10 +674,13 @@ const AccountPage = () => {
         handleDelete={handleActivityDelete}
         onDuplicate={handleActivityDuplicate}
         onAdd={() => navigate(`/activities/manage?account=${id}`)}
+        onLoadMore={accountActivitiesSearch.fetchNextPage}
+        hasNextPage={accountActivitiesSearch.hasNextPage}
+        isFetching={accountActivitiesSearch.isFetching}
+        isFetchingNextPage={accountActivitiesSearch.isFetchingNextPage}
+        hasLoadMoreError={accountActivitiesSearch.isFetchNextPageError}
       />
       <ActivityPagination
-        hasMore={accountActivitiesSearch.hasNextPage ?? false}
-        onLoadMore={accountActivitiesSearch.fetchNextPage}
         isFetching={accountActivitiesSearch.isFetchingNextPage}
         totalFetched={accountActivitiesSearch.data.length}
         totalCount={accountActivitiesSearch.totalRowCount}
@@ -688,10 +696,13 @@ const AccountPage = () => {
         handleEdit={handleActivityEdit}
         handleDelete={handleActivityDelete}
         onAdd={() => navigate(`/activities/manage?account=${id}`)}
+        onLoadMore={accountActivitiesSearch.fetchNextPage}
+        hasNextPage={accountActivitiesSearch.hasNextPage}
+        isFetching={accountActivitiesSearch.isFetching}
+        isFetchingNextPage={accountActivitiesSearch.isFetchingNextPage}
+        hasLoadMoreError={accountActivitiesSearch.isFetchNextPageError}
       />
       <ActivityPagination
-        hasMore={accountActivitiesSearch.hasNextPage ?? false}
-        onLoadMore={accountActivitiesSearch.fetchNextPage}
         isFetching={accountActivitiesSearch.isFetchingNextPage}
         totalFetched={accountActivitiesSearch.data.length}
         totalCount={accountActivitiesSearch.totalRowCount}
@@ -1183,7 +1194,7 @@ const AccountPage = () => {
             </SheetHeader>
             <div className="flex-1 overflow-hidden px-6">
               <HoldingsEditMode
-                holdings={holdings ?? []}
+                holdings={holdings}
                 account={account}
                 isLoading={isHoldingsLoading}
                 onClose={() => {
@@ -1239,6 +1250,7 @@ const AccountPage = () => {
           currentValuation?.accountCurrency
         }
         cashAuditTarget={selectedCashAuditTarget ?? undefined}
+        isCreditCardAccount={isLiabilityAccount}
       />
 
       {cashProductActions.dialogs}

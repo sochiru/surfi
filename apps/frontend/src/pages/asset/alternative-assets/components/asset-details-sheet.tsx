@@ -249,7 +249,6 @@ export function AssetDetailsSheet({
                               name={field.name}
                               value={field.value}
                               onValueChange={(value) => field.onChange(value ?? null)}
-                              placeholder="0.00"
                             />
                           </FormControl>
                           <FormMessage />
@@ -707,7 +706,6 @@ function LiabilityFields({
                   name={field.name}
                   value={field.value}
                   onValueChange={(value) => field.onChange(value ?? null)}
-                  placeholder="0.00"
                 />
               </FormControl>
               <FormMessage />
@@ -727,7 +725,6 @@ function LiabilityFields({
                   name={field.name}
                   value={field.value}
                   onValueChange={(value) => field.onChange(value ?? null)}
-                  placeholder="0.00"
                   maxDecimalPlaces={2}
                 />
               </FormControl>

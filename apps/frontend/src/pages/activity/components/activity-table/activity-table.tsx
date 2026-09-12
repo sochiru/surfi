@@ -1,7 +1,42 @@
 import React from "react";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
-import { parseOccSymbol } from "@/lib/occ-symbol";
+import {
+  calculateActivityValue,
+  formatSplitRatio,
+  isAssetBackedIncomeActivity,
+  isCashActivity,
+  isCashTransfer,
+  isFeeActivity,
+  isIncomeActivity,
+  isSecuritiesTransfer,
+  isSplitActivity,
+  localizeActivitySubtypeName,
+} from "@/lib/activity-utils";
+import { ActivityType, getExchangeDisplayName } from "@/lib/constants";
+import { formatOptionSubtitle, parseOccSymbol } from "@/lib/occ-symbol";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { ActivityDetails } from "@/lib/types";
+import { formatDateTime } from "@/lib/utils";
+import {
+  type OnChangeFn,
+  type VisibilityState,
+  ColumnDef,
+  SortingState,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+  AmountDisplay,
+  Button,
+  EmptyPlaceholder,
+  PriceDisplay,
+  useNumberFormatting,
+  useDateFormatting,
+} from "@wealthfolio/ui";
 import { DataTableColumnHeader } from "@wealthfolio/ui/components/ui/data-table/data-table-column-header";
 import {
   DropdownMenu,
@@ -18,38 +53,23 @@ import {
   TableHeader,
   TableRow,
 } from "@wealthfolio/ui/components/ui/table";
-import {
-  calculateActivityValue,
-  isAssetBackedIncomeActivity,
-  isCashActivity,
-  isCashTransfer,
-  isSecuritiesTransfer,
-  isFeeActivity,
-  isIncomeActivity,
-  isSplitActivity,
-  formatSplitRatio,
-} from "@/lib/activity-utils";
-import { localizeActivitySubtypeName } from "@/lib/activity-utils";
-import { ActivityType, getExchangeDisplayName } from "@/lib/constants";
-import { ActivityDetails } from "@/lib/types";
-import { formatDateTime } from "@/lib/utils";
-import { useSettingsContext } from "@/lib/settings-provider";
-import {
-  type OnChangeFn,
-  type VisibilityState,
-  ColumnDef,
-  SortingState,
-  flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
-import { Button, EmptyPlaceholder, formatAmount, formatPrice } from "@wealthfolio/ui";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
+import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
+
+/**
+ * Starting height for a virtualized row. Rows report their real height once
+ * measured, so this only has to keep the scrollbar honest for rows still below
+ * the fold.
+ */
+const ROW_HEIGHT = 89;
+/** Rows kept mounted past the viewport edge, so a fast scroll stays painted. */
+const OVERSCAN = 8;
 
 interface ActivityTableProps {
   activities: ActivityDetails[];
@@ -63,6 +83,11 @@ interface ActivityTableProps {
   filtersActive?: boolean;
   onAdd?: () => void;
   onClearFilters?: () => void;
+  onLoadMore?: () => void;
+  hasNextPage?: boolean;
+  isFetching?: boolean;
+  isFetchingNextPage?: boolean;
+  hasLoadMoreError?: boolean;
 }
 
 export const ActivityTable = ({
@@ -77,7 +102,15 @@ export const ActivityTable = ({
   filtersActive = false,
   onAdd,
   onClearFilters,
+  onLoadMore,
+  hasNextPage = false,
+  isFetching,
+  isFetchingNextPage = false,
+  hasLoadMoreError = false,
 }: ActivityTableProps) => {
+  const numberFormatting = useNumberFormatting();
+  const dateFormatting = useDateFormatting();
+  const { isBalanceHidden } = useBalancePrivacy();
   const { t } = useTranslation();
   const { duplicateActivityMutation } = useActivityMutations();
   const { settings } = useSettingsContext();
@@ -117,66 +150,6 @@ export const ActivityTable = ({
 
   const columns: ColumnDef<ActivityDetails>[] = React.useMemo(
     () => [
-      {
-        id: "activityType",
-        accessorKey: "activityType",
-        enableHiding: false,
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title={t("activity:table_type")} />
-        ),
-        cell: ({ row }) => {
-          const activityType = row.getValue("activityType");
-          const normalizedActivityType = String(activityType).trim().toUpperCase();
-          const normalizedSubtype = row.original.subtype?.trim().toUpperCase();
-          const subtypeLabel =
-            normalizedSubtype && normalizedSubtype !== normalizedActivityType
-              ? localizeActivitySubtypeName(t, normalizedSubtype)
-              : undefined;
-
-          return (
-            <div className="flex min-w-0 max-w-[160px] flex-col items-start gap-1 text-sm">
-              <ActivityTypeBadge
-                type={activityType as ActivityType}
-                className="whitespace-nowrap text-xs font-normal"
-              />
-              {subtypeLabel && (
-                <span className="text-muted-foreground max-w-full truncate text-xs font-light">
-                  {subtypeLabel}
-                </span>
-              )}
-            </div>
-          );
-        },
-        filterFn: (row, id, value: string) => {
-          const cellValue = row.getValue(id);
-          if (!cellValue) {
-            return false;
-          }
-
-          return value.includes(cellValue as string);
-        },
-      },
-      {
-        id: "date",
-        accessorKey: "date",
-        enableHiding: false,
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title={t("activity:table_date")} />
-        ),
-        cell: ({ row }) => {
-          const dateVal = row.getValue("date");
-          const formattedDate =
-            typeof dateVal === "string" || dateVal instanceof Date
-              ? formatDateTime(dateVal, appTimezone)
-              : formatDateTime(String(dateVal), appTimezone);
-          return (
-            <div className="ml-2 flex flex-col">
-              <span>{formattedDate.date}</span>
-              <span className="text-muted-foreground text-xs font-light">{formattedDate.time}</span>
-            </div>
-          );
-        },
-      },
       {
         id: "assetSymbol",
         accessorKey: "assetSymbol",
@@ -221,12 +194,18 @@ export const ActivityTable = ({
 
           // Option subtitle: "Mar 29 $150 CALL"
           const optionSubtitle = parsedOption
-            ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
+            ? formatOptionSubtitle(parsedOption, { ...numberFormatting, ...dateFormatting })
             : null;
 
           const content = (
             <div className="flex max-w-[220px] items-center gap-2">
-              <TickerAvatar symbol={avatarSymbol} className="h-8 w-8 shrink-0" />
+              <TickerAvatar
+                symbol={avatarSymbol}
+                exchangeMic={row.original.exchangeMic}
+                instrumentType={row.original.instrumentType}
+                assetId={assetId}
+                className="h-8 w-8 shrink-0"
+              />
               <div className="flex min-w-0 flex-col">
                 <span className="flex items-center gap-1 truncate font-medium">
                   <span className="truncate">{displaySymbol}</span>
@@ -257,6 +236,66 @@ export const ActivityTable = ({
           );
         },
         enableHiding: false,
+      },
+      {
+        id: "date",
+        accessorKey: "date",
+        enableHiding: false,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("activity:table_date")} />
+        ),
+        cell: ({ row }) => {
+          const dateVal = row.getValue("date");
+          const formattedDate =
+            typeof dateVal === "string" || dateVal instanceof Date
+              ? formatDateTime(dateVal, dateFormatting, appTimezone)
+              : formatDateTime(String(dateVal), dateFormatting, appTimezone);
+          return (
+            <div className="ml-2 flex flex-col">
+              <span>{formattedDate.date}</span>
+              <span className="text-muted-foreground text-xs font-light">{formattedDate.time}</span>
+            </div>
+          );
+        },
+      },
+      {
+        id: "activityType",
+        accessorKey: "activityType",
+        enableHiding: false,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("activity:table_type")} />
+        ),
+        cell: ({ row }) => {
+          const activityType = row.getValue("activityType");
+          const normalizedActivityType = String(activityType).trim().toUpperCase();
+          const normalizedSubtype = row.original.subtype?.trim().toUpperCase();
+          const subtypeLabel =
+            normalizedSubtype && normalizedSubtype !== normalizedActivityType
+              ? localizeActivitySubtypeName(t, normalizedSubtype)
+              : undefined;
+
+          return (
+            <div className="flex min-w-0 max-w-[160px] flex-col items-start gap-1 text-sm">
+              <ActivityTypeBadge
+                type={activityType as ActivityType}
+                className="whitespace-nowrap text-xs font-normal"
+              />
+              {subtypeLabel && (
+                <span className="text-muted-foreground max-w-full truncate text-xs font-light">
+                  {subtypeLabel}
+                </span>
+              )}
+            </div>
+          );
+        },
+        filterFn: (row, id, value: string) => {
+          const cellValue = row.getValue(id);
+          if (!cellValue) {
+            return false;
+          }
+
+          return value.includes(cellValue as string);
+        },
       },
       {
         id: "quantity",
@@ -307,7 +346,11 @@ export const ActivityTable = ({
 
           return (
             <div className="pr-4 text-right">
-              {typeof quantity === "number" ? quantity : String(quantity)}
+              {isBalanceHidden
+                ? "••••"
+                : typeof quantity === "number"
+                  ? quantity
+                  : String(quantity)}
             </div>
           );
         },
@@ -356,10 +399,22 @@ export const ActivityTable = ({
             isCashTransfer(activityType, assetSymbol, row.original.assetId) ||
             (isIncomeActivity(activityType) && !isAssetBackedIncome)
           ) {
-            return <div className="text-right">{formatAmount(Number(amount), currency)}</div>;
+            return (
+              <div className="text-right">
+                <AmountDisplay
+                  value={Number(amount)}
+                  currency={currency}
+                  isHidden={isBalanceHidden}
+                />
+              </div>
+            );
           }
 
-          return <div className="text-right">{formatPrice(unitPrice, currency)}</div>;
+          return (
+            <div className="text-right">
+              <PriceDisplay value={unitPrice} currency={currency} isHidden={isBalanceHidden} />
+            </div>
+          );
         },
       },
       {
@@ -388,7 +443,11 @@ export const ActivityTable = ({
 
           return (
             <div className="text-right">
-              {activityType === "SPLIT" ? "-" : formatAmount(fee, currency)}
+              {activityType === "SPLIT" ? (
+                "-"
+              ) : (
+                <AmountDisplay value={fee} currency={currency} isHidden={isBalanceHidden} />
+              )}
             </div>
           );
         },
@@ -419,7 +478,11 @@ export const ActivityTable = ({
 
           return (
             <div className="text-right">
-              {activityType === "SPLIT" ? "-" : formatAmount(tax, currency)}
+              {activityType === "SPLIT" ? (
+                "-"
+              ) : (
+                <AmountDisplay value={tax} currency={currency} isHidden={isBalanceHidden} />
+              )}
             </div>
           );
         },
@@ -449,7 +512,11 @@ export const ActivityTable = ({
           }
 
           const displayValue = calculateActivityValue(activity);
-          return <div className="pr-4 text-right">{formatAmount(displayValue, currency)}</div>;
+          return (
+            <div className="pr-4 text-right">
+              <AmountDisplay value={displayValue} currency={currency} isHidden={isBalanceHidden} />
+            </div>
+          );
         },
       },
       {
@@ -557,6 +624,7 @@ export const ActivityTable = ({
               onDuplicate={handleDuplicate}
               onLinkTransfer={onLinkTransfer}
               onUnlinkTransfer={onUnlinkTransfer}
+              hoverReveal
             />
           );
         },
@@ -565,11 +633,14 @@ export const ActivityTable = ({
     ],
     [
       appTimezone,
+      dateFormatting,
+      isBalanceHidden,
       handleEdit,
       handleDelete,
       handleDuplicate,
       onLinkTransfer,
       onUnlinkTransfer,
+      numberFormatting,
       symbolExchangeCountMap,
       t,
     ],
@@ -587,6 +658,10 @@ export const ActivityTable = ({
   const table = useReactTable({
     data: activities,
     columns,
+    // Without this, row ids are positions ("0", "1", ...) — and the virtualizer
+    // keys its measured heights by row id, so a sort or a refetch would hand a
+    // row the height cached for whatever activity previously sat at its index.
+    getRowId: (row) => row.id,
     manualSorting: true,
     onSortingChange: handleSortingChange,
     onColumnVisibilityChange: setColumnVisibility,
@@ -599,6 +674,45 @@ export const ActivityTable = ({
     debugTable: true,
   });
 
+  const tableRows = table.getRowModel().rows;
+
+  // The body scrolls inside this table's own box, but it starts below a sticky
+  // header, so the origin the virtualizer measures from is the body's top
+  // rather than the scroll box's.
+  const { listRef, scrollElement, scrollMargin } = useVirtualScrollContainer();
+
+  // Keyed by activity, so a row keeps its measured height when a page loads
+  // above it or the sort order changes. Stable so the virtualizer does not
+  // rebuild every row's measurement on each render.
+  const getItemKey = React.useCallback(
+    (index: number) => tableRows[index]?.id ?? index,
+    [tableRows],
+  );
+
+  const virtualizer = useVirtualizer({
+    count: tableRows.length,
+    getScrollElement: () => scrollElement,
+    estimateSize: () => ROW_HEIGHT,
+    getItemKey,
+    overscan: OVERSCAN,
+    scrollMargin,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+  const totalSize = virtualizer.getTotalSize();
+  // `start`/`end` are offsets within the scroll box, which begins above the
+  // body; the body positions its own rows from zero.
+  const paddingTop = virtualItems.length ? virtualItems[0].start - scrollMargin : 0;
+  // With no window yet — the scroll port is resolved in a layout effect, so the
+  // first commit has none — the body still reserves the full estimated height.
+  // Collapsing to nothing instead would stop the port overflowing, and the port
+  // is only recognised as one because it overflows: the list would settle empty
+  // rather than measure itself and fill in.
+  const paddingBottom = virtualItems.length
+    ? totalSize - (virtualItems[virtualItems.length - 1].end - scrollMargin)
+    : totalSize;
+  const columnCount = table.getVisibleFlatColumns().length;
+
   if (isLoading) {
     return (
       <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
@@ -607,7 +721,7 @@ export const ActivityTable = ({
     );
   }
 
-  const hasRows = table.getRowModel().rows?.length > 0;
+  const hasRows = tableRows.length > 0;
 
   if (!hasRows) {
     return (
@@ -639,7 +753,14 @@ export const ActivityTable = ({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="min-h-0 flex-1 overflow-auto rounded-md border">
+      {/* `overflow-anchor: none` keeps the browser from choosing a row in here
+          as its scroll anchor: rows are recycled as you scroll, and
+          re-anchoring to one that just changed height fights the virtualizer. */}
+      <div
+        data-virtual-scroll-parent
+        className="min-h-0 flex-1 overflow-auto rounded-md border"
+        style={{ overflowAnchor: "none" }}
+      >
         <Table>
           <TableHeader className="bg-muted-foreground/5 sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -657,10 +778,26 @@ export const ActivityTable = ({
             ))}
           </TableHeader>
 
-          <TableBody>
-            {table.getRowModel().rows.map((row) => {
+          {/* A table row cannot be wrapped in a positioned element without
+              breaking column alignment, so the rows above and below the
+              rendered window are stood in for by one spacer row at each end
+              and the real rows stay in normal table flow. */}
+          <TableBody ref={listRef}>
+            {paddingTop > 0 && (
+              <TableRow aria-hidden className="hover:bg-transparent">
+                <TableCell colSpan={columnCount} className="p-0" style={{ height: paddingTop }} />
+              </TableRow>
+            )}
+            {virtualItems.map((virtualItem) => {
+              const row = tableRows[virtualItem.index];
+              if (!row) return null;
               return (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={virtualItem.key}
+                  ref={virtualizer.measureElement}
+                  data-index={virtualItem.index}
+                  className="group/row"
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -669,8 +806,26 @@ export const ActivityTable = ({
                 </TableRow>
               );
             })}
+            {paddingBottom > 0 && (
+              <TableRow aria-hidden className="hover:bg-transparent">
+                <TableCell
+                  colSpan={columnCount}
+                  className="p-0"
+                  style={{ height: paddingBottom }}
+                />
+              </TableRow>
+            )}
           </TableBody>
         </Table>
+        {onLoadMore && (
+          <InfiniteScrollTrigger
+            onLoadMore={onLoadMore}
+            hasNextPage={hasNextPage}
+            isFetching={isFetching ?? isFetchingNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            hasLoadMoreError={hasLoadMoreError}
+          />
+        )}
       </div>
     </div>
   );

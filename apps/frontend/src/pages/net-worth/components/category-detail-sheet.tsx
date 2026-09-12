@@ -1,5 +1,6 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@wealthfolio/ui/components/ui/sheet";
+import { useNumberFormatting } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@wealthfolio/ui/components/ui/sheet";
 import { useTranslation } from "react-i18next";
 import { CategoryTrendChart } from "./category-trend-chart";
 import { CompactAmount } from "./compact-amount";
@@ -78,6 +79,7 @@ export function CategoryDetailSheet({
   currency,
   periodLabel,
 }: CategoryDetailSheetProps) {
+  const formatting = useNumberFormatting();
   const { t } = useTranslation();
   const trend = selected
     ? history.map((point) => ({ date: point.date, value: point.breakdown[selected.key] ?? 0 }))
@@ -115,8 +117,12 @@ export function CategoryDetailSheet({
                     <CompactAmount value={Math.abs(change.amount)} currency={currency} />
                   </span>
                   <span>
-                    {sign}
-                    {formatChangePercent(change.percent)}
+                    {change.percent !== null && sign}
+                    {formatChangePercent(
+                      change,
+                      t("insights:networth.breakdown_table.new"),
+                      formatting,
+                    )}
                   </span>
                   <span className="text-muted-foreground font-normal">
                     {t("insights:networth.category_sheet.over_period", { period: periodLabel })}

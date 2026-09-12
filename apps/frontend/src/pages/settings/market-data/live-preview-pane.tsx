@@ -1,23 +1,29 @@
+import type { TFunction } from "i18next";
 import { useMemo, useState } from "react";
 import { type UseFormReturn } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Input } from "@wealthfolio/ui/components/ui/input";
-import { Label } from "@wealthfolio/ui/components/ui/label";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@wealthfolio/ui/components/ui/collapsible";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Input } from "@wealthfolio/ui/components/ui/input";
+import { Label } from "@wealthfolio/ui/components/ui/label";
 
 import type { DetectedHtmlTable } from "@/lib/types/custom-provider";
 import { cn } from "@/lib/utils";
 
-import { RawResponseViewer } from "./response-preview";
+import { useNumberFormatting, type FormattingApi } from "@wealthfolio/ui";
 import type { FormValues, SourceKey } from "./custom-provider-form";
+import { RawResponseViewer } from "./response-preview";
+import {
+  expandTemplatePlaceholders,
+  resolveTemplatePlaceholder,
+  type TemplatePlaceholderValues,
+} from "./template-placeholders";
 import type { MappingField, SourceRuntime } from "./use-source-runtime";
 
 interface LivePreviewPaneProps {
@@ -77,19 +83,30 @@ const MAPPING_META: {
 ];
 
 /** Inline chips replacing placeholders in the preview URL. */
-function PreviewUrl({ template, values }: { template: string; values: Record<string, string> }) {
+function PreviewUrl({
+  template,
+  values,
+  multiline,
+  placeholder,
+}: {
+  template: string;
+  values: TemplatePlaceholderValues;
+  multiline?: boolean;
+  placeholder?: string;
+}) {
   const { t } = useTranslation();
   const segments = useMemo(() => {
     if (!template) return [];
-    const re = /\{([A-Za-z:%\-_]+)\}/g;
+    const re = /\{([A-Za-z]+)(?::([^}]+))?\}/g;
     const out: { kind: "text" | "chip"; text: string; value?: string }[] = [];
     let last = 0;
     let m: RegExpExecArray | null;
     while ((m = re.exec(template))) {
       if (m.index > last) out.push({ kind: "text", text: template.slice(last, m.index) });
       const key = m[1];
-      const value = values[key] || values[key.toUpperCase()];
-      out.push({ kind: "chip", text: key, value });
+      const format = m[2];
+      const value = resolveTemplatePlaceholder(key, format, values);
+      out.push({ kind: "chip", text: format ? `${key}:${format}` : key, value });
       last = m.index + m[0].length;
     }
     if (last < template.length) out.push({ kind: "text", text: template.slice(last) });
@@ -99,13 +116,13 @@ function PreviewUrl({ template, values }: { template: string; values: Record<str
   if (!template) {
     return (
       <span className="text-muted-foreground/60 font-mono text-xs italic">
-        {t("settings:market_data_page.enter_url_to_preview")}
+        {placeholder ?? t("settings:market_data_page.enter_url_to_preview")}
       </span>
     );
   }
 
   return (
-    <span className="break-all font-mono text-xs">
+    <span className={cn("break-all font-mono text-xs", multiline && "whitespace-pre-wrap")}>
       {segments.map((seg, i) =>
         seg.kind === "text" ? (
           <span key={i}>{seg.text}</span>
@@ -426,6 +443,8 @@ function labelForField(f: MappingField, t: TFunction): string {
 }
 
 function HtmlElementsResponse({ runtime }: { runtime: SourceRuntime }) {
+  const numberFormatting = useNumberFormatting();
+
   const { t } = useTranslation();
   const [showAll, setShowAll] = useState(false);
   const max = 10;
@@ -464,7 +483,7 @@ function HtmlElementsResponse({ runtime }: { runtime: SourceRuntime }) {
               )}
             </div>
             <span className="shrink-0 pt-0.5 font-mono text-base font-semibold tabular-nums">
-              {formatNumber(el.value)}
+              {formatNumber(el.value, numberFormatting)}
             </span>
           </button>
         ))}
@@ -484,9 +503,9 @@ function HtmlElementsResponse({ runtime }: { runtime: SourceRuntime }) {
   );
 }
 
-function formatNumber(n: number): string {
-  if (Math.abs(n) >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  if (n !== Math.floor(n)) return n.toLocaleString(undefined, { maximumFractionDigits: 6 });
+function formatNumber(n: number, formatting: Pick<FormattingApi, "formatDecimal">): string {
+  if (Math.abs(n) >= 1000) return formatting.formatDecimal(n, { maximumFractionDigits: 2 });
+  if (n !== Math.floor(n)) return formatting.formatDecimal(n, { maximumFractionDigits: 6 });
   return String(n);
 }
 
@@ -635,6 +654,7 @@ function FieldMappingRow({
 }
 
 export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps) {
+  const formatting = useNumberFormatting();
   const { t } = useTranslation();
   const [moreFieldsOpen, setMoreFieldsOpen] = useState(false);
   const format = form.watch(`${prefix}.format`) ?? "json";
@@ -659,7 +679,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
   const { inputs, setInputs, extraPlaceholders, isHistorical } = runtime;
   const previewCurrency = inputs.currency.trim() || "USD";
 
-  const previewValues: Record<string, string> = {
+  const previewValues: TemplatePlaceholderValues = {
     SYMBOL: inputs.symbol,
     ISIN: inputs.isin,
     MIC: inputs.mic,
@@ -669,6 +689,10 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
     FROM: inputs.from,
     TO: inputs.to,
   };
+
+  const method = form.watch(`${prefix}.method`) ?? "GET";
+  const bodyTemplate = form.watch(`${prefix}.body`) ?? "";
+  const expandedBody = expandTemplatePlaceholders(bodyTemplate, previewValues);
 
   const missingRange = isHistorical && (!inputs.from || !inputs.to);
   const fetchDisabled =
@@ -702,9 +726,11 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
             {t("settings:market_data_page.request_url_preview")}
           </Label>
           <span className="text-muted-foreground text-[11px]">
+            {form.watch(`${prefix}.method`) === "POST" ? "POST" : "GET"}
+            &nbsp;·&nbsp;
             {isHistorical
-              ? t("settings:market_data_page.get_historical")
-              : t("settings:market_data_page.get_latest")}
+              ? t("settings:market_data_page.method_historical")
+              : t("settings:market_data_page.method_latest")}
           </span>
         </div>
         <div className="bg-background relative min-h-[40px] rounded-lg border px-3 py-2 pr-10">
@@ -712,6 +738,24 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
           <CopyButton text={runtime.expandedUrl} disabled={!runtime.urlTemplate} />
         </div>
       </section>
+
+      {/* Request body preview (POST only) */}
+      {method === "POST" && (
+        <section className="space-y-2">
+          <Label className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+            {t("settings:market_data_page.request_body_preview")}
+          </Label>
+          <div className="bg-background relative min-h-[40px] rounded-lg border px-3 py-2 pr-10">
+            <PreviewUrl
+              template={bodyTemplate}
+              values={previewValues}
+              multiline
+              placeholder={t("settings:market_data_page.enter_body_to_preview")}
+            />
+            <CopyButton text={expandedBody} disabled={!bodyTemplate} />
+          </div>
+        </section>
+      )}
 
       {/* Test inputs */}
       <section className="space-y-2">
@@ -857,7 +901,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
                 display={
                   runtime.testResult.price != null ? (
                     <span className="tabular-nums">
-                      {runtime.testResult.price.toLocaleString()}
+                      {formatting.formatDecimal(runtime.testResult.price)}
                       {runtime.testResult.currency && (
                         <span className="text-muted-foreground ml-1.5 text-xs font-normal">
                           {runtime.testResult.currency}
@@ -885,7 +929,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
                   display={
                     runtime.testResult.open != null ? (
                       <span className="tabular-nums">
-                        {runtime.testResult.open.toLocaleString()}
+                        {formatting.formatDecimal(runtime.testResult.open)}
                       </span>
                     ) : null
                   }
@@ -898,7 +942,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
                   display={
                     runtime.testResult.high != null ? (
                       <span className="tabular-nums">
-                        {runtime.testResult.high.toLocaleString()}
+                        {formatting.formatDecimal(runtime.testResult.high)}
                       </span>
                     ) : null
                   }
@@ -911,7 +955,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
                   display={
                     runtime.testResult.low != null ? (
                       <span className="tabular-nums">
-                        {runtime.testResult.low.toLocaleString()}
+                        {formatting.formatDecimal(runtime.testResult.low)}
                       </span>
                     ) : null
                   }
@@ -924,7 +968,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
                   display={
                     runtime.testResult.volume != null ? (
                       <span className="tabular-nums">
-                        {runtime.testResult.volume.toLocaleString()}
+                        {formatting.formatDecimal(runtime.testResult.volume)}
                       </span>
                     ) : null
                   }

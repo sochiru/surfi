@@ -68,7 +68,10 @@
     "colCurrent": "当前",
     "colTarget": "目标",
     "colDrift": "偏离",
-    "colAccount": "账户"
+    "colAccount": "账户",
+    "accountCount_other": "{{count}} 个账户",
+    "summary_other": "{{count}} 项持仓 · {{currency}}",
+    "summaryUpdated_other": "{{count}} 项持仓 · {{currency}} · 更新于 {{updatedAt}}"
   },
   "presets": {
     "currentAllocation": "当前配置",
@@ -103,6 +106,29 @@
     "modeVerbSells": "卖出并买入",
     "modeVerbHybrid": "现金与卖出",
     "modeVerbCashFlow": "现金流买入"
+  },
+  "eligibleHoldings": {
+    "label": "可买入的持仓",
+    "triggerLabel": "{{label}}：{{summary}}",
+    "rowLabel": "{{symbol}} {{name}} {{details}} — {{state}}",
+    "selected": "已选择",
+    "notSelected": "未选择",
+    "allSelected": "已选择全部持仓",
+    "selectedCount": "已选择 {{selected}} / {{total}}",
+    "searchPlaceholder": "搜索持仓",
+    "noMatches": "没有匹配的持仓。",
+    "selectAll": "全选",
+    "clear": "清除",
+    "emptyGuidance": "请至少选择一项持仓后再计算计划。",
+    "groups": {
+      "equity": "股票",
+      "bond": "债券",
+      "crypto": "加密货币",
+      "option": "期权",
+      "metal": "金属",
+      "fx": "外汇",
+      "other": "其他"
+    }
   },
   "narrative": {
     "liftAndShrink": "{{verb}}将 {{lifted}} 提升至目标，并将 {{shrank}} 的超配从 {{before}} 缩减至 {{after}}。",

@@ -9,7 +9,7 @@ use rust_decimal::{prelude::FromPrimitive, Decimal};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::asset_id::{parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix};
+use super::asset_id::{parse_crypto_pair_symbol, parse_symbol_with_known_exchange};
 use crate::errors::Result;
 use crate::errors::ValidationError;
 use crate::fx::currency::normalize_currency_code;
@@ -155,6 +155,62 @@ pub struct OptionSpec {
 
 /// Top-level asset metadata key for instruments whose value is scaled per contract.
 pub const CONTRACT_MULTIPLIER_METADATA_KEY: &str = "contractMultiplier";
+
+/// Instrument-level default multiplier for assets without an explicit
+/// override. Bonds deliberately default to 1: market-data providers store
+/// bond quotes as a FRACTION of par (percent quotes are divided by 100 at
+/// the provider layer), so a percent-of-par default would double-apply the
+/// /100 and value every existing bond position at 1/100. Percent-of-par
+/// pricing is opt-in per asset via explicit `contractMultiplier` metadata.
+pub fn instrument_default_multiplier(is_option: bool, is_mini_option: bool) -> Decimal {
+    if is_option {
+        if is_mini_option {
+            Decimal::from(10)
+        } else {
+            Decimal::from(100)
+        }
+    } else {
+        Decimal::ONE
+    }
+}
+
+fn explicit_contract_multiplier_from_asset_metadata(
+    instrument_type: Option<&InstrumentType>,
+    metadata: Option<&Value>,
+) -> Option<Decimal> {
+    (instrument_type == Some(&InstrumentType::Option))
+        .then(|| {
+            metadata
+                .and_then(|value| value.get("option"))
+                .and_then(|value| serde_json::from_value::<OptionSpec>(value.clone()).ok())
+                .map(|spec| spec.multiplier)
+        })
+        .flatten()
+        .or_else(|| {
+            metadata
+                .and_then(|value| value.get(CONTRACT_MULTIPLIER_METADATA_KEY))
+                .and_then(|value| {
+                    value
+                        .as_f64()
+                        .and_then(Decimal::from_f64)
+                        .or_else(|| value.as_str().and_then(|raw| raw.parse::<Decimal>().ok()))
+                })
+                .filter(|multiplier| *multiplier > Decimal::ZERO)
+        })
+}
+
+/// Resolves the effective multiplier directly from persisted asset fields.
+///
+/// This is the field-level equivalent of [`Asset::contract_multiplier`] for
+/// projections that already joined the asset but do not need the full model.
+pub fn contract_multiplier_from_asset_metadata(
+    instrument_type: Option<&InstrumentType>,
+    metadata: Option<&Value>,
+) -> Decimal {
+    let is_option = instrument_type == Some(&InstrumentType::Option);
+    explicit_contract_multiplier_from_asset_metadata(instrument_type, metadata)
+        .unwrap_or_else(|| instrument_default_multiplier(is_option, false))
+}
 
 /// Bond specification stored in Asset.metadata["bond"]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -415,27 +471,18 @@ impl Asset {
     /// For options, this is the number of shares per contract (typically 100).
     /// Other contract instruments can provide an explicit multiplier in asset metadata.
     pub fn contract_multiplier(&self) -> Decimal {
-        if let Some(spec) = self.option_spec() {
-            spec.multiplier
-        } else if let Some(multiplier) = self
-            .metadata
-            .as_ref()
-            .and_then(|metadata| metadata.get(CONTRACT_MULTIPLIER_METADATA_KEY))
-            .and_then(|value| {
-                value
-                    .as_f64()
-                    .and_then(Decimal::from_f64)
-                    .or_else(|| value.as_str().and_then(|raw| raw.parse::<Decimal>().ok()))
-            })
-            .filter(|multiplier| *multiplier > Decimal::ZERO)
-        {
-            multiplier
-        } else if self.is_option() {
-            // Option without metadata — default to standard 100 multiplier
-            Decimal::from(100)
-        } else {
-            Decimal::ONE
-        }
+        contract_multiplier_from_asset_metadata(
+            self.instrument_type.as_ref(),
+            self.metadata.as_ref(),
+        )
+    }
+
+    /// Returns only a multiplier explicitly carried by the asset.
+    pub fn explicit_contract_multiplier(&self) -> Option<Decimal> {
+        explicit_contract_multiplier_from_asset_metadata(
+            self.instrument_type.as_ref(),
+            self.metadata.as_ref(),
+        )
     }
 
     /// Get option metadata if this is an option (instrument_type = OPTION)
@@ -1045,7 +1092,10 @@ pub fn canonicalize_market_identity(
         | Some(InstrumentType::Option)
         | Some(InstrumentType::Metal) => {
             if let Some(raw) = instrument_symbol.as_deref() {
-                let (base, suffix_mic) = parse_symbol_with_exchange_suffix(raw);
+                // The known venue decides whether a trailing `.X` is an exchange
+                // suffix or part of the ticker — see `parse_symbol_with_known_exchange`.
+                let (base, suffix_mic) =
+                    parse_symbol_with_known_exchange(raw, instrument_exchange_mic.as_deref());
                 instrument_symbol = Some(base.to_uppercase());
                 if instrument_exchange_mic.is_none() {
                     instrument_exchange_mic = suffix_mic.map(str::to_string);
@@ -1330,6 +1380,57 @@ mod tests {
             bond.coupon_frequency, None,
             "Corporate bond coupon_frequency should be None"
         );
+    }
+
+    #[test]
+    fn a_share_class_suffix_survives_when_the_venue_contradicts_it() {
+        // `ZAAA.F` on Cboe Canada is BMO's currency-hedged unit class, and `.F` is
+        // Yahoo's Frankfurt suffix. Stripping it stored the holding under `ZAAA`, the
+        // unhedged listing — a different security. Observed live 2026-07-30.
+        let result = canonicalize_market_identity(
+            Some(InstrumentType::Equity),
+            Some("ZAAA.F"),
+            Some("NEOE"),
+            None,
+        );
+
+        assert_eq!(result.instrument_symbol.as_deref(), Some("ZAAA.F"));
+        assert_eq!(result.instrument_exchange_mic.as_deref(), Some("NEOE"));
+        assert_eq!(result.display_code.as_deref(), Some("ZAAA.F"));
+    }
+
+    #[test]
+    fn an_exchange_suffix_is_still_stripped_when_the_venue_agrees_or_is_absent() {
+        // The ordinary paths, unchanged: no venue to check against, and a venue that
+        // says the same thing the suffix does.
+        let inferred =
+            canonicalize_market_identity(Some(InstrumentType::Equity), Some("SHOP.TO"), None, None);
+        assert_eq!(inferred.instrument_symbol.as_deref(), Some("SHOP"));
+        assert_eq!(inferred.instrument_exchange_mic.as_deref(), Some("XTSE"));
+
+        let agreeing = canonicalize_market_identity(
+            Some(InstrumentType::Equity),
+            Some("SHOP.TO"),
+            Some("XTSE"),
+            None,
+        );
+        assert_eq!(agreeing.instrument_symbol.as_deref(), Some("SHOP"));
+        assert_eq!(agreeing.instrument_exchange_mic.as_deref(), Some("XTSE"));
+    }
+
+    #[test]
+    fn a_share_class_that_is_not_a_known_venue_suffix_is_untouched_either_way() {
+        // `.B` is not in the Yahoo suffix table, so this never depended on the rule
+        // above — pinned so a widened table cannot silently mangle a share class.
+        for mic in [Some("XNYS"), None] {
+            let result = canonicalize_market_identity(
+                Some(InstrumentType::Equity),
+                Some("BRK.B"),
+                mic,
+                None,
+            );
+            assert_eq!(result.instrument_symbol.as_deref(), Some("BRK.B"));
+        }
     }
 
     #[test]

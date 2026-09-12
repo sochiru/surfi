@@ -4,7 +4,7 @@ import { debounce } from "@/lib/debounce";
 import { SymbolSearchResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { formatPrice } from "@wealthfolio/ui";
+import { useAmountFormatting } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Command,
@@ -29,6 +29,7 @@ interface QuoteInfo {
 }
 
 interface SearchProps {
+  id?: string;
   selectedResult?: SymbolSearchResult;
   defaultValue?: string;
   value?: string;
@@ -207,6 +208,7 @@ function focusRelativeTo(anchor: HTMLElement, direction: "next" | "prev") {
 const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
   (
     {
+      id,
       selectedResult,
       defaultValue,
       value,
@@ -225,6 +227,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     },
     ref,
   ) => {
+    const amountFormatting = useAmountFormatting();
     const { t } = useTranslation();
     const resolvedPlaceholder = placeholder ?? t("common:component.select_symbol");
     const isControlled = openProp !== undefined;
@@ -477,6 +480,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
         <Popover open={open} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>
             <Button
+              id={id}
               variant="outline"
               role="combobox"
               className={cn(
@@ -518,7 +522,11 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                         ) : (
                           quoteInfo?.price != null && (
                             <span className="tabular-nums">
-                              {formatPrice(quoteInfo.price, quoteInfo.currency ?? "USD", false)}
+                              {amountFormatting.formatPrice(
+                                quoteInfo.price,
+                                quoteInfo.currency ?? "USD",
+                                false,
+                              )}
                             </span>
                           )
                         )}

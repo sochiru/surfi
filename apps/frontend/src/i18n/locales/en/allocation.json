@@ -68,7 +68,13 @@
     "colCurrent": "Current",
     "colTarget": "Target",
     "colDrift": "Drift",
-    "colAccount": "Account"
+    "colAccount": "Account",
+    "accountCount_one": "{{count}} account",
+    "accountCount_other": "{{count}} accounts",
+    "summary_one": "{{count}} holding · {{currency}}",
+    "summary_other": "{{count}} holdings · {{currency}}",
+    "summaryUpdated_one": "{{count}} holding · {{currency}} · Updated {{updatedAt}}",
+    "summaryUpdated_other": "{{count}} holdings · {{currency}} · Updated {{updatedAt}}"
   },
   "presets": {
     "currentAllocation": "Current allocation",
@@ -98,11 +104,34 @@
     "loading": "Loading…",
     "recalculate": "Recalculate",
     "calculatePlan": "Calculate plan",
-    "driverSentenceOver": "{{name}} sits {{current}}% over a {{target}}% target.",
-    "driverSentenceUnder": "{{name}} sits {{current}}% under a {{target}}% target.",
+    "driverSentenceOver": "{{name}} is at {{current}}%, above a {{target}}% target.",
+    "driverSentenceUnder": "{{name}} is at {{current}}%, below a {{target}}% target.",
     "modeVerbSells": "Sells and buys",
     "modeVerbHybrid": "Cash and sells",
     "modeVerbCashFlow": "Cash-flow buys"
+  },
+  "eligibleHoldings": {
+    "label": "Eligible holdings",
+    "triggerLabel": "{{label}}: {{summary}}",
+    "rowLabel": "{{symbol}} {{name}} {{details}} — {{state}}",
+    "selected": "selected",
+    "notSelected": "not selected",
+    "allSelected": "All holdings selected",
+    "selectedCount": "{{selected}} of {{total}} selected",
+    "searchPlaceholder": "Search holdings",
+    "noMatches": "No holding matches.",
+    "selectAll": "Select all",
+    "clear": "Clear",
+    "emptyGuidance": "Select at least one holding to calculate a plan.",
+    "groups": {
+      "equity": "Equity",
+      "bond": "Bond",
+      "crypto": "Crypto",
+      "option": "Option",
+      "metal": "Metal",
+      "fx": "FX",
+      "other": "Other"
+    }
   },
   "narrative": {
     "liftAndShrink": "{{verb}} lift {{lifted}} toward target and shrink the {{shrank}} overweight from {{before}} to {{after}}.",

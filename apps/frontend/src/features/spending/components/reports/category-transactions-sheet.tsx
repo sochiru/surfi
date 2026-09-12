@@ -1,7 +1,12 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
+import { TruncatedText } from "@/components/truncated-text";
+import { useAccounts } from "@/hooks/use-accounts";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import type { Account, TaxonomyCategory } from "@/lib/types";
+import { cn, formatDate, formatDateISO } from "@/lib/utils";
 import {
   Button,
   Icons,
@@ -10,18 +15,22 @@ import {
   SheetContent,
   SheetTitle,
   Skeleton,
-  formatCompactAmount,
+  calendarDateFromLocalDate,
+  useAmountFormatting,
+  useDateFormatting,
+  useNumberFormatting,
+  type FormattingApi,
 } from "@wealthfolio/ui";
-import { useAccounts } from "@/hooks/use-accounts";
-import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import type { Account, TaxonomyCategory } from "@/lib/types";
-import { cn, formatDate, formatDateISO } from "@/lib/utils";
 
-import { CategoryIcon } from "../category-chips";
 import { useCashActivitySearch } from "../../hooks/use-cash-activity-search";
+import {
+  computeCategoryDrilldown,
+  DIRECT_ROW_ID,
+  type DrilldownBucket,
+} from "../../lib/category-drilldown";
+import { descendantCategoryIds } from "../../lib/category-rollup";
 import { getActivitySpendingAmount } from "../../lib/constants";
-
-const SPENDING_TAXONOMY = "spending_categories";
+import { CategoryIcon } from "../category-chips";
 
 interface CategoryTransactionsSheetProps {
   open: boolean;
@@ -31,6 +40,22 @@ interface CategoryTransactionsSheetProps {
   taxonomyCategories: TaxonomyCategory[];
   rangeStart: Date;
   rangeEnd: Date;
+  /**
+   * `insight.byDayByCategory` for the same window as `rangeStart`/`rangeEnd`.
+   * The header stats and subcategory mix come from here rather than from the
+   * paginated list below, which only ever holds the pages loaded so far.
+   */
+  buckets: DrilldownBucket[];
+  /** Calendar length of the window, from `ReportsRange.days`. Deriving it
+   *  from the two boundary instants overcounts by a day. */
+  rangeDays: number;
+  /** `insight.headline.pace.daysElapsed` — days of the window that have
+   *  actually happened, resolved in the app timezone. The pace card on the
+   *  page behind the drawer divides by the same figure. */
+  daysElapsed: number;
+  /** Loading state of the insight query that produced `buckets` — separate
+   *  from the transaction list's own. */
+  isStatsLoading: boolean;
   currency: string;
 }
 
@@ -61,29 +86,37 @@ export function CategoryTransactionsSheet({
   taxonomyCategories,
   rangeStart,
   rangeEnd,
+  buckets,
+  rangeDays,
+  daysElapsed,
+  isStatsLoading,
   currency,
 }: CategoryTransactionsSheetProps) {
+  const amountFormatting = useAmountFormatting();
+  const numberFormatting = useNumberFormatting();
+  const dateFormatting = useDateFormatting();
+
   const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
   const isTopLevel = !!category && !category.parentId;
 
-  const ids = useMemo(() => {
-    if (!category) return [] as string[];
-    if (category.parentId) return [category.id];
-    const out = [category.id];
-    for (const c of taxonomyCategories) {
-      if (c.parentId === category.id) out.push(c.id);
-    }
-    return out;
-  }, [category, taxonomyCategories]);
+  const categoryMeta = useMemo(
+    () => new Map(taxonomyCategories.map((c) => [c.id, c] as const)),
+    [taxonomyCategories],
+  );
 
+  // Whole subtree, so the list covers exactly what the stats roll up.
+  const ids = useMemo(
+    () => (category ? descendantCategoryIds(category.id, taxonomyCategories) : []),
+    [category, taxonomyCategories],
+  );
+
+  // Both bounds are already resolved against the configured app timezone —
+  // `rangeEnd` is that day's inclusive end-of-day instant. Re-flooring it to
+  // the *browser's* 23:59:59 would shift the window whenever the two
+  // timezones differ, pulling in rows the insight never counted.
   const startIso = rangeStart.toISOString();
-  // Inclusive end-of-day so transactions on the final day are included.
-  const endIso = useMemo(() => {
-    const d = new Date(rangeEnd);
-    d.setHours(23, 59, 59, 999);
-    return d.toISOString();
-  }, [rangeEnd]);
+  const endIso = rangeEnd.toISOString();
 
   const searchRequest = useMemo(
     () => ({
@@ -114,69 +147,37 @@ export function CategoryTransactionsSheet({
     return m;
   }, [accounts]);
 
-  // Aggregate the loaded items into the four header stats.
-  const stats = useMemo(() => {
-    let outflow = 0;
-    let outflowCount = 0;
-    for (const it of items) {
-      const account = accountById.get(it.accountId);
-      const amt = getActivitySpendingAmount(it, account?.accountType);
-      if (amt <= 0) continue;
-      outflow += amt;
-      outflowCount += 1;
-    }
-    const avg = outflowCount > 0 ? outflow / outflowCount : 0;
-    const days = Math.max(
-      1,
-      Math.round((rangeEnd.getTime() - rangeStart.getTime()) / 86_400_000) + 1,
-    );
-    const dailyPace = outflow / days;
-    return { outflow, outflowCount, avg, dailyPace, days };
-  }, [items, accountById, rangeStart, rangeEnd]);
+  // Header stats come from the server aggregate, never from `items` — the
+  // list holds only the pages fetched so far.
+  const drilldown = useMemo(
+    () =>
+      category
+        ? computeCategoryDrilldown({ categoryId: category.id, buckets, meta: categoryMeta })
+        : { spent: 0, mix: [] },
+    [buckets, category, categoryMeta],
+  );
 
-  // Subcategory composition for top-level categories only. Loaded items each
-  // carry their assignments; group by the spending-taxonomy assignment id.
+  // Divided by the same count shown in the TX tile, so the three figures
+  // multiply out on screen.
+  const avg = totalCount > 0 ? drilldown.spent / totalCount : 0;
+  // Elapsed days, not the calendar length: a live month-to-date window has
+  // most of its days still ahead of it.
+  const dailyPace = drilldown.spent / Math.max(1, daysElapsed);
+
+  // Subcategory composition for top-level categories only. Names and colors
+  // are resolved here; the arithmetic lives in `computeCategoryDrilldown`.
   const subBreakdown = useMemo(() => {
     if (!isTopLevel || !category) return [];
-    const subMeta = new Map(
-      taxonomyCategories.filter((c) => c.parentId === category.id).map((c) => [c.id, c] as const),
-    );
-    const byId = new Map<string, { id: string; name: string; color: string; amount: number }>();
-    let directAmount = 0; // Items tagged directly to the parent (no sub).
-    for (const it of items) {
-      const account = accountById.get(it.accountId);
-      const amt = getActivitySpendingAmount(it, account?.accountType);
-      if (amt <= 0) continue;
-      const assignment = it.assignments.find((a) => a.taxonomyId === SPENDING_TAXONOMY);
-      const subId = assignment?.categoryId;
-      if (subId && subMeta.has(subId)) {
-        const m = subMeta.get(subId)!;
-        const e = byId.get(subId) ?? {
-          id: subId,
-          name: m.name,
-          color: m.color ?? "var(--muted-foreground)",
-          amount: 0,
-        };
-        e.amount += amt;
-        byId.set(subId, e);
-      } else {
-        directAmount += amt;
-      }
-    }
-    const rows = Array.from(byId.values())
-      .filter((r) => r.amount > 0)
-      .sort((a, b) => b.amount - a.amount);
-    if (directAmount > 0) {
-      rows.push({
-        id: "__direct__",
-        name: t("spending:categorySheet.direct"),
-        color: category.color ?? "var(--muted-foreground)",
-        amount: directAmount,
-      });
-    }
-    const total = rows.reduce((s, r) => s + r.amount, 0);
-    return rows.map((r) => ({ ...r, share: total > 0 ? (r.amount / total) * 100 : 0 }));
-  }, [accountById, category, isTopLevel, items, taxonomyCategories, t]);
+    return drilldown.mix.map((row) => {
+      const meta = row.id === DIRECT_ROW_ID ? category : categoryMeta.get(row.id);
+      return {
+        ...row,
+        name:
+          row.id === DIRECT_ROW_ID ? t("spending:categorySheet.direct") : (meta?.name ?? row.id),
+        color: meta?.color ?? "var(--muted-foreground)",
+      };
+    });
+  }, [category, categoryMeta, drilldown.mix, isTopLevel, t]);
 
   const transactionsLink = useMemo(() => {
     if (!category) return "/activities?tab=spending";
@@ -236,8 +237,8 @@ export function CategoryTransactionsSheet({
                 {category?.name ?? t("spending:categorySheet.categoryFallback")}
               </SheetTitle>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                {formatRangeLabel(rangeStart, rangeEnd)} ·{" "}
-                {t("spending:categorySheet.daysCount", { count: stats.days })}
+                {formatRangeLabel(rangeStart, rangeEnd, dateFormatting)} ·{" "}
+                {t("spending:categorySheet.daysCount", { count: rangeDays })}
               </p>
             </div>
           </div>
@@ -246,47 +247,49 @@ export function CategoryTransactionsSheet({
             <Stat
               label={t("spending:categorySheet.spent")}
               value={
-                isLoading ? (
+                isStatsLoading ? (
                   <Skeleton className="h-5 w-16" />
                 ) : isBalanceHidden ? (
                   "••••"
                 ) : (
-                  formatCompactAmount(stats.outflow, currency)
+                  amountFormatting.formatCompactAmount(drilldown.spent, currency)
                 )
               }
               hint={isTopLevel ? t("spending:categorySheet.allSubcategories") : null}
             />
             <Stat
               label={t("spending:categorySheet.tx")}
-              value={isLoading ? <Skeleton className="h-5 w-10" /> : totalCount.toLocaleString()}
-              hint={
-                stats.outflowCount > 0 && stats.outflowCount < totalCount
-                  ? t("spending:categorySheet.outflowsCount", { count: stats.outflowCount })
-                  : null
+              value={
+                isLoading ? (
+                  <Skeleton className="h-5 w-10" />
+                ) : (
+                  numberFormatting.formatDecimal(totalCount)
+                )
               }
+              hint={null}
             />
             <Stat
               label={t("spending:categorySheet.avgPerTx")}
               value={
-                isLoading ? (
+                isStatsLoading || isLoading ? (
                   <Skeleton className="h-5 w-14" />
                 ) : isBalanceHidden ? (
                   "••••"
                 ) : (
-                  formatCompactAmount(stats.avg, currency)
+                  amountFormatting.formatCompactAmount(avg, currency)
                 )
               }
-              hint={t("spending:categorySheet.outflowsOnly")}
+              hint={t("spending:categorySheet.acrossAllTx")}
             />
             <Stat
               label={t("spending:categorySheet.dailyPace")}
               value={
-                isLoading ? (
+                isStatsLoading ? (
                   <Skeleton className="h-5 w-14" />
                 ) : isBalanceHidden ? (
                   "••••"
                 ) : (
-                  formatCompactAmount(stats.dailyPace, currency)
+                  amountFormatting.formatCompactAmount(dailyPace, currency)
                 )
               }
               hint={t("spending:categorySheet.inThisPeriod")}
@@ -297,7 +300,7 @@ export function CategoryTransactionsSheet({
         {/* ── Body ───────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {/* Subcategory composition */}
-          {isTopLevel && (subBreakdown.length > 0 || isLoading) && (
+          {isTopLevel && (subBreakdown.length > 0 || isStatsLoading) && (
             <section className="mb-6">
               <h3 className="text-foreground text-sm font-semibold">
                 {t("spending:categorySheet.subcategoryMix")}
@@ -306,7 +309,7 @@ export function CategoryTransactionsSheet({
                 {t("spending:categorySheet.subcategoryMixHint")}
               </p>
               <div className="mt-3 space-y-2">
-                {isLoading ? (
+                {isStatsLoading ? (
                   <>
                     <Skeleton className="h-5 w-full" />
                     <Skeleton className="h-5 w-full" />
@@ -333,10 +336,12 @@ export function CategoryTransactionsSheet({
                         />
                       </div>
                       <span className="text-muted-foreground/80 w-10 shrink-0 text-right text-[11px] tabular-nums">
-                        {row.share.toFixed(0)}%
+                        {numberFormatting.formatPercent(row.share / 100, { digits: 0 })}
                       </span>
                       <span className="text-foreground/90 w-16 shrink-0 text-right text-xs font-semibold tabular-nums">
-                        {isBalanceHidden ? "••••" : formatCompactAmount(row.amount, currency)}
+                        {isBalanceHidden
+                          ? "••••"
+                          : amountFormatting.formatCompactAmount(row.amount, currency)}
                       </span>
                     </div>
                   ))
@@ -390,15 +395,17 @@ export function CategoryTransactionsSheet({
                       className="hover:bg-muted/30 flex items-center gap-2.5 px-1 py-2 transition-colors"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="text-foreground truncate text-[13px] font-medium leading-tight">
-                          {it.notes ?? (
+                        <div className="text-foreground text-[13px] font-medium leading-tight">
+                          {it.notes != null ? (
+                            <TruncatedText text={it.notes} />
+                          ) : (
                             <span className="text-muted-foreground italic">
                               {it.activityType.toLowerCase()}
                             </span>
                           )}
                         </div>
                         <div className="text-muted-foreground/80 mt-0.5 flex items-center gap-1 text-[10px] leading-tight">
-                          <span>{formatDate(it.activityDate)}</span>
+                          <span>{formatDate(it.activityDate, dateFormatting)}</span>
                           <span aria-hidden>·</span>
                           <span className="truncate">{account?.name ?? it.accountId}</span>
                         </div>
@@ -483,12 +490,17 @@ function Stat({
   );
 }
 
-function formatRangeLabel(start: Date, end: Date): string {
-  const fmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+function formatRangeLabel(
+  start: Date,
+  end: Date,
+  formatting: Pick<FormattingApi, "formatCalendarDate">,
+): string {
   const sameYear = start.getFullYear() === end.getFullYear();
-  const yearFmt = new Intl.DateTimeFormat(undefined, { year: "numeric" });
-  const startStr = fmt.format(start);
-  const endStr = fmt.format(end);
-  const yearStr = sameYear ? `, ${yearFmt.format(end)}` : "";
+  const options = { month: "short", day: "numeric" } as const;
+  const startStr = formatting.formatCalendarDate(calendarDateFromLocalDate(start), options);
+  const endStr = formatting.formatCalendarDate(calendarDateFromLocalDate(end), options);
+  const yearStr = sameYear
+    ? `, ${formatting.formatCalendarDate(calendarDateFromLocalDate(end), { year: "numeric" })}`
+    : "";
   return `${startStr} – ${endStr}${yearStr}`;
 }

@@ -14,20 +14,20 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  formatAmount,
-  formatCompactAmount,
+  useAmountFormatting,
+  useNumberFormatting,
+  type FormattingApi,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { RiskLabSkeleton, StressCardSkeleton } from "../components/risk-lab-skeleton";
 import {
   TooltipContent,
   TooltipTrigger,
   Tooltip as UiTooltip,
 } from "@wealthfolio/ui/components/ui/tooltip";
+import type { TFunction } from "i18next";
 import type { CSSProperties } from "react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 import {
   Area,
   AreaChart,
@@ -40,6 +40,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { RiskLabSkeleton, StressCardSkeleton } from "../components/risk-lab-skeleton";
 import type {
   DecisionSensitivityCell,
   DecisionSensitivityMatrix,
@@ -49,6 +50,8 @@ import type {
   StressSeverity,
   StressTestResult,
 } from "../types";
+
+import { SimulationPercentage } from "../components/simulation-percentage";
 
 type PlannerMode = "fire" | "traditional";
 
@@ -73,12 +76,23 @@ const CHART = {
   reference: "color-mix(in srgb, var(--muted-foreground) 70%, transparent)",
 };
 
-function fmt(value: number, currency: string) {
-  return formatAmount(value, currency);
+function fmt(value: number, currency: string, formatting: Pick<FormattingApi, "formatAmount">) {
+  return formatting.formatAmount(value, currency);
 }
 
-function pct(value: number) {
-  return `${(value * 100).toFixed(0)}%`;
+function localizedBackendLabel(t: TFunction, label: string) {
+  const keys: Record<string, string> = {
+    "Base case": "risk_lab.advanced.base_case",
+    "Crash Year 1 (-30%)": "risk_lab.labels.crash_year_1",
+    "Crash Year 5 (-30%)": "risk_lab.labels.crash_year_5",
+    "Double Crash": "risk_lab.labels.double_crash",
+    "Lost Decade": "risk_lab.labels.lost_decade",
+    "After-fee return": "risk_lab.labels.after_fee_return",
+    "Monthly contribution": "sidebar.plan.monthly_contribution",
+    "Monthly spending": "sidebar.spending.monthly_spending",
+    "Retirement age": "sidebar.plan.retirement_age",
+  };
+  return keys[label] ? t(`goals:${keys[label]}`) : label;
 }
 
 function moneyLastsDefinition(t: TFunction, plannerMode: PlannerMode, horizonAge: number) {
@@ -87,14 +101,6 @@ function moneyLastsDefinition(t: TFunction, plannerMode: PlannerMode, horizonAge
   }
 
   return t("goals:risk_lab.results.money_lasts_definition_fire", { horizonAge });
-}
-
-function moneyLastsSummary(t: TFunction, plannerMode: PlannerMode, horizonAge: number) {
-  if (plannerMode === "traditional") {
-    return t("goals:risk_lab.results.money_lasts_summary_traditional", { horizonAge });
-  }
-
-  return t("goals:risk_lab.results.money_lasts_summary_fire", { horizonAge });
 }
 
 function moneyLastsPrompt(t: TFunction, plannerMode: PlannerMode, horizonAge: number) {
@@ -153,6 +159,7 @@ function InlineAmountTooltip({
   delta: number;
   tone?: "default" | "shortfall";
 }) {
+  const formatting = useAmountFormatting();
   const { t } = useTranslation();
   return (
     <UiTooltip>
@@ -163,20 +170,20 @@ function InlineAmountTooltip({
             tone === "shortfall" ? "text-amber-600" : "text-foreground",
           )}
         >
-          {formatCompactAmount(value, currency)}
+          {formatting.formatCompactAmount(value, currency)}
         </span>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs text-xs">
         <div className="text-[10px] font-semibold uppercase tracking-wider">{label}</div>
         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums">
           <span className="text-muted-foreground">{t("goals:risk_lab.results.base_plan")}</span>
-          <span className="text-right">{fmt(baseline, currency)}</span>
+          <span className="text-right">{fmt(baseline, currency, formatting)}</span>
           <span className="text-muted-foreground">{t("goals:risk_lab.results.stress_test")}</span>
-          <span className="text-right">{fmt(stressed, currency)}</span>
+          <span className="text-right">{fmt(stressed, currency, formatting)}</span>
           <span className="text-muted-foreground">{t("goals:risk_lab.results.change")}</span>
           <span className={cn("text-right", delta < 0 ? "text-destructive" : "text-amber-600")}>
             {delta > 0 ? "+" : delta < 0 ? "-" : ""}
-            {fmt(Math.abs(delta), currency)}
+            {fmt(Math.abs(delta), currency, formatting)}
           </span>
         </div>
       </TooltipContent>
@@ -241,7 +248,9 @@ function deterministicRiskContent(
 
   return (
     <>
-      {t("goals:risk_lab.results.largest_risk", { label: stress.label })}
+      {t("goals:risk_lab.results.largest_risk", {
+        label: t(`goals:risk_lab.scenarios.${stress.id}.label`),
+      })}
       {fragments.length ? ": " : "."}
       {fragments.map((fragment, index) => (
         <Fragment key={index}>
@@ -343,6 +352,8 @@ function PlanResilienceHero({
   mc?: MonteCarloResult;
   plannerMode?: PlannerMode;
 }) {
+  const amountFormatting = useAmountFormatting();
+
   const { t } = useTranslation();
   const currency = plan.currency;
   const isTraditional = plannerMode === "traditional";
@@ -361,16 +372,16 @@ function PlanResilienceHero({
   const gapLabel =
     !overview || !hasGap
       ? isTraditional && surplus > 0
-        ? formatCompactAmount(surplus, currency)
+        ? amountFormatting.formatCompactAmount(surplus, currency)
         : t("goals:risk_lab.results.none")
-      : formatCompactAmount(overview.shortfallAtGoalAge, currency);
+      : amountFormatting.formatCompactAmount(overview.shortfallAtGoalAge, currency);
   const gapDetail =
     !overview || !hasGap
       ? isTraditional && surplus > 0
         ? t("goals:risk_lab.results.surplus")
         : t("goals:risk_lab.results.funded")
       : t("goals:risk_lab.results.amount_gap", {
-          amount: formatCompactAmount(overview.shortfallAtGoalAge, currency),
+          amount: amountFormatting.formatCompactAmount(overview.shortfallAtGoalAge, currency),
         });
   const fiDetail = fiAge
     ? fiAge <= desiredAge
@@ -385,12 +396,6 @@ function PlanResilienceHero({
     <Card className="overflow-hidden shadow-sm">
       <CardContent className="space-y-4 p-5 md:p-6">
         <div className="flex gap-4">
-          <div
-            className={cn(
-              "mt-2 h-14 w-1.5 shrink-0 rounded-full",
-              isBaselineHealthy ? "bg-[hsl(111,25%,48%)]" : "bg-destructive",
-            )}
-          />
           <div className="min-w-0 space-y-3">
             <div>
               <p className="text-muted-foreground text-[9px] font-semibold uppercase tracking-[0.22em]">
@@ -408,7 +413,7 @@ function PlanResilienceHero({
                 </span>
                 .
               </h2>
-              <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed">
+              <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed xl:max-w-4xl">
                 {risk}
               </p>
             </div>
@@ -428,7 +433,11 @@ function PlanResilienceHero({
           {isTraditional ? (
             <HeroMetric
               label={t("goals:risk_lab.hero.projected_balance")}
-              value={overview ? formatCompactAmount(overview.portfolioAtGoalAge, currency) : "—"}
+              value={
+                overview
+                  ? amountFormatting.formatCompactAmount(overview.portfolioAtGoalAge, currency)
+                  : "—"
+              }
               detail={t("goals:risk_lab.hero.at_age", { age: desiredAge })}
               tone={isBaselineHealthy ? "good" : "bad"}
             />
@@ -452,13 +461,19 @@ function PlanResilienceHero({
           />
           <HeroMetric
             label={t("goals:risk_lab.hero.money_lasts")}
-            value={mc ? pct(mc.successRate) : "—"}
-            detail={
-              mc
-                ? t("goals:risk_lab.hero.paths_count", { count: mc.nSimulations.toLocaleString() })
-                : t("goals:risk_lab.hero.not_run")
+            value={
+              mc ? <SimulationPercentage rate={mc.successRate} plannerMode={plannerMode} /> : "—"
             }
-            tone={mc ? (mc.successRate >= 0.9 ? "good" : "bad") : "default"}
+            detail={
+              mc ? (
+                <>
+                  {t("goals:risk_lab.results.of_simulated_paths")} ·{" "}
+                  {t("goals:risk_lab.hero.paths_count", { count: mc.nSimulations })}
+                </>
+              ) : (
+                t("goals:risk_lab.hero.not_run")
+              )
+            }
           />
         </div>
       </CardContent>
@@ -466,11 +481,15 @@ function PlanResilienceHero({
   );
 }
 
-function compactDelta(value: number, currency: string) {
+function compactDelta(
+  value: number,
+  currency: string,
+  formatting: Pick<FormattingApi, "formatCompactAmount">,
+) {
   if (Math.abs(value) < 1) return "—";
   const direction = value > 0 ? "↑" : "↓";
   const sign = value > 0 ? "+" : "-";
-  return `${direction}${sign}${formatCompactAmount(Math.abs(value), currency)}`;
+  return `${direction}${sign}${formatting.formatCompactAmount(Math.abs(value), currency)}`;
 }
 
 function fiAgeDeltaLabel(t: TFunction, stress: StressTestResult) {
@@ -498,12 +517,6 @@ function severityBadgeClass(severity: StressSeverity) {
   return "bg-muted text-muted-foreground";
 }
 
-function severityRailClass(severity: StressSeverity) {
-  if (severity === "high") return "bg-destructive";
-  if (severity === "medium") return "bg-amber-500";
-  return "bg-border";
-}
-
 function impactTextClass(value: number, badWhenPositive = true) {
   if (Math.abs(value) < 1) return "text-foreground";
   const isBad = badWhenPositive ? value > 0 : value < 0;
@@ -511,7 +524,7 @@ function impactTextClass(value: number, badWhenPositive = true) {
 }
 
 function StressIcon({ id }: { id: StressTestResult["id"] }) {
-  const className = "mt-0.5 size-3.5 shrink-0 text-muted-foreground";
+  const className = "size-3.5 shrink-0 text-muted-foreground";
   switch (id) {
     case "return-drag":
       return <Icons.TrendingDown className={className} />;
@@ -600,6 +613,7 @@ function StressTestsSection({
   onRun: () => void;
   plannerMode?: PlannerMode;
 }) {
+  const formatting = useAmountFormatting();
   const { t } = useTranslation();
   const isTraditional = plannerMode === "traditional";
   const sorted = useMemo(
@@ -654,21 +668,22 @@ function StressTestsSection({
               key={stress.id}
               className="bg-card relative overflow-hidden rounded-xl border shadow-sm"
             >
-              <div
-                className={cn(
-                  "absolute inset-y-5 left-0 w-0.5 rounded-r-full",
-                  severityRailClass(stress.severity),
-                )}
-              />
               <div className="p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <StressIcon id={stress.id} />
-                      <h3 className="text-base font-semibold leading-none">{stress.label}</h3>
+                      <span
+                        aria-hidden="true"
+                        className="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full"
+                      >
+                        <StressIcon id={stress.id} />
+                      </span>
+                      <h3 className="text-base font-semibold leading-none">
+                        {t(`goals:risk_lab.scenarios.${stress.id}.label`)}
+                      </h3>
                     </div>
                     <p className="text-muted-foreground mt-3 line-clamp-2 text-sm">
-                      {stress.description}
+                      {t(`goals:risk_lab.scenarios.${stress.id}.description`)}
                     </p>
                   </div>
                   <Badge
@@ -715,14 +730,20 @@ function StressTestsSection({
                     />
                     <StressMetric
                       label={t("goals:risk_lab.stress.extra_gap")}
-                      value={compactDelta(stress.delta.shortfallAtGoalAge, currency)}
-                      from={formatCompactAmount(stress.baseline.shortfallAtGoalAge, currency)}
+                      value={compactDelta(stress.delta.shortfallAtGoalAge, currency, formatting)}
+                      from={formatting.formatCompactAmount(
+                        stress.baseline.shortfallAtGoalAge,
+                        currency,
+                      )}
                       tone={impactTextClass(stress.delta.shortfallAtGoalAge)}
                     />
                     <StressMetric
                       label={t("goals:risk_lab.stress.money_left")}
-                      value={compactDelta(stress.delta.portfolioAtHorizon, currency)}
-                      from={formatCompactAmount(stress.baseline.portfolioAtHorizon, currency)}
+                      value={compactDelta(stress.delta.portfolioAtHorizon, currency, formatting)}
+                      from={formatting.formatCompactAmount(
+                        stress.baseline.portfolioAtHorizon,
+                        currency,
+                      )}
                       tone={impactTextClass(stress.delta.portfolioAtHorizon, false)}
                     />
                   </div>
@@ -747,6 +768,8 @@ function MonteCarloTooltip({
   label?: string | number;
   currency: string;
 }) {
+  const amountFormatting = useAmountFormatting();
+
   const { t } = useTranslation();
   const point = payload?.[0]?.payload;
   if (!active || !point) return null;
@@ -755,15 +778,25 @@ function MonteCarloTooltip({
       <p className="font-semibold">{t("goals:risk_lab.chart.age_label", { age: label })}</p>
       <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
         <span className="text-muted-foreground">P90</span>
-        <span className="text-right tabular-nums">{fmt(point.p90, currency)}</span>
+        <span className="text-right tabular-nums">
+          {fmt(point.p90, currency, amountFormatting)}
+        </span>
         <span className="text-muted-foreground">P75</span>
-        <span className="text-right tabular-nums">{fmt(point.p75, currency)}</span>
+        <span className="text-right tabular-nums">
+          {fmt(point.p75, currency, amountFormatting)}
+        </span>
         <span className="text-muted-foreground">P50</span>
-        <span className="text-right tabular-nums">{fmt(point.p50, currency)}</span>
+        <span className="text-right tabular-nums">
+          {fmt(point.p50, currency, amountFormatting)}
+        </span>
         <span className="text-muted-foreground">P25</span>
-        <span className="text-right tabular-nums">{fmt(point.p25, currency)}</span>
+        <span className="text-right tabular-nums">
+          {fmt(point.p25, currency, amountFormatting)}
+        </span>
         <span className="text-muted-foreground">P10</span>
-        <span className="text-right tabular-nums">{fmt(point.p10, currency)}</span>
+        <span className="text-right tabular-nums">
+          {fmt(point.p10, currency, amountFormatting)}
+        </span>
       </div>
     </div>
   );
@@ -822,6 +855,7 @@ function MonteCarloFanChart({
   showMedianFiLine?: boolean;
   goalLabel?: string;
 }) {
+  const formatting = useAmountFormatting();
   const { t } = useTranslation();
   const chartData = useMemo(
     () =>
@@ -859,7 +893,7 @@ function MonteCarloFanChart({
           axisLine={false}
           tickLine={false}
           tick={{ fill: CHART.muted, fontSize: 12 }}
-          tickFormatter={(value) => formatCompactAmount(Number(value), currency)}
+          tickFormatter={(value) => formatting.formatCompactAmount(Number(value), currency)}
         />
         <Tooltip content={<MonteCarloTooltip currency={currency} />} />
         <Area
@@ -923,12 +957,15 @@ function MonteCarloDistributionSection({
   activeSims: number;
   plannerMode?: PlannerMode;
 }) {
+  const amountFormatting = useAmountFormatting();
+  const numberFormatting = useNumberFormatting();
+
   const { t } = useTranslation();
   const message = errorMessage(t, error);
   const desiredAge = plan.personal.targetRetirementAge;
   const isTraditional = plannerMode === "traditional";
   const moneyLastsCopy = moneyLastsDefinition(t, plannerMode, plan.personal.planningHorizonAge);
-  const moneyLastsDetail = moneyLastsSummary(t, plannerMode, plan.personal.planningHorizonAge);
+
   const moneyLastsCta = moneyLastsPrompt(t, plannerMode, plan.personal.planningHorizonAge);
 
   return (
@@ -1026,9 +1063,8 @@ function MonteCarloDistributionSection({
             <div className="bg-muted/10 grid border-b md:grid-cols-5">
               <SimulationMetric
                 label={t("goals:risk_lab.montecarlo.money_lasts")}
-                value={pct(result.successRate)}
-                detail={moneyLastsDetail}
-                tone={result.successRate >= 0.9 ? "good" : "bad"}
+                value={<SimulationPercentage rate={result.successRate} plannerMode={plannerMode} />}
+                detail={t("goals:risk_lab.results.of_simulated_paths")}
               />
               <SimulationMetric
                 label={
@@ -1045,23 +1081,35 @@ function MonteCarloDistributionSection({
               />
               <SimulationMetric
                 label={t("goals:risk_lab.montecarlo.bad_path")}
-                value={formatCompactAmount(result.finalPortfolioAtHorizon.p10, plan.currency)}
-                detail={t("goals:risk_lab.chart.age_detail", {
+                value={amountFormatting.formatCompactAmount(
+                  result.finalPortfolioAtHorizon.p10,
+                  plan.currency,
+                )}
+                detail={t("goals:risk_lab.chart.percentile_at_age", {
+                  percentile: 10,
                   age: plan.personal.planningHorizonAge,
                 })}
                 tone={result.finalPortfolioAtHorizon.p10 > 0 ? "default" : "bad"}
               />
               <SimulationMetric
                 label={t("goals:risk_lab.montecarlo.middle_path")}
-                value={formatCompactAmount(result.finalPortfolioAtHorizon.p50, plan.currency)}
-                detail={t("goals:risk_lab.chart.age_detail", {
+                value={amountFormatting.formatCompactAmount(
+                  result.finalPortfolioAtHorizon.p50,
+                  plan.currency,
+                )}
+                detail={t("goals:risk_lab.chart.percentile_at_age", {
+                  percentile: 50,
                   age: plan.personal.planningHorizonAge,
                 })}
               />
               <SimulationMetric
                 label={t("goals:risk_lab.montecarlo.good_path")}
-                value={formatCompactAmount(result.finalPortfolioAtHorizon.p90, plan.currency)}
-                detail={t("goals:risk_lab.chart.age_detail", {
+                value={amountFormatting.formatCompactAmount(
+                  result.finalPortfolioAtHorizon.p90,
+                  plan.currency,
+                )}
+                detail={t("goals:risk_lab.chart.percentile_at_age", {
+                  percentile: 90,
                   age: plan.personal.planningHorizonAge,
                 })}
                 tone="good"
@@ -1103,7 +1151,7 @@ function MonteCarloDistributionSection({
                 )}
                 <span className="ml-auto italic">
                   {t("goals:risk_lab.chart.market_paths_count", {
-                    count: result.nSimulations.toLocaleString(),
+                    count: numberFormatting.formatDecimal(result.nSimulations),
                   })}
                 </span>
               </div>
@@ -1115,8 +1163,12 @@ function MonteCarloDistributionSection({
   );
 }
 
-function axisMoney(value: number, currency: string) {
-  return formatCompactAmount(value, currency).replace(".0", "");
+function axisMoney(
+  value: number,
+  currency: string,
+  formatting: Pick<FormattingApi, "formatCompactAmount">,
+) {
+  return formatting.formatCompactAmount(value, currency).replace(".0", "");
 }
 
 function SensitivityMatrixCard({
@@ -1251,14 +1303,19 @@ function sensitivityCellStyle({
   };
 }
 
-function decisionCellLabel(t: TFunction, cell: DecisionSensitivityCell, currency: string) {
+function decisionCellLabel(
+  t: TFunction,
+  cell: DecisionSensitivityCell,
+  currency: string,
+  formatting: Pick<FormattingApi, "formatCompactAmount">,
+) {
   if (cell.shortfallAtGoalAge > 1) {
-    return `-${formatCompactAmount(cell.shortfallAtGoalAge, currency)}`;
+    return `-${formatting.formatCompactAmount(cell.shortfallAtGoalAge, currency)}`;
   }
   if (cell.portfolioAtHorizon <= 0) {
     return t("goals:risk_lab.results.runs_short");
   }
-  return formatCompactAmount(cell.portfolioAtHorizon, currency);
+  return formatting.formatCompactAmount(cell.portfolioAtHorizon, currency);
 }
 
 function DecisionHeatmap({
@@ -1276,6 +1333,8 @@ function DecisionHeatmap({
   flatColumnHint?: string;
   ageMetricLabel: string;
 }) {
+  const amountFormatting = useAmountFormatting();
+
   const { t } = useTranslation();
   const range = useMemo(() => matrixDeltaRange(matrix), [matrix]);
   const baseline = useMemo(() => matrixBaselineCell(matrix), [matrix]);
@@ -1337,19 +1396,24 @@ function DecisionHeatmap({
                           )}
                           style={sensitivityCellStyle({ cell, baseline, range, active })}
                         >
-                          {decisionCellLabel(t, cell, currency)}
+                          {decisionCellLabel(t, cell, currency, amountFormatting)}
                         </div>
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs text-xs">
                         <div className="text-[10px] font-semibold uppercase tracking-wider">
-                          {matrix.rowLabel} × {matrix.columnLabel}
+                          {localizedBackendLabel(t, matrix.rowLabel)} ×{" "}
+                          {localizedBackendLabel(t, matrix.columnLabel)}
                         </div>
                         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums">
-                          <span className="text-muted-foreground">{matrix.rowLabel}</span>
+                          <span className="text-muted-foreground">
+                            {localizedBackendLabel(t, matrix.rowLabel)}
+                          </span>
                           <span className="text-right">
                             {formatRow(rowValue, matrix.rowLabels[row] ?? "")}
                           </span>
-                          <span className="text-muted-foreground">{matrix.columnLabel}</span>
+                          <span className="text-muted-foreground">
+                            {localizedBackendLabel(t, matrix.columnLabel)}
+                          </span>
                           <span className="text-right">
                             {formatColumn(columnValue, matrix.columnLabels[column] ?? "")}
                           </span>
@@ -1357,7 +1421,7 @@ function DecisionHeatmap({
                             {t("goals:risk_lab.results.money_left_at_end")}
                           </span>
                           <span className="text-right">
-                            {fmt(cell.portfolioAtHorizon, currency)}
+                            {fmt(cell.portfolioAtHorizon, currency, amountFormatting)}
                           </span>
                           <span className="text-muted-foreground">
                             {t("goals:risk_lab.results.change_vs_base_plan")}
@@ -1376,6 +1440,7 @@ function DecisionHeatmap({
                             {fmt(
                               Math.abs(cell.portfolioAtHorizon - range.baselinePortfolio),
                               currency,
+                              amountFormatting,
                             )}
                           </span>
                           <span className="text-muted-foreground">{ageMetricLabel}</span>
@@ -1386,7 +1451,7 @@ function DecisionHeatmap({
                             {t("goals:risk_lab.results.shortfall_at_retirement")}
                           </span>
                           <span className="text-right">
-                            {fmt(cell.shortfallAtGoalAge, currency)}
+                            {fmt(cell.shortfallAtGoalAge, currency, amountFormatting)}
                           </span>
                         </div>
                       </TooltipContent>
@@ -1400,7 +1465,7 @@ function DecisionHeatmap({
                     className="text-muted-foreground/80 mx-auto block whitespace-nowrap text-center text-[11px] font-normal leading-none sm:text-xs"
                     style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                   >
-                    {matrix.rowLabel}
+                    {localizedBackendLabel(t, matrix.rowLabel)}
                   </span>
                 </td>
               )}
@@ -1414,7 +1479,7 @@ function DecisionHeatmap({
               colSpan={matrix.columnValues.length}
               className="text-muted-foreground/80 px-1 pt-1.5 text-center text-[11px] font-normal leading-none sm:text-xs"
             >
-              {matrix.columnLabel}
+              {localizedBackendLabel(t, matrix.columnLabel)}
             </th>
             <th className="w-3 sm:w-4" />
           </tr>
@@ -1443,6 +1508,9 @@ function WhatMovesThePlanSection({
   plan: RetirementPlan;
   plannerMode?: PlannerMode;
 }) {
+  const amountFormatting = useAmountFormatting();
+  const numberFormatting = useNumberFormatting();
+
   const { t } = useTranslation();
   const message = errorMessage(t, error);
   const isFireMode = plannerMode !== "traditional";
@@ -1496,8 +1564,10 @@ function WhatMovesThePlanSection({
               <DecisionHeatmap
                 matrix={contributionReturn}
                 currency={plan.currency}
-                formatRow={(value, label) => label || `${(value * 100).toFixed(1)}%`}
-                formatColumn={(value) => axisMoney(value, plan.currency)}
+                formatRow={(value, label) =>
+                  label || numberFormatting.formatPercent(value, { digits: 1 })
+                }
+                formatColumn={(value) => axisMoney(value, plan.currency, amountFormatting)}
                 ageMetricLabel={
                   isFireMode
                     ? t("goals:risk_lab.moves.fi_age")
@@ -1524,7 +1594,7 @@ function WhatMovesThePlanSection({
               <DecisionHeatmap
                 matrix={retirementAgeSpending}
                 currency={plan.currency}
-                formatRow={(value) => axisMoney(value, plan.currency)}
+                formatRow={(value) => axisMoney(value, plan.currency, amountFormatting)}
                 formatColumn={(value, label) => label || String(Math.round(value))}
                 ageMetricLabel={
                   isFireMode
@@ -1591,6 +1661,8 @@ function SorrTooltip({
   label?: string | number;
   currency: string;
 }) {
+  const amountFormatting = useAmountFormatting();
+
   const { t } = useTranslation();
   const visiblePayload = payload?.filter((entry) => entry.value != null) ?? [];
   if (!active || visiblePayload.length === 0) return null;
@@ -1609,7 +1681,9 @@ function SorrTooltip({
               style={{ backgroundColor: entry.color ?? CHART.muted }}
             />
             <span className="text-muted-foreground truncate">{entry.name}</span>
-            <span className="font-medium">{fmt(Number(entry.value ?? 0), currency)}</span>
+            <span className="font-medium">
+              {fmt(Number(entry.value ?? 0), currency, amountFormatting)}
+            </span>
           </div>
         ))}
       </div>
@@ -1626,6 +1700,8 @@ function SorrChart({
   currency: string;
   retirementStartAge: number;
 }) {
+  const formatting = useAmountFormatting();
+  const { t } = useTranslation();
   const maxLen = Math.max(...scenarios.map((scenario) => scenario.portfolioPath.length));
   const data = Array.from({ length: maxLen }, (_, index) => {
     const entry: Record<string, number> = { age: retirementStartAge + index };
@@ -1655,7 +1731,7 @@ function SorrChart({
           axisLine={false}
           tickLine={false}
           tick={{ fill: CHART.muted, fontSize: 12 }}
-          tickFormatter={(value) => formatCompactAmount(Number(value), currency)}
+          tickFormatter={(value) => formatting.formatCompactAmount(Number(value), currency)}
         />
         <Tooltip
           content={<SorrTooltip currency={currency} />}
@@ -1665,6 +1741,7 @@ function SorrChart({
           <Line
             key={scenario.label}
             dataKey={scenario.label}
+            name={localizedBackendLabel(t, scenario.label)}
             stroke={SORR_COLORS[index % SORR_COLORS.length]}
             dot={false}
             activeDot={{ r: 4, stroke: "var(--card)", strokeWidth: 2 }}
@@ -1689,9 +1766,14 @@ function sorrRiskAge(scenario: SorrScenario) {
   return scenario.failureAge ?? scenario.spendingShortfallAge ?? null;
 }
 
-function sorrOutcomeText(t: TFunction, scenario: SorrScenario, currency: string) {
+function sorrOutcomeText(
+  t: TFunction,
+  scenario: SorrScenario,
+  currency: string,
+  formatting: Pick<FormattingApi, "formatCompactAmount">,
+) {
   if (scenario.survived) {
-    return formatCompactAmount(scenario.finalValue, currency);
+    return formatting.formatCompactAmount(scenario.finalValue, currency);
   }
 
   const riskAge = sorrRiskAge(scenario);
@@ -1723,6 +1805,8 @@ function AdvancedSection({
   sorrError: unknown;
   onRunSorr: () => void;
 }) {
+  const amountFormatting = useAmountFormatting();
+
   const { t } = useTranslation();
   const retirementStartAge = overview?.retirementStartAge ?? plan.personal.targetRetirementAge;
   const canRunSorr = (overview?.portfolioAtRetirementStart ?? 0) > 0;
@@ -1782,7 +1866,7 @@ function AdvancedSection({
                 </p>
                 <p className="mt-1 font-semibold tabular-nums">
                   {hardestPath && hardestPathRiskAge
-                    ? `${hardestPath.label} @ ${hardestPathRiskAge}`
+                    ? `${localizedBackendLabel(t, hardestPath.label)} @ ${hardestPathRiskAge}`
                     : t("goals:risk_lab.results.none")}
                 </p>
               </div>
@@ -1799,7 +1883,7 @@ function AdvancedSection({
                   {t("goals:risk_lab.advanced.base_case")}
                 </p>
                 <p className="mt-1 font-semibold tabular-nums">
-                  {baseCase ? sorrOutcomeText(t, baseCase, plan.currency) : "—"}
+                  {baseCase ? sorrOutcomeText(t, baseCase, plan.currency, amountFormatting) : "—"}
                 </p>
               </div>
             </div>
@@ -1822,7 +1906,9 @@ function AdvancedSection({
                       className="size-2 shrink-0 rounded-full"
                       style={{ backgroundColor: SORR_COLORS[index % SORR_COLORS.length] }}
                     />
-                    <span className="text-muted-foreground truncate">{scenario.label}</span>
+                    <span className="text-muted-foreground truncate">
+                      {localizedBackendLabel(t, scenario.label)}
+                    </span>
                   </span>
                   <span
                     className={cn(
@@ -1830,7 +1916,7 @@ function AdvancedSection({
                       scenario.survived ? "text-[hsl(102,32%,39%)]" : "text-destructive",
                     )}
                   >
-                    {sorrOutcomeText(t, scenario, plan.currency)}
+                    {sorrOutcomeText(t, scenario, plan.currency, amountFormatting)}
                   </span>
                 </div>
               ))}

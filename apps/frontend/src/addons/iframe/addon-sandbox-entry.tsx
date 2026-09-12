@@ -4,6 +4,7 @@ import "@/globals.css";
 import * as React from "react";
 import * as ReactDOMClient from "react-dom/client";
 import { QueryClient } from "@tanstack/react-query";
+import { FormattingProvider } from "@wealthfolio/ui";
 import { createHostDependencyModuleUrl, isHostDependencySpecifier } from "./host-dependencies";
 import {
   clearAddonStyles,
@@ -15,6 +16,12 @@ import {
 import { SandboxAddonAssetRegistry, type SandboxAddonAsset } from "./addon-sandbox-asset-registry";
 import { applyHostTheme, type AddonThemeSnapshot } from "./addon-sandbox-theme";
 import { rewriteModuleSpecifiers } from "./addon-module-rewriter";
+import type { AddonLocalizationSnapshot } from "./addon-sandbox-localization";
+import {
+  initSandboxI18n,
+  installAddonTranslationRuntime,
+  setSandboxLanguage,
+} from "./addon-sandbox-i18n";
 
 const CHANNEL = "wealthfolio:addon-sandbox:v1";
 const RUNTIME_PROTOCOL_VERSION = 1;
@@ -62,6 +69,7 @@ interface SandboxMessage {
   subscriptionId?: string;
   payload?: unknown;
   theme?: AddonThemeSnapshot;
+  localization?: AddonLocalizationSnapshot;
 }
 
 type RouteRenderer = (context: RouteRenderContext) => Promise<void> | void;
@@ -70,6 +78,12 @@ const init = new URLSearchParams(window.name);
 const ADDON_ID = init.get("addonId") ?? "";
 const NONCE = init.get("nonce") ?? "";
 const HOST_BASE_URL = init.get("hostBaseUrl") ?? "";
+let sandboxLocalization: AddonLocalizationSnapshot = {
+  locale: init.get("locale") || "en-US",
+  uiLocale: init.get("uiLocale") || undefined,
+  timezone: init.get("timezone") || undefined,
+};
+const localizationListeners = new Set<() => void>();
 const rootElement = document.getElementById("addon-root");
 const routes = new Map<string, RouteRenderer>();
 const pending = new Map<string, PendingCall>();
@@ -88,6 +102,11 @@ if (!ADDON_ID || !NONCE || !HOST_BASE_URL || !rootElement) {
 
 const root = rootElement;
 
+// Bootstrap i18next before any addon (and its `@wealthfolio/ui` components)
+// render, seeded from the bootstrap params so there is no flash of raw keys.
+initSandboxI18n(sandboxLocalization.uiLocale);
+installAddonTranslationRuntime(ADDON_ID);
+
 function post(type: string, payload: Record<string, unknown> = {}) {
   parent.postMessage({ channel: CHANNEL, addonId: ADDON_ID, nonce: NONCE, type, ...payload }, "*");
 }
@@ -100,8 +119,17 @@ function callHost(type: string, payload: Record<string, unknown> = {}) {
   });
 }
 
-globalThis.__wealthfolioRequestTickerLogo = (symbol: string) =>
-  callHost("hostAssetRequest", { kind: "tickerLogo", symbol }) as Promise<Blob | null>;
+globalThis.__wealthfolioRequestTickerLogo = (
+  symbol: string,
+  exchangeMic?: string | null,
+  instrumentType?: string | null,
+) =>
+  callHost("hostAssetRequest", {
+    kind: "tickerLogo",
+    symbol,
+    exchangeMic,
+    instrumentType,
+  }) as Promise<Blob | null>;
 
 function createAddonAssetRegistry(assets: SandboxAddonAsset[] = []) {
   return new SandboxAddonAssetRegistry(
@@ -125,6 +153,43 @@ function reportHostCallError(action: string, error: unknown) {
 function reportLoadPhase(phase: string) {
   post("loadPhase", { phase });
 }
+
+function updateSandboxLocalization(localization?: AddonLocalizationSnapshot) {
+  if (!localization?.locale) return;
+  if (
+    sandboxLocalization.locale === localization.locale &&
+    sandboxLocalization.uiLocale === localization.uiLocale &&
+    sandboxLocalization.timezone === localization.timezone
+  ) {
+    return;
+  }
+  sandboxLocalization = localization;
+  setSandboxLanguage(localization.uiLocale);
+  for (const listener of localizationListeners) listener();
+}
+
+function SandboxFormattingProvider({ children }: { children: React.ReactNode }) {
+  const localization = React.useSyncExternalStore(
+    (listener) => {
+      localizationListeners.add(listener);
+      return () => localizationListeners.delete(listener);
+    },
+    () => sandboxLocalization,
+  );
+
+  return (
+    <FormattingProvider
+      locale={localization.locale}
+      uiLocale={localization.uiLocale}
+      timezone={localization.timezone}
+    >
+      {children}
+    </FormattingProvider>
+  );
+}
+
+globalThis.__wealthfolioWrapAddonReactNode = (children) =>
+  React.createElement(SandboxFormattingProvider, null, children);
 
 // Resolve on the next paint, but with a timer fallback. Legacy `render` routes
 // (which never call `onRendered`) rely on this to signal completion — and a
@@ -467,12 +532,16 @@ function createReactRouteRenderer(component: unknown): RouteRenderer {
       React.startTransition(() => {
         reactRoot.render(
           React.createElement(
-            React.Suspense,
-            { fallback: null },
-            // The sandbox has no react-router provider, so the component gets
-            // the host location as a prop (re-passed on each navigation).
-            React.createElement(Component, { location }),
-            React.createElement(RouteRenderCommit, { onRendered: handleRendered }),
+            SandboxFormattingProvider,
+            null,
+            React.createElement(
+              React.Suspense,
+              { fallback: null },
+              // The sandbox has no react-router provider, so the component gets
+              // the host location as a prop (re-passed on each navigation).
+              React.createElement(Component, { location }),
+              React.createElement(RouteRenderCommit, { onRendered: handleRendered }),
+            ),
           ),
         );
       });
@@ -718,6 +787,11 @@ window.addEventListener("message", (event: MessageEvent<SandboxMessage>) => {
     return;
   }
 
+  if (message.type === "localizationUpdate") {
+    updateSandboxLocalization(message.localization);
+    return;
+  }
+
   void (async () => {
     try {
       if (message.type === "disable") {
@@ -731,6 +805,7 @@ window.addEventListener("message", (event: MessageEvent<SandboxMessage>) => {
         }
       } else if (message.type === "loadAddon" && typeof message.code === "string") {
         applyHostTheme(message.theme);
+        updateSandboxLocalization(message.localization);
         await loadAddon(message.code, message.files, message.assets);
         post("loaded");
       } else if (message.type === "renderRoute" && message.routeId && message.location) {

@@ -540,7 +540,6 @@ export function AlternativeAssetQuickAddModal({
                     <MoneyInput
                       value={formData.currentValue}
                       onValueChange={(value) => updateFormData("currentValue", value)}
-                      placeholder="0.00"
                       className="h-11"
                     />
                   </div>
@@ -571,7 +570,6 @@ export function AlternativeAssetQuickAddModal({
                     <MoneyInput
                       value={formData.purchasePrice || ""}
                       onValueChange={(value) => updateFormData("purchasePrice", value)}
-                      placeholder="0.00"
                       className="h-11"
                     />
                     <p className="text-muted-foreground text-xs">

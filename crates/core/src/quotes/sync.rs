@@ -41,7 +41,7 @@ use super::sync_state::{
 };
 use super::types::{AssetId, Day, ProviderId};
 use crate::activities::{ActivityRepositoryTrait, ActivityUpsert};
-use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, QuoteMode};
+use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, InstrumentType, QuoteMode};
 use crate::errors::Error;
 use crate::errors::Result;
 use crate::utils::time_utils;
@@ -81,12 +81,24 @@ impl Drop for SyncLockGuard {
     }
 }
 
-fn effective_market_today(now: DateTime<Utc>, exchange_mic: Option<&str>) -> NaiveDate {
-    time_utils::market_effective_date(now, exchange_mic)
+fn is_continuous_market(instrument_type: Option<&InstrumentType>) -> bool {
+    matches!(instrument_type, Some(InstrumentType::Crypto))
 }
 
-fn market_fetch_end_date(now: DateTime<Utc>, exchange_mic: Option<&str>) -> NaiveDate {
-    time_utils::market_calendar_date(now, exchange_mic)
+fn effective_market_today(
+    now: DateTime<Utc>,
+    exchange_mic: Option<&str>,
+    instrument_type: Option<&InstrumentType>,
+) -> NaiveDate {
+    time_utils::market_effective_date(now, exchange_mic, is_continuous_market(instrument_type))
+}
+
+fn market_fetch_end_date(
+    now: DateTime<Utc>,
+    exchange_mic: Option<&str>,
+    instrument_type: Option<&InstrumentType>,
+) -> NaiveDate {
+    time_utils::market_calendar_date(now, exchange_mic, is_continuous_market(instrument_type))
 }
 
 /// Determine the effective data provider for an asset.
@@ -221,10 +233,6 @@ fn should_include_closed_positions(mode: SyncMode, targeted_sync: bool) -> bool 
             mode,
             SyncMode::RefetchRecent { .. } | SyncMode::BackfillHistory { .. }
         )
-}
-
-fn is_incremental_style(mode: SyncMode) -> bool {
-    matches!(mode, SyncMode::Incremental | SyncMode::Periodic)
 }
 
 fn should_skip_for_error_limit(mode: SyncMode, targeted_sync: bool, error_count: i32) -> bool {
@@ -390,8 +398,6 @@ pub enum AssetSkipReason {
     MaturedBond,
     /// Option has expired — no further quotes available.
     ExpiredOption,
-    /// Provider is excluded from background periodic sync (manual Sync only).
-    ManualSyncOnlyProvider,
 }
 
 impl std::fmt::Display for AssetSkipReason {
@@ -410,9 +416,6 @@ impl std::fmt::Display for AssetSkipReason {
             }
             AssetSkipReason::MaturedBond => write!(f, "Bond has matured (price is par)"),
             AssetSkipReason::ExpiredOption => write!(f, "Option has expired"),
-            AssetSkipReason::ManualSyncOnlyProvider => {
-                write!(f, "Provider is manual-sync only")
-            }
         }
     }
 }
@@ -691,8 +694,8 @@ where
         asset: &Asset,
     ) -> (NaiveDate, NaiveDate) {
         match mode {
-            SyncMode::Incremental | SyncMode::Periodic => {
-                // Use category-based calculation for incremental-style modes
+            SyncMode::Incremental => {
+                // Use category-based calculation for incremental mode
                 let category = determine_sync_category(
                     inputs,
                     CLOSED_POSITION_GRACE_PERIOD_DAYS,
@@ -1226,10 +1229,16 @@ where
                 quote_max,
             };
 
-            let effective_today =
-                effective_market_today(now, asset.instrument_exchange_mic.as_deref());
-            let fetch_end_date =
-                market_fetch_end_date(now, asset.instrument_exchange_mic.as_deref());
+            let effective_today = effective_market_today(
+                now,
+                asset.instrument_exchange_mic.as_deref(),
+                asset.instrument_type.as_ref(),
+            );
+            let fetch_end_date = market_fetch_end_date(
+                now,
+                asset.instrument_exchange_mic.as_deref(),
+                asset.instrument_type.as_ref(),
+            );
             let category = determine_sync_category(
                 &inputs,
                 CLOSED_POSITION_GRACE_PERIOD_DAYS,
@@ -1471,19 +1480,16 @@ where
         for asset in &syncable {
             let state = existing_states.get(&asset.id).cloned();
             let data_source = effective_provider(state.as_ref(), asset);
-            let effective_today =
-                effective_market_today(now, asset.instrument_exchange_mic.as_deref());
-            let fetch_end_date =
-                market_fetch_end_date(now, asset.instrument_exchange_mic.as_deref());
-
-            if matches!(mode, SyncMode::Periodic) && is_manual_sync_only_provider(&data_source) {
-                debug!(
-                    "Skipping {} - provider {} is manual-sync only",
-                    asset.id, data_source
-                );
-                result.add_skipped(asset.id.clone(), AssetSkipReason::ManualSyncOnlyProvider);
-                continue;
-            }
+            let effective_today = effective_market_today(
+                now,
+                asset.instrument_exchange_mic.as_deref(),
+                asset.instrument_type.as_ref(),
+            );
+            let fetch_end_date = market_fetch_end_date(
+                now,
+                asset.instrument_exchange_mic.as_deref(),
+                asset.instrument_type.as_ref(),
+            );
 
             // Explicit targeted retries bypass the broad-sync error cutoff.
             if let Some(ref s) = state {
@@ -1535,7 +1541,7 @@ where
                     continue;
                 }
 
-                if targeted_sync && is_incremental_style(mode) {
+                if targeted_sync && matches!(mode, SyncMode::Incremental) {
                     info!(
                         "Planning targeted quote refresh for closed position {}",
                         asset.id
@@ -1546,7 +1552,7 @@ where
                 }
             }
 
-            if is_incremental_style(mode)
+            if matches!(mode, SyncMode::Incremental)
                 && matches!(category, SyncCategory::NeedsBackfill)
                 && planning_inputs.is_active
             {
@@ -1870,7 +1876,6 @@ mod tests {
     #[test]
     fn test_sync_mode_display() {
         assert_eq!(format!("{}", SyncMode::Incremental), "Incremental");
-        assert_eq!(format!("{}", SyncMode::Periodic), "Periodic");
         assert_eq!(
             format!("{}", SyncMode::RefetchRecent { days: 45 }),
             "RefetchRecent(45d)"
@@ -2127,10 +2132,6 @@ mod tests {
         assert_eq!(
             AssetSkipReason::NoDataForRange.to_string(),
             "No data for requested date range"
-        );
-        assert_eq!(
-            AssetSkipReason::ManualSyncOnlyProvider.to_string(),
-            "Provider is manual-sync only"
         );
     }
 

@@ -5,6 +5,7 @@
  * on render / state and these pure transforms become unit-testable.
  */
 import type { TaxonomyCategory } from "@/lib/types";
+import type { FormattingApi } from "@wealthfolio/ui";
 
 import type { BudgetCategoryRow, BudgetGroupRow } from "../../../types/budget";
 import type { CategoryBreakdownRow } from "../../../types/report";
@@ -46,12 +47,14 @@ export function buildTree({
   budgetRows,
   taxonomyCategories,
   sort,
+  compareNames,
 }: {
   breakdown: CategoryBreakdownRow[];
   priorBreakdown: CategoryBreakdownRow[];
   budgetRows: BudgetCategoryRow[];
   taxonomyCategories: TaxonomyCategory[];
   sort: CategorySort;
+  compareNames: (a: string, b: string) => number;
 }): NodeRow[] {
   const meta = new Map(taxonomyCategories.map((c) => [c.id, c]));
   const allocationByCat = new Map(budgetRows.map((a) => [a.categoryId, a.target || 0]));
@@ -134,7 +137,7 @@ export function buildTree({
 
   const compare =
     sort === "name"
-      ? (a: NodeRow, b: NodeRow) => a.name.localeCompare(b.name)
+      ? (a: NodeRow, b: NodeRow) => compareNames(a.name, b.name)
       : sort === "delta"
         ? (a: NodeRow, b: NodeRow) =>
             Math.abs(b.spent - b.priorSpent) - Math.abs(a.spent - a.priorSpent)
@@ -220,11 +223,14 @@ export function buildGroupWeights({
   );
 }
 
-export function formatDelta(delta: number, baseline: number): string {
+export function formatDelta(
+  delta: number,
+  baseline: number,
+  formatting: Pick<FormattingApi, "formatPercent">,
+): string {
   if (delta === 0) return "—";
   // No prior period spend — label as "new" instead of restating current amount.
   if (baseline === 0) return delta > 0 ? "new" : "—";
-  const pct = (Math.abs(delta) / baseline) * 100;
   const arrow = delta > 0 ? "↑" : "↓";
-  return `${arrow} ${pct.toFixed(0)}%`;
+  return `${arrow} ${formatting.formatPercent(Math.abs(delta) / baseline, { digits: 0 })}`;
 }

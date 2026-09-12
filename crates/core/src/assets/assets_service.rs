@@ -20,7 +20,7 @@ use super::auto_classification::{
     AutoClassificationService, ClassificationInput, ProviderProfileClassification,
 };
 use super::{
-    asset_provider_alias_symbols, parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix,
+    asset_provider_alias_symbols, parse_crypto_pair_symbol, parse_symbol_with_known_exchange,
     AssetResolutionInput, AssetResolutionOutput,
 };
 use crate::errors::{DatabaseError, Error, Result};
@@ -993,16 +993,39 @@ impl AssetService {
             .filter(|s| !s.is_empty())
     }
 
+    /// Pricing inputs a user can edit on a bond spec. A change here alters every
+    /// price the calculated provider would derive, so the provider binding has
+    /// to be re-resolved. Note this only re-resolves and refetches the recent
+    /// window: older calculated quotes keep the previous specification.
+    fn bond_pricing_inputs(
+        metadata: Option<&serde_json::Value>,
+    ) -> (
+        Option<&serde_json::Value>,
+        Option<&serde_json::Value>,
+        Option<&serde_json::Value>,
+    ) {
+        let bond = metadata.and_then(|m| m.get("bond"));
+        (
+            bond.and_then(|b| b.get("maturityDate")),
+            bond.and_then(|b| b.get("couponRate")),
+            bond.and_then(|b| b.get("couponFrequency")),
+        )
+    }
+
     fn should_reset_sync_state_after_profile_change(before: &Asset, after: &Asset) -> bool {
+        let is_bond = before.is_bond() || after.is_bond();
         before.quote_mode != after.quote_mode
             || before.quote_ccy != after.quote_ccy
             || before.instrument_type != after.instrument_type
             || before.instrument_symbol != after.instrument_symbol
             || before.instrument_exchange_mic != after.instrument_exchange_mic
             || before.provider_config != after.provider_config
-            || ((before.is_bond() || after.is_bond())
+            || (is_bond
                 && Self::metadata_identifier(before.metadata.as_ref(), "isin")
                     != Self::metadata_identifier(after.metadata.as_ref(), "isin"))
+            || (is_bond
+                && Self::bond_pricing_inputs(before.metadata.as_ref())
+                    != Self::bond_pricing_inputs(after.metadata.as_ref()))
     }
 
     /// Creates a new AssetService instance
@@ -1430,7 +1453,12 @@ impl AssetServiceTrait for AssetService {
                 continue;
             }
 
-            let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(&resolution_symbol);
+            // The venue the caller supplied decides whether a trailing `.X` is an
+            // exchange suffix or part of the ticker. A broker sending `ZAAA.F` with
+            // Cboe Canada means the hedged unit class, not a Frankfurt listing, and
+            // stripping the class resolves quotes for a different fund entirely.
+            let (base_symbol, suffix_mic) =
+                parse_symbol_with_known_exchange(&resolution_symbol, input.exchange_mic.as_deref());
             let has_import_market_hint = input
                 .exchange_mic
                 .as_deref()
@@ -3477,6 +3505,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn resolution_keeps_a_share_class_the_venue_contradicts() {
+        // A broker sending `ZAAA.F` on Cboe Canada means BMO's currency-hedged unit
+        // class. `.F` is Yahoo's Frankfurt suffix, so stripping it resolved `ZAAA` —
+        // the unhedged listing, a different fund quoting ~4% away. Observed live in 33
+        // activity records on 2026-07-30. The venue we were handed is the evidence that
+        // `.F` is not a venue.
+        let service = test_asset_service(Vec::new(), TestQuoteService::default());
+        let mut input = import_input("ZAAA.F", "CAD");
+        input.exchange_mic = Some("NEOE".to_string());
+
+        let output = service
+            .resolve_import_asset_inputs(vec![input])
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        assert_eq!(output.canonical_symbol.as_deref(), Some("ZAAA.F"));
+        assert_eq!(output.exchange_mic.as_deref(), Some("NEOE"));
+        let draft = output.draft.expect("draft for an unseen instrument");
+        assert_eq!(draft.instrument_symbol.as_deref(), Some("ZAAA.F"));
+        assert_eq!(draft.instrument_exchange_mic.as_deref(), Some("NEOE"));
+    }
+
+    #[tokio::test]
+    async fn resolution_still_strips_a_suffix_the_venue_agrees_with() {
+        // The ordinary case, unchanged: the venue and the suffix say the same thing.
+        let service = test_asset_service(Vec::new(), TestQuoteService::default());
+        let mut input = import_input("SHOP.TO", "CAD");
+        input.exchange_mic = Some("XTSE".to_string());
+
+        let output = service
+            .resolve_import_asset_inputs(vec![input])
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        assert_eq!(output.canonical_symbol.as_deref(), Some("SHOP"));
+        assert_eq!(output.exchange_mic.as_deref(), Some("XTSE"));
+    }
+
+    #[tokio::test]
     async fn test_resolve_import_asset_inputs_preserves_share_class_identity() {
         let mut wrong_display_match = yahoo_search_result(
             "BRK.B",
@@ -4378,6 +4449,61 @@ mod tests {
         let before = test_market_asset();
         let after = Asset {
             notes: Some("Updated notes".to_string()),
+            ..before.clone()
+        };
+
+        assert!(!AssetService::should_reset_sync_state_after_profile_change(
+            &before, &after
+        ));
+    }
+
+    fn test_bond_asset(bond: serde_json::Value) -> Asset {
+        Asset {
+            instrument_type: Some(InstrumentType::Bond),
+            instrument_symbol: Some("US912828XY12".to_string()),
+            metadata: Some(serde_json::json!({ "bond": bond })),
+            ..test_market_asset()
+        }
+    }
+
+    #[test]
+    fn test_bond_pricing_input_change_resets_sync_state() {
+        let before = test_bond_asset(serde_json::json!({ "maturityDate": "2032-02-15" }));
+
+        for after in [
+            test_bond_asset(serde_json::json!({ "maturityDate": "2033-02-15" })),
+            test_bond_asset(serde_json::json!({
+                "maturityDate": "2032-02-15", "couponRate": 0.04375
+            })),
+            test_bond_asset(serde_json::json!({
+                "maturityDate": "2032-02-15", "couponFrequency": "ANNUAL"
+            })),
+        ] {
+            assert!(
+                AssetService::should_reset_sync_state_after_profile_change(&before, &after),
+                "editing a bond pricing input must re-resolve the provider binding"
+            );
+        }
+    }
+
+    #[test]
+    fn test_bond_face_value_change_does_not_reset_sync_state() {
+        let before = test_bond_asset(serde_json::json!({ "maturityDate": "2032-02-15" }));
+        let after = test_bond_asset(serde_json::json!({
+            "maturityDate": "2032-02-15", "faceValue": 100
+        }));
+
+        // faceValue cancels out of the calculated price, so it changes nothing.
+        assert!(!AssetService::should_reset_sync_state_after_profile_change(
+            &before, &after
+        ));
+    }
+
+    #[test]
+    fn test_non_bond_metadata_change_does_not_reset_sync_state() {
+        let before = test_market_asset();
+        let after = Asset {
+            metadata: Some(serde_json::json!({ "contractMultiplier": 50 })),
             ..before.clone()
         };
 
