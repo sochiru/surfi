@@ -66,6 +66,7 @@
   "logout": "登出",
   "login": "登入",
   "income": "收入",
+  "dividends": "股利",
   "dashboard": "儀表板",
   "symbol": "代號",
   "shares": "股數",
@@ -102,6 +103,7 @@
     "label_insights": "檢視分析",
     "label_holdings": "檢視持有部位",
     "label_activities": "檢視交易紀錄",
+    "label_dividends": "檢視股利",
     "label_goals": "目標",
     "label_assistant": "AI 助理"
   },
@@ -192,6 +194,7 @@
     "manage_securities": "管理有價證券",
     "manage_accounts": "管理帳戶",
     "manage_goals": "管理目標",
+    "view_dividends": "檢視股利",
     "manage_contribution_limits": "管理提撥上限",
     "benchmark_group_us_indices": "美國市場指數",
     "benchmark_group_european_indices": "歐洲市場指數",

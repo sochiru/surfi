@@ -4,6 +4,7 @@
     "tab_overview": "總覽",
     "tab_performance": "績效",
     "tab_income": "收入",
+    "tab_liabilities": "負債",
     "back_to_allocation": "返回資產配置",
     "target_allocation": "目標資產配置",
     "back_to_overview": "返回總覽",
@@ -125,5 +126,24 @@
     },
     "days_ago_other": "{{count}} 天前",
     "days_ago_one": "{{count}} 天前"
+  },
+  "liabilities": {
+    "empty_title": "沒有可分析的負債",
+    "empty_description": "請從持有部位新增房貸、貸款、信用卡或其他債務。",
+    "add_liability": "新增負債",
+    "installment_loans": "分期貸款",
+    "average_paid_down": "平均已償還",
+    "rate_updates_due": "待更新利率",
+    "monthly_payments": "已記錄的每月還款",
+    "snapshot_only": "僅快照",
+    "rate_due": "待更新利率",
+    "auto_amortizing": "自動攤銷",
+    "current_balance": "目前餘額",
+    "interest_rate": "目前利率",
+    "monthly_payment": "每月還款",
+    "loan_term": "已記錄期數",
+    "months": "{{count}} 個月",
+    "next_rate_review": "下次利率檢討",
+    "paid_down": "已償還"
   }
 }
