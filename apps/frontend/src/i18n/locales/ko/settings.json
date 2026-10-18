@@ -674,7 +674,19 @@
     "mode_switch_checklist_accurate": "날짜, 수량, 가격이 정확합니다",
     "mode_switch_checklist_gaps": "기록에 공백이 있으면 잔액과 수익률이 잘못될 수 있습니다",
     "mode_switch_keep_holdings": "보유 종목 유지",
-    "mode_switch_confirm": "거래 모드로 전환"
+    "mode_switch_confirm": "거래 모드로 전환",
+    "form_institution_label": "금융기관",
+    "form_institution_description": "은행을 고르면 해당 상품으로 시작합니다. 일반 현금 계좌는 사용자 지정을 선택하세요.",
+    "form_institution_custom": "사용자 지정",
+    "form_institution_product_label": "상품",
+    "form_institution_product_description": "금리는 미리 채워져 있으며 모두 수정할 수 있습니다.",
+    "form_fixed_income_product_label": "확정수익 상품",
+    "form_fixed_income_product_description": "이 계좌에서 자동으로 만들 이자 또는 배당을 설정합니다.",
+    "form_fixed_income_product_aria": "확정수익 상품 유형",
+    "form_product_none": "없음",
+    "form_product_hysa": "HYSA",
+    "form_product_goal": "목표 저금통",
+    "form_product_mp2": "MP2"
   },
   "limits": {
     "day_left": "{{days}}일 남음"
@@ -1688,5 +1700,6 @@
   "cloud_backup_hint_running": "암호화된 클라우드 백업을 저장하는 동안에도 Wealthfolio를 계속 사용할 수 있어요.",
   "cloud_backup_hint_failed": "백업을 완료하지 못했어요. 자동으로 다시 시도하거나 지금 다시 시도할 수 있어요.",
   "cloud_backup_retry_label": "다음 재시도",
-  "cloud_backup_retry_now": "백업 다시 시도"
+  "cloud_backup_retry_now": "백업 다시 시도",
+  "about_fork_notice": "Wealthfolio(https://wealthfolio.app/)에서 분기한 프로젝트입니다. Wealthfolio는 Teymz Inc.의 상표입니다. SURfi는 공식 프로젝트와 무관하며 승인을 받지 않았습니다."
 }

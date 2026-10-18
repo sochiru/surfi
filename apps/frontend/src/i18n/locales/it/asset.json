@@ -555,7 +555,9 @@
       "g": "Grammo",
       "kg": "Chilogrammo"
     },
-    "end_date": "Data di scadenza"
+    "end_date": "Data di scadenza",
+    "lock_in_ended_title": "Il periodo a tasso fisso è terminato",
+    "lock_in_ended_description": "Il periodo a tasso fisso è terminato il {{date}} e non è stato registrato un tasso successivo. Aggiungi una variazione del tasso prima di fare affidamento sul saldo previsto."
   },
   "quickAdd": {
     "add_new_asset": "Aggiungi nuovo asset",

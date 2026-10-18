@@ -551,7 +551,9 @@
       "g": "Gramm",
       "kg": "Kilogramm"
     },
-    "end_date": "Enddatum"
+    "end_date": "Enddatum",
+    "lock_in_ended_title": "Die Zinsbindung ist abgelaufen",
+    "lock_in_ended_description": "Die Festzinsperiode endete am {{date}}, und es wurde kein späterer Zinssatz erfasst. Fügen Sie eine Zinsänderung hinzu, bevor Sie sich auf den prognostizierten Saldo verlassen."
   },
   "quickAdd": {
     "add_new_asset": "Neue Anlage hinzufügen",

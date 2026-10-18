@@ -67,7 +67,8 @@
       "accounts_count_one": "{{count}} Konto",
       "accounts_count_other": "{{count}} Konten",
       "pnl_current_holdings": "Aktuelle Positionen"
-    }
+    },
+    "tab_liabilities": "Schulden"
   },
   "networth": {
     "attention": {
@@ -164,5 +165,24 @@
     "hide": "{{widget}} ausblenden",
     "drag": "{{widget}} ziehen",
     "empty": "Keine Widgets ausgewählt. Passen Sie diese Seite an, um Widgets hinzuzufügen."
+  },
+  "liabilities": {
+    "empty_title": "Keine Verbindlichkeiten zur Auswertung",
+    "empty_description": "Fügen Sie eine Hypothek, ein Darlehen, eine Kreditkarte oder andere Schulden unter Bestände hinzu.",
+    "add_liability": "Verbindlichkeit hinzufügen",
+    "installment_loans": "Ratenkredite",
+    "average_paid_down": "Durchschnittlich getilgt",
+    "rate_updates_due": "Fällige Zinsanpassungen",
+    "monthly_payments": "Erfasste monatliche Zahlungen",
+    "snapshot_only": "Nur Bestand",
+    "rate_due": "Zins fällig",
+    "auto_amortizing": "Automatische Tilgung",
+    "current_balance": "Aktueller Saldo",
+    "interest_rate": "Aktueller Zinssatz",
+    "monthly_payment": "Monatliche Zahlung",
+    "loan_term": "Erfasste Laufzeit",
+    "months": "{{count}} Monate",
+    "next_rate_review": "Nächste Zinsprüfung",
+    "paid_down": "Getilgt"
   }
 }

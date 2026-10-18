@@ -551,7 +551,9 @@
       "g": "グラム",
       "kg": "キログラム"
     },
-    "end_date": "終了日"
+    "end_date": "終了日",
+    "lock_in_ended_title": "固定金利期間が終了しました",
+    "lock_in_ended_description": "固定金利期間は {{date}} に終了し、その後の金利は記録されていません。見込み残高を参照する前に金利変更を追加してください。"
   },
   "quickAdd": {
     "add_new_asset": "資産を追加",

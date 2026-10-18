@@ -551,7 +551,9 @@
       "g": "克",
       "kg": "千克"
     },
-    "end_date": "结束日期"
+    "end_date": "结束日期",
+    "lock_in_ended_title": "固定利率期已结束",
+    "lock_in_ended_description": "固定利率期已于 {{date}} 结束，且尚未记录之后的利率。在参考预计余额之前，请先添加利率变更。"
   },
   "quickAdd": {
     "add_new_asset": "添加新资产",

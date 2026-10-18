@@ -66,7 +66,8 @@
       "accounts_count_one": "계좌 {{count}}개",
       "accounts_count_other": "계좌 {{count}}개",
       "pnl_current_holdings": "현재 보유 종목"
-    }
+    },
+    "tab_liabilities": "부채"
   },
   "networth": {
     "attention": {
@@ -162,5 +163,24 @@
     "hide": "{{widget}} 숨기기",
     "drag": "{{widget}} 끌기",
     "empty": "선택된 위젯이 없습니다. 이 페이지를 사용자 지정하여 위젯을 추가하세요."
+  },
+  "liabilities": {
+    "empty_title": "분석할 부채가 없습니다",
+    "empty_description": "보유 자산에서 주택담보대출, 대출, 신용카드 또는 기타 부채를 추가하세요.",
+    "add_liability": "부채 추가",
+    "installment_loans": "분할 상환 대출",
+    "average_paid_down": "평균 상환률",
+    "rate_updates_due": "금리 갱신 예정",
+    "monthly_payments": "기록된 월 납입액",
+    "snapshot_only": "잔액만",
+    "rate_due": "금리 갱신 필요",
+    "auto_amortizing": "자동 상환",
+    "current_balance": "현재 잔액",
+    "interest_rate": "현재 금리",
+    "monthly_payment": "월 납입액",
+    "loan_term": "기록된 기간",
+    "months": "{{count}}개월",
+    "next_rate_review": "다음 금리 검토",
+    "paid_down": "상환됨"
   }
 }

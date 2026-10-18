@@ -283,9 +283,7 @@ function LiabilityCard({ holding }: { holding: AlternativeAssetHolding }) {
           />
           <Metric
             label={t("insights:liabilities.next_rate_review")}
-            value={
-              lockIn ? format(new Date(`${lockIn}T00:00:00`), "MMM d, yyyy") : "—"
-            }
+            value={lockIn ? format(new Date(`${lockIn}T00:00:00`), "MMM d, yyyy") : "—"}
           />
         </div>
 

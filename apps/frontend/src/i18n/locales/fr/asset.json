@@ -555,7 +555,9 @@
       "g": "Gramme",
       "kg": "Kilogramme"
     },
-    "end_date": "Date de fin"
+    "end_date": "Date de fin",
+    "lock_in_ended_title": "La période de taux fixe est terminée",
+    "lock_in_ended_description": "La période à taux fixe s'est terminée le {{date}} et aucun taux ultérieur n'a été enregistré. Ajoutez un changement de taux avant de vous fier au solde projeté."
   },
   "quickAdd": {
     "add_new_asset": "Ajouter un nouvel actif",

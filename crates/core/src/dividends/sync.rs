@@ -396,7 +396,11 @@ impl DividendSyncService {
             return Ok(result);
         }
 
-        let base_ccy = self.base_currency.read().unwrap().clone();
+        let base_ccy = self
+            .base_currency
+            .read()
+            .expect("base currency lock is not poisoned")
+            .clone();
         let accounts = if let Some(id) = account_id {
             vec![self.accounts.get_account(id)?]
         } else {
@@ -643,7 +647,11 @@ impl DividendSyncServiceTrait for DividendSyncService {
 
     async fn build_calendar_events(&self) -> Result<Vec<DividendCalendarEvent>> {
         let settings = self.load_settings()?;
-        let base_ccy = self.base_currency.read().unwrap().clone();
+        let base_ccy = self
+            .base_currency
+            .read()
+            .expect("base currency lock is not poisoned")
+            .clone();
         let accounts = self.accounts.get_all_accounts()?;
         let now = Utc::now().date_naive();
         let mut events = Vec::new();
@@ -857,7 +865,11 @@ impl DividendSyncServiceTrait for DividendSyncService {
     }
 
     async fn build_asset_dividend_view(&self, asset_id: &str) -> Result<AssetDividendView> {
-        let base_ccy = self.base_currency.read().unwrap().clone();
+        let base_ccy = self
+            .base_currency
+            .read()
+            .expect("base currency lock is not poisoned")
+            .clone();
         let accounts = self.accounts.get_all_accounts()?;
         let mut symbol = asset_id.to_string();
         // Dividends pay in the instrument's quote currency; base currency is the

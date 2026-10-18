@@ -676,7 +676,19 @@
     "mode_switch_checklist_accurate": "Las fechas, cantidades y precios son correctos",
     "mode_switch_checklist_gaps": "Los huecos en el historial provocarán saldos y rentabilidades incorrectos",
     "mode_switch_keep_holdings": "Conservar posiciones",
-    "mode_switch_confirm": "Cambiar a Transacciones"
+    "mode_switch_confirm": "Cambiar a Transacciones",
+    "form_institution_label": "Entidad",
+    "form_institution_description": "Elija un banco para empezar por sus productos, o Personalizado para una cuenta de efectivo genérica.",
+    "form_institution_custom": "Personalizado",
+    "form_institution_product_label": "Producto",
+    "form_institution_product_description": "Los tipos vienen rellenados y se pueden editar por completo.",
+    "form_fixed_income_product_label": "Producto de renta fija",
+    "form_fixed_income_product_description": "Configure los intereses o dividendos generados automáticamente para esta cuenta.",
+    "form_fixed_income_product_aria": "Tipo de producto de renta fija",
+    "form_product_none": "Ninguno",
+    "form_product_hysa": "HYSA",
+    "form_product_goal": "Hucha objetivo",
+    "form_product_mp2": "MP2"
   },
   "limits": {
     "day_left": "{{days}} d restantes"
@@ -1761,5 +1773,6 @@
   "cloud_backup_hint_running": "Puedes seguir usando Wealthfolio mientras guardamos tu copia cifrada en la nube.",
   "cloud_backup_hint_failed": "No pudimos completar la copia. Lo intentaremos de nuevo automáticamente, o puedes intentarlo ahora.",
   "cloud_backup_retry_label": "Próximo intento",
-  "cloud_backup_retry_now": "Reintentar copia"
+  "cloud_backup_retry_now": "Reintentar copia",
+  "about_fork_notice": "Bifurcación de Wealthfolio (https://wealthfolio.app/). Wealthfolio es una marca de Teymz Inc. SURfi no está afiliado ni respaldado por el proyecto oficial."
 }

@@ -555,7 +555,9 @@
       "g": "Gramo",
       "kg": "Kilogramo"
     },
-    "end_date": "Fecha de vencimiento"
+    "end_date": "Fecha de vencimiento",
+    "lock_in_ended_title": "El periodo de tipo fijo ha terminado",
+    "lock_in_ended_description": "El periodo de tipo fijo terminó el {{date}} y no se ha registrado un tipo posterior. Añada un cambio de tipo antes de fiarse del saldo previsto."
   },
   "quickAdd": {
     "add_new_asset": "Añadir nuevo activo",

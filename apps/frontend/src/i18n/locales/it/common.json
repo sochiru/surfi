@@ -103,7 +103,8 @@
     "label_holdings": "Visualizza posizioni",
     "label_activities": "Visualizza movimenti",
     "label_goals": "Obiettivi",
-    "label_assistant": "Assistente IA"
+    "label_assistant": "Assistente IA",
+    "label_dividends": "Vedi dividendi"
   },
   "layout": {
     "search": "Cerca...",
@@ -322,7 +323,8 @@
     "all_portfolio": "Tutto il portafoglio",
     "calculation_notes_one": "Nota di calcolo ({{count}})",
     "calculation_notes_many": "Note di calcolo ({{count}})",
-    "calculation_notes_other": "Note di calcolo ({{count}})"
+    "calculation_notes_other": "Note di calcolo ({{count}})",
+    "view_dividends": "Vedi dividendi"
   },
   "globalEvents": {
     "syncingMarket": "Sincronizzazione dei dati di mercato...",
@@ -520,5 +522,6 @@
       "rebind": "Ricollega Wealthfolio Connect per confermare l’account e il nucleo familiare di questo profilo.",
       "cooldown_many": "Troppi tentativi. Riprova tra {{count}} secondi."
     }
-  }
+  },
+  "dividends": "Dividendi"
 }

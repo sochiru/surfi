@@ -674,7 +674,19 @@
     "mode_switch_checklist_accurate": "日期、数量和价格均准确无误",
     "mode_switch_checklist_gaps": "历史记录的空缺将导致余额和收益不正确",
     "mode_switch_keep_holdings": "保留持仓",
-    "mode_switch_confirm": "切换到交易"
+    "mode_switch_confirm": "切换到交易",
+    "form_institution_label": "机构",
+    "form_institution_description": "选择银行即可从其产品开始，或选择自定义以建立普通现金账户。",
+    "form_institution_custom": "自定义",
+    "form_institution_product_label": "产品",
+    "form_institution_product_description": "利率已预填，且可以完全编辑。",
+    "form_fixed_income_product_label": "固定收益产品",
+    "form_fixed_income_product_description": "为此账户配置自动生成的利息或股息。",
+    "form_fixed_income_product_aria": "固定收益产品类型",
+    "form_product_none": "无",
+    "form_product_hysa": "HYSA",
+    "form_product_goal": "目标账户",
+    "form_product_mp2": "MP2"
   },
   "limits": {
     "day_left": "剩余 {{days}} 天"
@@ -1688,5 +1700,6 @@
   "cloud_backup_hint_running": "保存加密云备份期间，你可以继续使用 Wealthfolio。",
   "cloud_backup_hint_failed": "未能完成备份。我们会自动重试，你也可以立即重试。",
   "cloud_backup_retry_label": "下次重试",
-  "cloud_backup_retry_now": "重新尝试备份"
+  "cloud_backup_retry_now": "重新尝试备份",
+  "about_fork_notice": "本项目分支自 Wealthfolio（https://wealthfolio.app/）。Wealthfolio 是 Teymz Inc. 的商标。SURfi 与官方项目无关，亦未经其认可。"
 }

@@ -103,7 +103,8 @@
     "label_holdings": "Ver posições",
     "label_activities": "Ver atividades",
     "label_goals": "Metas",
-    "label_assistant": "Assistente de IA"
+    "label_assistant": "Assistente de IA",
+    "label_dividends": "Ver dividendos"
   },
   "layout": {
     "search": "Buscar...",
@@ -322,7 +323,8 @@
     "all_portfolio": "Toda a carteira",
     "calculation_notes_one": "Nota de cálculo ({{count}})",
     "calculation_notes_other": "Notas de cálculo ({{count}})",
-    "calculation_notes_many": "Notas de cálculo ({{count}})"
+    "calculation_notes_many": "Notas de cálculo ({{count}})",
+    "view_dividends": "Ver dividendos"
   },
   "globalEvents": {
     "syncingMarket": "Sincronizando dados de mercado...",
@@ -520,5 +522,6 @@
       "rebind": "Reconecte o Wealthfolio Connect para confirmar a conta e o grupo familiar deste perfil.",
       "cooldown_many": "Muitas tentativas. Tente novamente em {{count}} segundos."
     }
-  }
+  },
+  "dividends": "Dividendos"
 }

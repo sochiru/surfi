@@ -66,7 +66,8 @@
       "accounts_count_one": "{{count}} 个账户",
       "accounts_count_other": "{{count}} 个账户",
       "pnl_current_holdings": "当前持仓"
-    }
+    },
+    "tab_liabilities": "负债"
   },
   "networth": {
     "attention": {
@@ -162,5 +163,24 @@
     "hide": "隐藏{{widget}}",
     "drag": "拖动{{widget}}",
     "empty": "未选择组件。请自定义此页面以添加组件。"
+  },
+  "liabilities": {
+    "empty_title": "没有可分析的负债",
+    "empty_description": "请在持仓中添加按揭、贷款、信用卡或其他负债。",
+    "add_liability": "添加负债",
+    "installment_loans": "分期贷款",
+    "average_paid_down": "平均已偿还",
+    "rate_updates_due": "待更新利率",
+    "monthly_payments": "已记录的月供",
+    "snapshot_only": "仅快照",
+    "rate_due": "利率待更新",
+    "auto_amortizing": "自动摊还",
+    "current_balance": "当前余额",
+    "interest_rate": "当前利率",
+    "monthly_payment": "月供",
+    "loan_term": "已记录期限",
+    "months": "{{count}} 个月",
+    "next_rate_review": "下次利率复核",
+    "paid_down": "已偿还"
   }
 }

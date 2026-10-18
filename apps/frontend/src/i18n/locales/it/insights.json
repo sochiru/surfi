@@ -70,7 +70,8 @@
       "accounts_count_many": "{{count}} conti",
       "accounts_count_other": "{{count}} conti",
       "pnl_current_holdings": "Posizioni attuali"
-    }
+    },
+    "tab_liabilities": "Debiti"
   },
   "networth": {
     "attention": {
@@ -168,5 +169,24 @@
     "hide": "Nascondi {{widget}}",
     "drag": "Trascina {{widget}}",
     "empty": "Nessun widget selezionato. Personalizza questa pagina per aggiungere widget."
+  },
+  "liabilities": {
+    "empty_title": "Nessuna passività da analizzare",
+    "empty_description": "Aggiungi un mutuo, un prestito, una carta di credito o un altro debito da Posizioni.",
+    "add_liability": "Aggiungi passività",
+    "installment_loans": "Prestiti rateali",
+    "average_paid_down": "Rimborsato in media",
+    "rate_updates_due": "Aggiornamenti del tasso in scadenza",
+    "monthly_payments": "Rate mensili registrate",
+    "snapshot_only": "Solo saldo",
+    "rate_due": "Tasso in scadenza",
+    "auto_amortizing": "Ammortamento automatico",
+    "current_balance": "Saldo attuale",
+    "interest_rate": "Tasso di interesse attuale",
+    "monthly_payment": "Rata mensile",
+    "loan_term": "Durata registrata",
+    "months": "{{count}} mesi",
+    "next_rate_review": "Prossima revisione del tasso",
+    "paid_down": "Rimborsato"
   }
 }

@@ -70,7 +70,8 @@
       "accounts_count_other": "{{count}} comptes",
       "accounts_count_many": "{{count}} comptes",
       "pnl_current_holdings": "Positions actuelles"
-    }
+    },
+    "tab_liabilities": "Dettes"
   },
   "networth": {
     "attention": {
@@ -168,5 +169,24 @@
     "hide": "Masquer {{widget}}",
     "drag": "Déplacer {{widget}}",
     "empty": "Aucun widget sélectionné. Personnalisez cette page pour ajouter des widgets."
+  },
+  "liabilities": {
+    "empty_title": "Aucun passif à analyser",
+    "empty_description": "Ajoutez un prêt immobilier, un emprunt, une carte de crédit ou une autre dette depuis Avoirs.",
+    "add_liability": "Ajouter un passif",
+    "installment_loans": "Prêts amortissables",
+    "average_paid_down": "Remboursé en moyenne",
+    "rate_updates_due": "Mises à jour de taux dues",
+    "monthly_payments": "Mensualités enregistrées",
+    "snapshot_only": "Solde seulement",
+    "rate_due": "Taux à revoir",
+    "auto_amortizing": "Amortissement automatique",
+    "current_balance": "Solde actuel",
+    "interest_rate": "Taux d'intérêt actuel",
+    "monthly_payment": "Mensualité",
+    "loan_term": "Durée enregistrée",
+    "months": "{{count}} mois",
+    "next_rate_review": "Prochain examen du taux",
+    "paid_down": "Remboursé"
   }
 }

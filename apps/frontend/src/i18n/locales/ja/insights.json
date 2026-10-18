@@ -66,7 +66,8 @@
       "accounts_count_one": "{{count}}口座",
       "accounts_count_other": "{{count}}口座",
       "pnl_current_holdings": "現在の保有銘柄"
-    }
+    },
+    "tab_liabilities": "負債"
   },
   "networth": {
     "attention": {
@@ -162,5 +163,24 @@
     "hide": "{{widget}}を非表示",
     "drag": "{{widget}}をドラッグ",
     "empty": "ウィジェットが選択されていません。このページをカスタマイズして追加してください。"
+  },
+  "liabilities": {
+    "empty_title": "分析する負債がありません",
+    "empty_description": "保有資産から住宅ローン、ローン、クレジットカード、その他の負債を追加してください。",
+    "add_liability": "負債を追加",
+    "installment_loans": "分割ローン",
+    "average_paid_down": "平均返済率",
+    "rate_updates_due": "金利の見直し期限",
+    "monthly_payments": "記録された月々の支払い",
+    "snapshot_only": "残高のみ",
+    "rate_due": "金利の見直し",
+    "auto_amortizing": "自動返済",
+    "current_balance": "現在の残高",
+    "interest_rate": "現在の金利",
+    "monthly_payment": "月々の支払い",
+    "loan_term": "記録された期間",
+    "months": "{{count}} か月",
+    "next_rate_review": "次の金利見直し",
+    "paid_down": "返済済み"
   }
 }

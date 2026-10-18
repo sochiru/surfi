@@ -551,7 +551,9 @@
       "g": "그램",
       "kg": "킬로그램"
     },
-    "end_date": "종료일"
+    "end_date": "종료일",
+    "lock_in_ended_title": "고정 금리 기간이 종료되었습니다",
+    "lock_in_ended_description": "고정 금리 기간이 {{date}}에 끝났고 이후 금리는 기록되지 않았습니다. 예상 잔액을 믿기 전에 금리 변경을 추가하세요."
   },
   "quickAdd": {
     "add_new_asset": "새 자산 추가",

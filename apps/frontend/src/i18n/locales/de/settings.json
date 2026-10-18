@@ -563,7 +563,19 @@
     "mode_switch_checklist_accurate": "Daten, Mengen & Preise sind korrekt",
     "mode_switch_checklist_gaps": "Lücken im Verlauf führen zu falschen Salden & Renditen",
     "mode_switch_keep_holdings": "Bestände behalten",
-    "mode_switch_confirm": "Zu Transaktionen wechseln"
+    "mode_switch_confirm": "Zu Transaktionen wechseln",
+    "form_institution_label": "Institut",
+    "form_institution_description": "Wählen Sie eine Bank, um mit ihren Produkten zu starten, oder Benutzerdefiniert für ein allgemeines Geldkonto.",
+    "form_institution_custom": "Benutzerdefiniert",
+    "form_institution_product_label": "Produkt",
+    "form_institution_product_description": "Zinssätze sind vorausgefüllt und vollständig bearbeitbar.",
+    "form_fixed_income_product_label": "Festzinsprodukt",
+    "form_fixed_income_product_description": "Konfigurieren Sie automatisch erzeugte Zinsen oder Dividenden für dieses Konto.",
+    "form_fixed_income_product_aria": "Art des Festzinsprodukts",
+    "form_product_none": "Keines",
+    "form_product_hysa": "HYSA",
+    "form_product_goal": "Sparziel",
+    "form_product_mp2": "MP2"
   },
   "limits": {
     "day_left": "Noch {{days}} T"
@@ -1258,7 +1270,6 @@
   "export_format_json": "JSON",
   "export_exporting": "{{name}} wird exportiert...",
   "export_button_aria": "{{name}} exportieren",
-  "backup_create_description": "Erstellen Sie eine vollständige Sicherung Ihrer Datenbank einschließlich WAL- und SHM-Dateien. Wählen Sie den Sicherungsort.",
   "about_app_name": "SURfi",
   "about_database_directory": "Datenbankverzeichnis",
   "about_database_file": "Datenbankdatei: <span className=\"font-mono\">app.db</span>",
@@ -1713,5 +1724,6 @@
   "cloud_backup_hint_running": "Du kannst Wealthfolio weiter nutzen, während wir dein verschlüsseltes Cloud-Backup speichern.",
   "cloud_backup_hint_failed": "Das Backup konnte nicht abgeschlossen werden. Wir versuchen es automatisch erneut, oder du kannst es jetzt versuchen.",
   "cloud_backup_retry_label": "Nächster Versuch",
-  "cloud_backup_retry_now": "Backup erneut versuchen"
+  "cloud_backup_retry_now": "Backup erneut versuchen",
+  "about_fork_notice": "Abspaltung von Wealthfolio (https://wealthfolio.app/). Wealthfolio ist eine Marke von Teymz Inc. SURfi steht in keiner Verbindung zum offiziellen Projekt und wird von diesem nicht unterstützt."
 }

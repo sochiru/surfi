@@ -674,7 +674,19 @@
     "mode_switch_checklist_accurate": "日付、数量、価格が正確である",
     "mode_switch_checklist_gaps": "履歴に欠損があると残高やリターンが正しく計算されません",
     "mode_switch_keep_holdings": "残高ベースのままにする",
-    "mode_switch_confirm": "取引ベースに切り替え"
+    "mode_switch_confirm": "取引ベースに切り替え",
+    "form_institution_label": "金融機関",
+    "form_institution_description": "銀行を選ぶとその商品から始められます。一般的な現金口座にはカスタムを選んでください。",
+    "form_institution_custom": "カスタム",
+    "form_institution_product_label": "商品",
+    "form_institution_product_description": "金利は入力済みで、すべて編集できます。",
+    "form_fixed_income_product_label": "固定収益商品",
+    "form_fixed_income_product_description": "この口座で自動作成する利息または配当を設定します。",
+    "form_fixed_income_product_aria": "固定収益商品の種類",
+    "form_product_none": "なし",
+    "form_product_hysa": "HYSA",
+    "form_product_goal": "目標ポット",
+    "form_product_mp2": "MP2"
   },
   "limits": {
     "day_left": "残り{{days}}日"
@@ -1688,5 +1700,6 @@
   "cloud_backup_hint_running": "暗号化されたクラウドバックアップを保存している間も、Wealthfolioを引き続き使用できます。",
   "cloud_backup_hint_failed": "バックアップを完了できませんでした。自動的に再試行します。今すぐ再試行することもできます。",
   "cloud_backup_retry_label": "次の再試行",
-  "cloud_backup_retry_now": "バックアップを再試行"
+  "cloud_backup_retry_now": "バックアップを再試行",
+  "about_fork_notice": "Wealthfolio（https://wealthfolio.app/）からのフォークです。Wealthfolio は Teymz Inc. の商標です。SURfi は公式プロジェクトと関係がなく、承認も受けていません。"
 }

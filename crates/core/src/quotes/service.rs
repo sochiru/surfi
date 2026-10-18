@@ -1869,8 +1869,16 @@ where
         let today = Utc::now().date_naive();
         let end_date = end.unwrap_or_else(|| today + Duration::days(366));
         let start_date = start.unwrap_or_else(|| today - Duration::days(365 * 5));
-        let start_dt = Utc.from_utc_datetime(&start_date.and_hms_opt(0, 0, 0).unwrap());
-        let end_dt = Utc.from_utc_datetime(&end_date.and_hms_opt(23, 59, 59).unwrap());
+        let start_dt = Utc.from_utc_datetime(
+            &start_date
+                .and_hms_opt(0, 0, 0)
+                .expect("midnight is a valid time"),
+        );
+        let end_dt = Utc.from_utc_datetime(
+            &end_date
+                .and_hms_opt(23, 59, 59)
+                .expect("end of day is a valid time"),
+        );
 
         let provider_config = preferred_provider
             .map(|provider| serde_json::json!({ "preferred_provider": provider }));

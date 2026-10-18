@@ -70,7 +70,8 @@
       "accounts_count_other": "{{count}} cuentas",
       "accounts_count_many": "{{count}} cuentas",
       "pnl_current_holdings": "Posiciones actuales"
-    }
+    },
+    "tab_liabilities": "Deudas"
   },
   "networth": {
     "attention": {
@@ -168,5 +169,24 @@
     "hide": "Ocultar {{widget}}",
     "drag": "Arrastrar {{widget}}",
     "empty": "No hay widgets seleccionados. Personaliza esta página para añadir widgets."
+  },
+  "liabilities": {
+    "empty_title": "No hay deudas que analizar",
+    "empty_description": "Añada una hipoteca, un préstamo, una tarjeta de crédito u otra deuda desde Posiciones.",
+    "add_liability": "Añadir deuda",
+    "installment_loans": "Préstamos a plazos",
+    "average_paid_down": "Amortizado de media",
+    "rate_updates_due": "Actualizaciones de tipo pendientes",
+    "monthly_payments": "Pagos mensuales registrados",
+    "snapshot_only": "Solo saldo",
+    "rate_due": "Tipo pendiente",
+    "auto_amortizing": "Amortización automática",
+    "current_balance": "Saldo actual",
+    "interest_rate": "Tipo de interés actual",
+    "monthly_payment": "Pago mensual",
+    "loan_term": "Plazo registrado",
+    "months": "{{count}} meses",
+    "next_rate_review": "Próxima revisión del tipo",
+    "paid_down": "Amortizado"
   }
 }

@@ -555,7 +555,9 @@
       "g": "Grama",
       "kg": "Quilograma"
     },
-    "end_date": "Data de vencimento"
+    "end_date": "Data de vencimento",
+    "lock_in_ended_title": "O período de taxa fixa terminou",
+    "lock_in_ended_description": "O período de taxa fixa terminou em {{date}} e nenhuma taxa posterior foi registada. Adicione uma alteração de taxa antes de confiar no saldo previsto."
   },
   "quickAdd": {
     "add_new_asset": "Adicionar novo ativo",
