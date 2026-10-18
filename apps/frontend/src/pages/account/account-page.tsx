@@ -1,3 +1,5 @@
+import { parseLocalDate } from "@/lib/utils";
+import { formatZonedDateKey } from "@/features/spending/lib/timezone";
 import { getContributionLimit, getSnapshots, searchActivities } from "@/adapters";
 import { HistoryChart } from "@/components/history-chart";
 import type { ActivityDetails } from "@/lib/types";
@@ -10,6 +12,7 @@ import {
   GainPercent,
   AnimatedToggleGroup,
   IntervalSelector,
+  getInitialIntervalData,
   Page,
   PageContent,
   PageHeader,
@@ -52,7 +55,6 @@ import {
   Account,
   AccountValuation,
   ContributionLimit,
-  DateRange,
   SnapshotInfo,
   TimePeriod,
   TrackedItem,
@@ -96,7 +98,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@wealthfolio/ui/components/ui/sheet";
-import { format, subMonths } from "date-fns";
+import { format } from "date-fns";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AccountContributionLimit } from "./account-contribution-limit";
 import AccountHoldings from "./account-holdings";
@@ -129,12 +131,6 @@ const accountTypeIcons: Record<AccountType, Icon> = {
   CREDIT_CARD: Icons.CreditCard,
   CRYPTOCURRENCY: Icons.Bitcoin,
 };
-
-// Helper function to get the initial date range (copied from dashboard)
-const getInitialDateRange = (): DateRange => ({
-  from: subMonths(new Date(), 3),
-  to: new Date(),
-});
 
 // Define the initial interval code (consistent with other pages)
 const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
@@ -185,9 +181,14 @@ const AccountPage = () => {
   const requestedAccountDetailTab = parseAccountDetailTab(searchParams.get("tab"));
   const navigate = useNavigate();
   const isMobile = useIsMobileViewport();
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
   const [selectedIntervalCode, setSelectedIntervalCode] =
     useState<TimePeriod>(INITIAL_INTERVAL_CODE);
+  const todayISO = formatZonedDateKey(new Date(), appTimezone);
+  const today = useMemo(() => parseLocalDate(todayISO), [todayISO]);
+  const dateRange = useMemo(
+    () => getInitialIntervalData(selectedIntervalCode, today).range,
+    [selectedIntervalCode, today],
+  );
   const [desktopSelectorOpen, setDesktopSelectorOpen] = useState(false);
   const [mobileSelectorOpen, setMobileSelectorOpen] = useState(false);
   const [actionPaletteOpen, setActionPaletteOpen] = useState(false);
@@ -214,8 +215,10 @@ const AccountPage = () => {
   } = useActivityActionDialogs();
 
   const recalculatePortfolioMutation = useRecalculatePortfolioMutation();
-  const { accounts, isLoading: isAccountsLoading } = useAccounts();
-  const account = useMemo(() => accounts?.find((acc) => acc.id === id), [accounts, id]);
+  // Hidden accounts stay reachable by URL and keep their activities editable here,
+  // so the page works from every non-archived account; only the switcher hides them.
+  const { accounts, isLoading: isAccountsLoading } = useAccounts({ filterActive: false });
+  const account = useMemo(() => accounts.find((acc) => acc.id === id), [accounts, id]);
   const cashProductActions = useCashProductActions(account);
   const isLiabilityAccount = isLiabilityAccountType(account?.accountType);
   const isCashOnlyAccount = account?.accountType === AccountType.CASH || isLiabilityAccount;
@@ -224,7 +227,7 @@ const AccountPage = () => {
     account,
     AccountPurpose.CONTRIBUTION_LIMITS,
   );
-  const currentContributionYear = new Date().getFullYear();
+  const currentContributionYear = today.getFullYear();
 
   const { data: contributionLimits, isLoading: isContributionLimitsLoading } = useQuery<
     ContributionLimit[],
@@ -423,17 +426,19 @@ const AccountPage = () => {
     enabled: isActivitySheetOpen && !!selectedActivityDate,
   });
 
-  // Group accounts by type for the selector
+  // Group accounts by type for the selector: visible accounts, plus this one if hidden
   const accountsByType = useMemo(() => {
     const grouped: Record<string, Account[]> = {};
-    accounts.forEach((acc) => {
-      if (!grouped[acc.accountType]) {
-        grouped[acc.accountType] = [];
-      }
-      grouped[acc.accountType].push(acc);
-    });
+    accounts
+      .filter((acc) => acc.isActive || acc.id === id)
+      .forEach((acc) => {
+        if (!grouped[acc.accountType]) {
+          grouped[acc.accountType] = [];
+        }
+        grouped[acc.accountType].push(acc);
+      });
     return Object.entries(grouped);
-  }, [accounts]);
+  }, [accounts, id]);
 
   const accountTrackedItem: TrackedItem | undefined = useMemo(() => {
     if (account && supportsPerformance) {
@@ -618,24 +623,23 @@ const AccountPage = () => {
 
   const chartData: HistoryChartData[] = useMemo(() => {
     if (!valuationHistory) return [];
-    return valuationHistory.map((valuation: AccountValuation) => ({
-      date: valuation.valuationDate,
-      totalValue: valuation.totalValue,
-      netContribution: valuation.netContribution,
-      currency: valuation.accountCurrency,
-    }));
+    // A day the engine could not fully convert carries a partial value; it
+    // is not plotted rather than drawn as if it were complete.
+    return valuationHistory
+      .filter((valuation) => valuation.valueStatus !== "unavailable")
+      .map((valuation: AccountValuation) => ({
+        date: valuation.valuationDate,
+        totalValue: valuation.totalValue,
+        netContribution: valuation.netContribution,
+        currency: valuation.accountCurrency,
+      }));
   }, [valuationHistory]);
 
   const isLoading = isAccountsLoading || isValuationHistoryLoading;
 
   // Callback for IntervalSelector
-  const handleIntervalSelect = (
-    code: TimePeriod,
-    _description: string,
-    range: DateRange | undefined,
-  ) => {
+  const handleIntervalSelect = (code: TimePeriod) => {
     setSelectedIntervalCode(code);
-    setDateRange(range);
   };
 
   const percentageToDisplay = useMemo(() => {

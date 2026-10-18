@@ -15,8 +15,10 @@ import {
   CurrencyInput,
   RadioGroup,
   RadioGroupItem,
+  ResponsiveSelect,
   ToggleGroup,
   ToggleGroupItem,
+  type ResponsiveSelectOption,
 } from "@wealthfolio/ui";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import {
@@ -47,18 +49,16 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 
 import { useAccountMutations } from "./use-account-mutations";
-import { AccountTypeCards, CatalogProductCards, InstitutionCards } from "./account-form-pickers";
+import { CatalogProductCards, InstitutionCards } from "./account-form-pickers";
 import { CashProductFields } from "@/features/mp2/components/cash-product-fields";
 import type { CashProductType } from "@/lib/cash-product-meta";
 import {
   defaultCashProduct,
   getProductType,
   parseAccountMeta,
-  setCashCategoryInMeta,
   setCatalogSelectionInMeta,
   setProductInMeta,
 } from "@/lib/cash-product-meta";
-import { accountTypeVisual } from "@/lib/account-type-visuals";
 import {
   applyCatalogProduct,
   CUSTOM_INSTITUTION_ID,
@@ -71,12 +71,92 @@ const CASH_ALLOCATION_DEFAULT_VALUE = "__default__";
 const CASH_FIXED_INCOME_CATEGORY_ID = "FIXED_INCOME";
 const CASH_PRODUCT_NONE = "__none__";
 
+function getCashCategoryFromMeta(meta?: string | null): string | null {
+  if (!meta) return null;
+  try {
+    const parsed = JSON.parse(meta) as Record<string, unknown>;
+    const allocation = parsed.allocation as Record<string, unknown> | undefined;
+    return (allocation?.cashCategoryId as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function setCashCategoryInMeta(meta: string | null | undefined, categoryId: string | null): string {
+  let parsed: Record<string, unknown> = {};
+  if (meta) {
+    try {
+      const value: unknown = JSON.parse(meta);
+      if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        parsed = value as Record<string, unknown>;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (categoryId) {
+    parsed.allocation = { cashCategoryId: categoryId };
+  } else {
+    delete parsed.allocation;
+  }
+  return JSON.stringify(parsed);
+}
+
 function getSelectableCashCategoryFromMeta(meta?: string | null): string {
-  const categoryId = parseAccountMeta(meta).allocation?.cashCategoryId;
+  const categoryId = getCashCategoryFromMeta(meta);
   return categoryId === CASH_FIXED_INCOME_CATEGORY_ID
     ? CASH_FIXED_INCOME_CATEGORY_ID
     : CASH_ALLOCATION_DEFAULT_VALUE;
 }
+
+// The methods the portfolio engine computes (CostBasisMethod::ALL); an account
+// without a method in its meta uses FIFO.
+const COST_BASIS_METHODS: readonly string[] = ["FIFO", "LIFO", "HIFO", "WAC"];
+const DEFAULT_COST_BASIS_METHOD = "FIFO";
+
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function parseMetaObject(meta?: string | null): Record<string, unknown> | null {
+  if (!meta) return null;
+  try {
+    return asObject(JSON.parse(meta));
+  } catch {
+    return null;
+  }
+}
+
+function getAccountingFromMeta(meta?: string | null): Record<string, unknown> {
+  return asObject(parseMetaObject(meta)?.accounting) ?? {};
+}
+
+// The stored code as core reads it: exactly, without trimming or case folding,
+// so a code core refuses reads as unsupported here too.
+function getCostBasisMethodFromMeta(meta?: string | null): string {
+  const accounting = getAccountingFromMeta(meta);
+  const method = accounting.costBasisMethod ?? accounting.cost_basis_method;
+  return typeof method === "string" ? method : DEFAULT_COST_BASIS_METHOD;
+}
+
+function setCostBasisMethodInMeta(meta: string | null | undefined, method: string): string {
+  // Meta that is not a JSON object cannot hold settings: start a new one.
+  const parsed = parseMetaObject(meta) ?? {};
+  // Keep the rest of the accounting settings; one spelling of the method key.
+  const accounting = { ...getAccountingFromMeta(meta) };
+  delete accounting.cost_basis_method;
+  parsed.accounting = { ...accounting, costBasisMethod: method };
+  return JSON.stringify(parsed);
+}
+
+const accountTypeIcons = {
+  [AccountType.SECURITIES]: Icons.Briefcase,
+  [AccountType.CASH]: Icons.DollarSign,
+  [AccountType.CREDIT_CARD]: Icons.CreditCard,
+  [AccountType.CRYPTOCURRENCY]: Icons.Bitcoin,
+} as const;
 
 const formCardClassName =
   "rounded-xl border border-border bg-background p-4 sm:p-5 dark:border-border/70 dark:bg-muted/20";
@@ -101,25 +181,26 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
   const { t } = useTranslation();
   const { createAccountMutation, updateAccountMutation } = useAccountMutations({ onSuccess });
 
-  const accountTypeLabels: Record<AccountType, string> = useMemo(
-    () => ({
-      SECURITIES: t("settings:accounts_form_type_securities"),
-      CASH: t("settings:accounts_form_type_cash"),
-      CREDIT_CARD: t("settings:accounts_form_type_credit_card"),
-      CRYPTOCURRENCY: t("settings:accounts_form_type_crypto"),
-    }),
+  const accountTypes: ResponsiveSelectOption[] = useMemo(
+    () => [
+      { label: t("settings:accounts_form_type_securities"), value: "SECURITIES" },
+      { label: t("settings:accounts_form_type_cash"), value: "CASH" },
+      { label: t("settings:accounts_form_type_credit_card"), value: "CREDIT_CARD" },
+      { label: t("settings:accounts_form_type_crypto"), value: "CRYPTOCURRENCY" },
+    ],
     [t],
   );
-
-  const lastPrefill = useRef<{ name: string; group?: string; currency: string } | null>(null);
 
   // Track initial tracking mode to detect changes
   const initialTrackingMode = defaultValues?.trackingMode;
   const needsSetup = initialTrackingMode === "NOT_SET" || initialTrackingMode === undefined;
 
-  // State for mode switch confirmation dialog
+  // State for the mode switch and archive confirmation dialogs
   const [showModeConfirmation, setShowModeConfirmation] = useState(false);
+  const [showArchiveConfirmation, setShowArchiveConfirmation] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<AccountFormOutput | null>(null);
+
+  const lastPrefill = useRef<{ name: string; group?: string; currency: string } | null>(null);
 
   const form = useForm<AccountFormInput, unknown, AccountFormOutput>({
     resolver: zodResolver(newAccountSchema),
@@ -142,6 +223,39 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
   const catalogInstitution = getInstitution(selectedInstitutionId);
   const isFixedIncome =
     getSelectableCashCategoryFromMeta(cashMeta) === CASH_FIXED_INCOME_CATEGORY_ID;
+  // Only transactions accounts that hold securities keep lots.
+  const showsCostBasisMethod =
+    currentTrackingMode === "TRANSACTIONS" && !isCashAccount && !isCreditCardAccount;
+
+  const currentMeta = form.watch("meta");
+  const costBasisMethod = getCostBasisMethodFromMeta(currentMeta);
+  const savedCostBasisMethod = getCostBasisMethodFromMeta(defaultValues?.meta);
+  // Collapsed while the account uses the default; open when it does not, so
+  // a non-default method is never hidden.
+  const [costBasisOpen, setCostBasisOpen] = useState(
+    savedCostBasisMethod !== DEFAULT_COST_BASIS_METHOD,
+  );
+  const costBasisChanged = !!defaultValues?.id && costBasisMethod !== savedCostBasisMethod;
+  const costBasisDescription = COST_BASIS_METHODS.includes(costBasisMethod)
+    ? t(`settings:accounts.form_cost_basis_method_${costBasisMethod.toLowerCase()}_description`)
+    : null;
+  const costBasisMethods: ResponsiveSelectOption[] = useMemo(() => {
+    const options: ResponsiveSelectOption[] = COST_BASIS_METHODS.map((method) => ({
+      label: t(`settings:accounts.form_cost_basis_method_${method.toLowerCase()}`),
+      value: method,
+    }));
+    // A stored method the engine does not compute fails this account's
+    // calculation: show it, so choosing another is the fix.
+    if (!COST_BASIS_METHODS.includes(costBasisMethod)) {
+      options.push({
+        label: t("settings:accounts.form_cost_basis_method_unsupported", {
+          method: costBasisMethod,
+        }),
+        value: costBasisMethod,
+      });
+    }
+    return options;
+  }, [costBasisMethod, t]);
 
   const { data: assetClassesTaxonomy } = useTaxonomy(isCashAccount ? "asset_classes" : null);
   const fixedIncomeCategoryName = useMemo(() => {
@@ -180,6 +294,17 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
   );
 
   function onSubmit(data: AccountFormOutput) {
+    // Archiving asks first, as it does from the account menu
+    const isArchiving = !!data.id && data.isArchived && !defaultValues?.isArchived;
+    if (isArchiving) {
+      setPendingFormData(data);
+      setShowArchiveConfirmation(true);
+      return;
+    }
+    submitAfterArchiveCheck(data);
+  }
+
+  function submitAfterArchiveCheck(data: AccountFormOutput) {
     // Check if this is an existing account (update) and mode is switching from HOLDINGS to TRANSACTIONS
     const isExistingAccount = !!data.id;
     const isSwitchingFromHoldingsToTransactions =
@@ -243,13 +368,27 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
     [defaultValues?.currency, defaultValues?.id, form],
   );
 
+  const handleConfirmArchive = () => {
+    setShowArchiveConfirmation(false);
+    setPendingFormData(null);
+    if (pendingFormData) {
+      submitAfterArchiveCheck(pendingFormData);
+    }
+  };
+
+  const handleCancelArchive = () => {
+    setShowArchiveConfirmation(false);
+    setPendingFormData(null);
+    form.setValue("isArchived", false);
+  };
+
   const formTitle = defaultValues?.id
     ? t("settings:accounts_form_update_title")
     : t("settings:accounts_form_add_title");
   const formDescription = defaultValues?.id
     ? t("settings:accounts_form_update_description")
     : t("settings:accounts_form_add_description");
-  const AccountTypeIcon = accountTypeVisual(currentAccountType).icon;
+  const AccountTypeIcon = accountTypeIcons[currentAccountType] ?? Icons.Wallet;
 
   return (
     <Form {...form}>
@@ -272,262 +411,310 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
           <input type="hidden" name="id" />
-          <section className={formCardClassName}>
-            <h3 className={formSectionLabelClassName}>{t("settings:accounts.form_identity")}</h3>
-            <div className="mt-4 grid gap-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("settings:accounts_form_name_label")}</FormLabel>
-                    <FormControl>
-                      <Input
-                        data-testid="account-name-input"
-                        placeholder={t("settings:accounts_form_name_placeholder")}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="group"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("settings:accounts_form_group_label")}</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder={t("settings:accounts_form_group_placeholder")}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="accountType"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>{t("settings:accounts_form_type_label")}</FormLabel>
-                    <FormControl>
-                      <AccountTypeCards
-                        value={field.value}
-                        labels={accountTypeLabels}
-                        onChange={(type) => {
-                          field.onChange(type);
-                          if (type !== AccountType.CASH) {
-                            form.setValue(
-                              "meta",
-                              setCatalogSelectionInMeta(
-                                setProductInMeta(form.getValues("meta"), null),
-                                null,
-                                null,
-                              ),
-                              { shouldDirty: true },
-                            );
-                          }
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {!defaultValues?.id ? (
+          <div className="contents lg:grid lg:content-start lg:gap-4">
+            <section className={formCardClassName}>
+              <h3 className={formSectionLabelClassName}>{t("settings:accounts.form_identity")}</h3>
+              <div className="mt-4 grid gap-4">
                 <FormField
                   control={form.control}
-                  name="currency"
+                  name="name"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>{t("settings:accounts_form_currency_label")}</FormLabel>
+                    <FormItem>
+                      <FormLabel>{t("settings:accounts_form_name_label")}</FormLabel>
                       <FormControl>
-                        <CurrencyInput
-                          data-testid="account-currency-select"
-                          value={field.value}
-                          onChange={(value: string) => field.onChange(value)}
+                        <Input
+                          data-testid="account-name-input"
+                          placeholder={t("settings:accounts_form_name_placeholder")}
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              ) : null}
-
-              {isCashAccount && (
-                <div className="flex flex-col gap-2">
-                  <div>
-                    <label className="text-sm font-medium">
-                      {t("settings:accounts.form_institution_label")}
-                    </label>
-                    <p className="text-muted-foreground text-xs">
-                      {t("settings:accounts.form_institution_description")}
-                    </p>
-                  </div>
-                  <InstitutionCards
-                    value={selectedInstitutionId}
-                    customLabel={t("settings:accounts.form_institution_custom")}
-                    onChange={(institutionId) => {
-                      if (institutionId === CUSTOM_INSTITUTION_ID) {
-                        form.setValue(
-                          "meta",
-                          setCatalogSelectionInMeta(form.getValues("meta"), null, null),
-                          { shouldDirty: true },
-                        );
-                        return;
-                      }
-                      const firstProduct = getInstitution(institutionId)?.products[0];
-                      if (firstProduct) applyCatalog(firstProduct);
-                    }}
-                  />
-                </div>
-              )}
-
-              {isCashAccount && catalogInstitution && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium">
-                      {t("settings:accounts.form_institution_product_label")}
-                    </label>
-                    <p className="text-muted-foreground text-xs">
-                      {t("settings:accounts.form_institution_product_description")}
-                    </p>
-                  </div>
-                  <CatalogProductCards
-                    products={catalogInstitution.products}
-                    value={parsedCashMeta.productId}
-                    onChange={applyCatalog}
-                  />
-                  {cashProductType && (
-                    <CashProductFields
-                      meta={cashMeta}
-                      productKind={cashProductType}
-                      headingOverride={
-                        selectedCatalogProduct
-                          ? {
-                              title: selectedCatalogProduct.name,
-                              description: selectedCatalogProduct.description,
-                            }
-                          : undefined
-                      }
-                      onMetaChange={(meta) => form.setValue("meta", meta, { shouldDirty: true })}
-                    />
+                <FormField
+                  control={form.control}
+                  name="group"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("settings:accounts_form_group_label")}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={t("settings:accounts_form_group_placeholder")}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </div>
-              )}
+                />
 
-              {isCashAccount && selectedInstitutionId === CUSTOM_INSTITUTION_ID && (
-                <div className="flex flex-col gap-2">
-                  <div>
-                    <label className="text-sm font-medium">
-                      {t("settings:accounts.form_cash_classification_label")}
-                    </label>
-                    <p className="text-muted-foreground text-xs">
-                      {t("settings:accounts.form_cash_classification_description")}
-                    </p>
+                <FormField
+                  control={form.control}
+                  name="accountType"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>{t("settings:accounts_form_type_label")}</FormLabel>
+                      <FormControl>
+                        <ResponsiveSelect
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          options={accountTypes}
+                          placeholder={t("settings:accounts_form_type_placeholder")}
+                          sheetTitle={t("settings:accounts_form_type_sheet_title")}
+                          sheetDescription={t("settings:accounts_form_type_sheet_description")}
+                          triggerClassName="h-11"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {!defaultValues?.id ? (
+                  <FormField
+                    control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>{t("settings:accounts_form_currency_label")}</FormLabel>
+                        <FormControl>
+                          <CurrencyInput
+                            data-testid="account-currency-select"
+                            value={field.value}
+                            onChange={(value: string) => field.onChange(value)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : null}
+
+                {isCashAccount && (
+                  <div className="flex flex-col gap-2">
+                    <div>
+                      <label className="text-sm font-medium">
+                        {t("settings:accounts.form_institution_label")}
+                      </label>
+                      <p className="text-muted-foreground text-xs">
+                        {t("settings:accounts.form_institution_description")}
+                      </p>
+                    </div>
+                    <InstitutionCards
+                      value={selectedInstitutionId}
+                      customLabel={t("settings:accounts.form_institution_custom")}
+                      onChange={(institutionId) => {
+                        if (institutionId === CUSTOM_INSTITUTION_ID) {
+                          form.setValue(
+                            "meta",
+                            setCatalogSelectionInMeta(form.getValues("meta"), null, null),
+                            { shouldDirty: true },
+                          );
+                          return;
+                        }
+                        const firstProduct = getInstitution(institutionId)?.products[0];
+                        if (firstProduct) applyCatalog(firstProduct);
+                      }}
+                    />
                   </div>
-                  <ToggleGroup
-                    type="single"
-                    aria-label={t("settings:accounts.form_cash_classification_aria")}
-                    value={getSelectableCashCategoryFromMeta(form.watch("meta"))}
-                    onValueChange={(v) => {
-                      if (!v) return;
-                      const categoryId = v === CASH_ALLOCATION_DEFAULT_VALUE ? null : v;
-                      let updatedMeta = setCashCategoryInMeta(form.getValues("meta"), categoryId);
-                      if (!categoryId) {
-                        updatedMeta = setProductInMeta(updatedMeta, null);
-                      }
-                      form.setValue("meta", updatedMeta, { shouldDirty: true });
-                    }}
-                    className="bg-muted grid h-11 grid-cols-2 rounded-lg p-1"
-                  >
-                    <ToggleGroupItem
-                      value={CASH_ALLOCATION_DEFAULT_VALUE}
-                      className={cashClassificationItemClassName}
-                    >
-                      {t("settings:accounts.form_cash_classification_cash")}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem
-                      value={CASH_FIXED_INCOME_CATEGORY_ID}
-                      className={cashClassificationItemClassName}
-                    >
-                      {fixedIncomeCategoryName}
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-              )}
+                )}
 
-              {isCashAccount &&
-                selectedInstitutionId === CUSTOM_INSTITUTION_ID &&
-                isFixedIncome && (
+                {isCashAccount && catalogInstitution && (
                   <div className="space-y-3">
                     <div>
                       <label className="text-sm font-medium">
-                        {t("settings:accounts.form_fixed_income_product_label")}
+                        {t("settings:accounts.form_institution_product_label")}
                       </label>
                       <p className="text-muted-foreground text-xs">
-                        {t("settings:accounts.form_fixed_income_product_description")}
+                        {t("settings:accounts.form_institution_product_description")}
                       </p>
                     </div>
-                    <ToggleGroup
-                      type="single"
-                      aria-label={t("settings:accounts.form_fixed_income_product_aria")}
-                      value={cashProductType ?? CASH_PRODUCT_NONE}
-                      onValueChange={(value) => {
-                        if (!value) return;
-                        const existing = parseAccountMeta(cashMeta).product;
-                        const next =
-                          value === CASH_PRODUCT_NONE
-                            ? null
-                            : existing?.type === value
-                              ? existing
-                              : defaultCashProduct(value as CashProductType);
-                        form.setValue(
-                          "meta",
-                          setCatalogSelectionInMeta(setProductInMeta(cashMeta, next), null, null),
-                          { shouldDirty: true },
-                        );
-                      }}
-                      className="bg-muted grid h-11 grid-cols-4 rounded-lg p-1"
-                    >
-                      <ToggleGroupItem
-                        value={CASH_PRODUCT_NONE}
-                        className={cashClassificationItemClassName}
-                      >
-                        {t("settings:accounts.form_product_none")}
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="HYSA" className={cashClassificationItemClassName}>
-                        {t("settings:accounts.form_product_hysa")}
-                      </ToggleGroupItem>
-                      <ToggleGroupItem
-                        value="HYSA_GOAL"
-                        className={cashClassificationItemClassName}
-                      >
-                        {t("settings:accounts.form_product_goal")}
-                      </ToggleGroupItem>
-                      <ToggleGroupItem
-                        value="PAGIBIG_MP2"
-                        className={cashClassificationItemClassName}
-                      >
-                        {t("settings:accounts.form_product_mp2")}
-                      </ToggleGroupItem>
-                    </ToggleGroup>
+                    <CatalogProductCards
+                      products={catalogInstitution.products}
+                      value={parsedCashMeta.productId}
+                      onChange={applyCatalog}
+                    />
                     {cashProductType && (
                       <CashProductFields
                         meta={cashMeta}
                         productKind={cashProductType}
+                        headingOverride={
+                          selectedCatalogProduct
+                            ? {
+                                title: selectedCatalogProduct.name,
+                                description: selectedCatalogProduct.description,
+                              }
+                            : undefined
+                        }
                         onMetaChange={(meta) => form.setValue("meta", meta, { shouldDirty: true })}
                       />
                     )}
                   </div>
                 )}
-            </div>
-          </section>
+
+                {isCashAccount && selectedInstitutionId === CUSTOM_INSTITUTION_ID && (
+                  <div className="flex flex-col gap-2">
+                    <div>
+                      <label className="text-sm font-medium">
+                        {t("settings:accounts.form_cash_classification_label")}
+                      </label>
+                      <p className="text-muted-foreground text-xs">
+                        {t("settings:accounts.form_cash_classification_description")}
+                      </p>
+                    </div>
+                    <ToggleGroup
+                      type="single"
+                      aria-label={t("settings:accounts.form_cash_classification_aria")}
+                      value={getSelectableCashCategoryFromMeta(cashMeta)}
+                      onValueChange={(v) => {
+                        if (!v) return;
+                        const categoryId = v === CASH_ALLOCATION_DEFAULT_VALUE ? null : v;
+                        let updatedMeta = setCashCategoryInMeta(form.getValues("meta"), categoryId);
+                        if (!categoryId) {
+                          updatedMeta = setProductInMeta(updatedMeta, null);
+                        }
+                        form.setValue("meta", updatedMeta, { shouldDirty: true });
+                      }}
+                      className="bg-muted grid h-11 grid-cols-2 rounded-lg p-1"
+                    >
+                      <ToggleGroupItem
+                        value={CASH_ALLOCATION_DEFAULT_VALUE}
+                        className={cashClassificationItemClassName}
+                      >
+                        {t("settings:accounts.form_cash_classification_cash")}
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value={CASH_FIXED_INCOME_CATEGORY_ID}
+                        className={cashClassificationItemClassName}
+                      >
+                        {fixedIncomeCategoryName}
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                )}
+
+                {isCashAccount &&
+                  selectedInstitutionId === CUSTOM_INSTITUTION_ID &&
+                  isFixedIncome && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium">
+                          {t("settings:accounts.form_fixed_income_product_label")}
+                        </label>
+                        <p className="text-muted-foreground text-xs">
+                          {t("settings:accounts.form_fixed_income_product_description")}
+                        </p>
+                      </div>
+                      <ToggleGroup
+                        type="single"
+                        aria-label={t("settings:accounts.form_fixed_income_product_aria")}
+                        value={cashProductType ?? CASH_PRODUCT_NONE}
+                        onValueChange={(value) => {
+                          if (!value) return;
+                          const existing = parseAccountMeta(cashMeta).product;
+                          const next =
+                            value === CASH_PRODUCT_NONE
+                              ? null
+                              : existing?.type === value
+                                ? existing
+                                : defaultCashProduct(value as CashProductType);
+                          form.setValue(
+                            "meta",
+                            setCatalogSelectionInMeta(setProductInMeta(cashMeta, next), null, null),
+                            { shouldDirty: true },
+                          );
+                        }}
+                        className="bg-muted grid h-11 grid-cols-4 rounded-lg p-1"
+                      >
+                        <ToggleGroupItem
+                          value={CASH_PRODUCT_NONE}
+                          className={cashClassificationItemClassName}
+                        >
+                          {t("settings:accounts.form_product_none")}
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="HYSA" className={cashClassificationItemClassName}>
+                          {t("settings:accounts.form_product_hysa")}
+                        </ToggleGroupItem>
+                        <ToggleGroupItem
+                          value="HYSA_GOAL"
+                          className={cashClassificationItemClassName}
+                        >
+                          {t("settings:accounts.form_product_goal")}
+                        </ToggleGroupItem>
+                        <ToggleGroupItem
+                          value="PAGIBIG_MP2"
+                          className={cashClassificationItemClassName}
+                        >
+                          {t("settings:accounts.form_product_mp2")}
+                        </ToggleGroupItem>
+                      </ToggleGroup>
+                      {cashProductType && (
+                        <CashProductFields
+                          meta={cashMeta}
+                          productKind={cashProductType}
+                          onMetaChange={(meta) =>
+                            form.setValue("meta", meta, { shouldDirty: true })
+                          }
+                        />
+                      )}
+                    </div>
+                  )}
+              </div>
+            </section>
+            <section className={cn(formCardClassName, "order-last lg:order-none")}>
+              <h3 className={formSectionLabelClassName}>
+                {t("settings:accounts.form_visibility")}
+              </h3>
+              <div className="mt-4 grid gap-4">
+                <FormField
+                  control={form.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between gap-4 space-y-0">
+                      <div className="min-w-0">
+                        <FormLabel className="text-sm font-normal">
+                          {t("settings:accounts.form_hide_label")}
+                          <span className="text-muted-foreground ml-1 text-xs font-normal">
+                            {t("settings:accounts.form_hide_hint")}
+                          </span>
+                        </FormLabel>
+                        <FormMessage />
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={!field.value}
+                          onCheckedChange={(checked) => field.onChange(!checked)}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {defaultValues?.id && (
+                  <FormField
+                    control={form.control}
+                    name="isArchived"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between gap-4 space-y-0">
+                        <div className="min-w-0">
+                          <FormLabel className="text-sm font-normal">
+                            {t("settings:accounts.form_archive_label")}
+                            <span className="text-muted-foreground ml-1 text-xs font-normal">
+                              {t("settings:accounts.form_archive_hint")}
+                            </span>
+                          </FormLabel>
+                          <FormMessage />
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+            </section>
+          </div>
 
           <div className="grid content-start gap-4">
             <FormField
@@ -625,63 +812,67 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                     </Alert>
                   )}
                   <FormMessage />
+                  {showsCostBasisMethod && (
+                    <div className="border-border border-t pt-4">
+                      <button
+                        type="button"
+                        aria-expanded={costBasisOpen}
+                        aria-controls="account-cost-basis"
+                        onClick={() => setCostBasisOpen((open) => !open)}
+                        className="flex w-full items-center justify-between gap-3 text-left"
+                      >
+                        <span className="text-sm font-medium">
+                          {t("settings:accounts.form_cost_basis_method_label")}
+                        </span>
+                        <span className="text-muted-foreground flex items-center gap-1 text-sm">
+                          {!costBasisOpen && costBasisMethod}
+                          <Icons.ChevronDown
+                            className={cn(
+                              "h-4 w-4 transition-transform",
+                              costBasisOpen && "rotate-180",
+                            )}
+                          />
+                        </span>
+                      </button>
+                      {costBasisOpen && (
+                        <div id="account-cost-basis" className="mt-2 flex flex-col gap-2">
+                          <p className="text-muted-foreground text-xs">
+                            {t("settings:accounts.form_cost_basis_method_description")}
+                          </p>
+                          <ResponsiveSelect
+                            aria-label={t("settings:accounts.form_cost_basis_method_label")}
+                            value={costBasisMethod}
+                            onValueChange={(method) => {
+                              const updatedMeta = setCostBasisMethodInMeta(
+                                form.getValues("meta"),
+                                method,
+                              );
+                              form.setValue("meta", updatedMeta, { shouldDirty: true });
+                            }}
+                            options={costBasisMethods}
+                            placeholder={t("settings:accounts.form_cost_basis_method_label")}
+                            sheetTitle={t("settings:accounts.form_cost_basis_method_label")}
+                            sheetDescription={t(
+                              "settings:accounts.form_cost_basis_method_description",
+                            )}
+                            triggerClassName="h-11"
+                          />
+                          {costBasisDescription && (
+                            <p className="text-muted-foreground text-xs">{costBasisDescription}</p>
+                          )}
+                        </div>
+                      )}
+                      {costBasisChanged && (
+                        <p className="text-muted-foreground mt-2 flex items-start gap-1.5 text-xs">
+                          <Icons.Info className="mt-px h-3.5 w-3.5 shrink-0" />
+                          {t("settings:accounts.form_cost_basis_method_changed")}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </FormItem>
               )}
             />
-
-            <section className={formCardClassName}>
-              <h3 className={formSectionLabelClassName}>
-                {t("settings:accounts.form_visibility")}
-              </h3>
-              <div className="mt-4 grid gap-4">
-                <FormField
-                  control={form.control}
-                  name="isActive"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center justify-between gap-4 space-y-0">
-                      <div className="min-w-0">
-                        <FormLabel className="text-sm font-normal">
-                          {t("settings:accounts.form_hide_label")}
-                          <span className="text-muted-foreground ml-1 text-xs font-normal">
-                            {t("settings:accounts.form_hide_hint")}
-                          </span>
-                        </FormLabel>
-                        <FormMessage />
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={!field.value}
-                          onCheckedChange={(checked) => field.onChange(!checked)}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                {defaultValues?.id && (
-                  <FormField
-                    control={form.control}
-                    name="isArchived"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center justify-between gap-4 space-y-0">
-                        <div className="min-w-0">
-                          <FormLabel className="text-sm font-normal">
-                            {t("settings:accounts.form_archive_label")}
-                            <span className="text-muted-foreground ml-1 text-xs font-normal">
-                              {t("settings:accounts.form_archive_hint")}
-                            </span>
-                          </FormLabel>
-                          <FormMessage />
-                        </div>
-                        <FormControl>
-                          <Switch checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </div>
-            </section>
           </div>
         </div>
         <DialogFooter className="gap-2">
@@ -761,6 +952,32 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
             </AlertDialogCancel>
             <Button onClick={handleConfirmModeSwitch}>
               {t("settings:accounts.mode_switch_confirm")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Archive Confirmation Dialog, as the account menu shows it */}
+      <AlertDialog
+        open={showArchiveConfirmation}
+        onOpenChange={(open) => {
+          if (!open) handleCancelArchive();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Icons.AlertTriangle className="h-5 w-5 text-amber-500" />
+              {t("settings:accounts.archive_title")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("settings:accounts.archive_description")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("settings:accounts_cancel_button")}</AlertDialogCancel>
+            <Button onClick={handleConfirmArchive}>
+              {t("settings:accounts.operations_archive")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

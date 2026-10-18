@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Extension, Path},
     routing::{delete, get, post},
     Json, Router,
 };
@@ -10,7 +10,7 @@ use wealthfolio_core::interest::{CashInterestSyncResult, Mp2DividendRates};
 use crate::{error::ApiResult, main_lib::AppState};
 
 async fn sync_cash_interest(
-    State(state): State<Arc<AppState>>,
+    Extension(state): Extension<Arc<AppState>>,
 ) -> ApiResult<Json<CashInterestSyncResult>> {
     let result = state.interest_accrual_service.sync().await?;
     Ok(Json(result))
@@ -18,7 +18,7 @@ async fn sync_cash_interest(
 
 async fn sync_cash_interest_account(
     Path(account_id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    Extension(state): Extension<Arc<AppState>>,
 ) -> ApiResult<Json<CashInterestSyncResult>> {
     let result = state
         .interest_accrual_service
@@ -27,14 +27,16 @@ async fn sync_cash_interest_account(
     Ok(Json(result))
 }
 
-async fn remove_auto_interest(State(state): State<Arc<AppState>>) -> ApiResult<Json<usize>> {
+async fn remove_auto_interest(
+    Extension(state): Extension<Arc<AppState>>,
+) -> ApiResult<Json<usize>> {
     let n = state.interest_accrual_service.remove_auto_created().await?;
     Ok(Json(n))
 }
 
 async fn remove_auto_interest_account(
     Path(account_id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    Extension(state): Extension<Arc<AppState>>,
 ) -> ApiResult<Json<usize>> {
     let n = state
         .interest_accrual_service
@@ -43,13 +45,15 @@ async fn remove_auto_interest_account(
     Ok(Json(n))
 }
 
-async fn get_mp2_rates(State(state): State<Arc<AppState>>) -> ApiResult<Json<Mp2DividendRates>> {
+async fn get_mp2_rates(
+    Extension(state): Extension<Arc<AppState>>,
+) -> ApiResult<Json<Mp2DividendRates>> {
     let rates = state.interest_accrual_service.get_mp2_rates()?;
     Ok(Json(rates))
 }
 
 async fn update_mp2_rates(
-    State(state): State<Arc<AppState>>,
+    Extension(state): Extension<Arc<AppState>>,
     Json(payload): Json<Mp2DividendRates>,
 ) -> ApiResult<Json<Mp2DividendRates>> {
     state
@@ -59,7 +63,7 @@ async fn update_mp2_rates(
     Ok(Json(payload))
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/cash-interest/sync", post(sync_cash_interest))
         .route(

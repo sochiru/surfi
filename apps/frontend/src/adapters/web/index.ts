@@ -5,7 +5,7 @@ import type { RunEnv } from "../types";
 import { RunEnvs } from "../types";
 
 // Platform constants
-export { isDesktop, isWeb, logger } from "./core";
+export { isTauri, isWeb, logger } from "./core";
 
 // Re-export types and constants from shared types
 export { RunEnvs } from "../types";
@@ -26,12 +26,13 @@ export type {
   AgentAuditQuery,
   AppInfo,
   BackendEnableSyncResult,
+  BackendRestoreErrorCode,
+  BackendRestoreOperation,
+  BackendRestorePhase,
+  BackendRestoreRetry,
   BackendSyncBackgroundEngineResult,
-  BackendSyncBootstrapOverwriteCheckResult,
-  BackendSyncBootstrapResult,
   BackendSyncCycleResult,
   BackendSyncEngineStatusResult,
-  BackendSyncReconcileReadyResult,
   BackendSyncSnapshotUploadResult,
   BackendSyncStateResult,
   CreateAgentAccessTokenInput,
@@ -253,6 +254,8 @@ export {
   searchTicker,
   syncHistoryQuotes,
   syncMarketData,
+  resetProviderHistory,
+  resetAllProviderHistory,
   updateAssetProfile,
   updateMarketDataProviderSettings,
   updateQuote,
@@ -305,11 +308,16 @@ export {
   createAlternativeAsset,
   deleteAlternativeAsset,
   getAlternativeHoldings,
+  applyLoanAction,
+  calculateLoan,
+  getLoanPayments,
+  linkLoanPayment,
+  previewLoanTerms,
+  recalculateLoan,
   getNetWorth,
   getNetWorthHistory,
   linkLiability,
   unlinkLiability,
-  syncLiabilityAmortization,
   updateAlternativeAssetMetadata,
   updateAlternativeAssetValuation,
 } from "../shared/alternative-assets";
@@ -324,30 +332,28 @@ export {
 
 // Connect Commands (Broker + Device Sync + Auth)
 export {
+  approveDeviceSyncRestore,
   approvePairing,
-  approvePairingOverwrite,
-  beginPairingConfirm,
+  beginPairingRestore,
+  cancelDeviceSyncRestore,
   cancelPairing,
-  cancelPairingFlow,
   claimPairing,
   clearDeviceSyncData,
   clearSyncSession,
+  getSyncSessionStatus,
   completePairing,
   completePairingWithTransfer,
   confirmPairing,
-  confirmPairingWithBootstrap,
   createPairing,
-  getPairingFlowState,
   deleteDevice,
-  deviceSyncBootstrapOverwriteCheck,
   deviceSyncCancelSnapshotUpload,
   deviceSyncGenerateSnapshotNow,
-  deviceSyncReconcileReadyState,
   deviceSyncStartBackgroundEngine,
   deviceSyncStopBackgroundEngine,
   enableDeviceSync,
   getBrokerSyncStates,
   getDevice,
+  getDeviceSyncRestore,
   getDeviceSyncState,
   getImportRuns,
   getPairingSourceStatus,
@@ -366,9 +372,10 @@ export {
   reinitializeDeviceSync,
   resetTeamSync,
   restoreSyncSession,
+  retryDeviceSyncRestore,
   revokeDevice,
+  startDeviceSyncRestore,
   storeSyncSession,
-  syncBootstrapSnapshotIfNeeded,
   syncBrokerData,
   syncTriggerCycle,
   updateDevice,
@@ -459,6 +466,7 @@ export {
   listenBrokerSyncStart,
   listenDatabaseRestored,
   listenDeepLink,
+  listenDeviceSyncRestore,
   getCurrentDeepLinks,
   listenFileDrop,
   listenFileDropCancelled,
@@ -479,16 +487,20 @@ export {
   openFileSaveDialog,
   openFolderDialog,
   saveAppDataFileViaPicker,
+  stagePickedDatabaseFileForRestore,
   openUrlInBrowser,
 } from "./files";
 
 // Settings Commands (web-specific API for backups and updates)
 export {
   backupDatabase,
-  backupDatabaseToPendingExport,
-  backupDatabaseToPath,
   checkForUpdates,
   deleteDatabaseBackup,
+  discardDatabaseBackupImport,
+  inspectDatabaseBackup,
+  inspectSavedDatabaseBackup,
+  restoreDatabaseBackupImport,
+  exportDatabaseBackup,
   getAppInfo,
   getDatabaseBackupDownloadUrl,
   getPlatform,
@@ -496,10 +508,12 @@ export {
   installUpdate,
   isAutoUpdateCheckEnabled,
   listDatabaseBackups,
-  restoreDatabase,
+  openDatabaseBackupFolder,
+  getDatabaseEncryptionStatus,
+  setDatabaseEncryptionEnabled,
   updateSettings,
 } from "./settings";
-export type { DatabaseBackup } from "./settings";
+export type { BackupImportPreview, DatabaseBackup, DatabaseEncryptionStatus } from "./settings";
 
 // Addon Commands (web-specific implementations)
 export {
@@ -530,6 +544,8 @@ export {
   uninstallAddon,
   updateAddon,
   updateAddonNetworkApprovals,
+  registerDevAddonManifest,
+  unregisterDevAddonManifest,
 } from "./addons";
 
 // FIRE Planner (desktop-only — stubs throw at runtime)
@@ -557,3 +573,13 @@ export {
   syncHashPairingCode,
   syncHmacSha256,
 } from "./crypto";
+
+export {
+  cloudBackupAction,
+  captureCloudBackup,
+  type CloudBackupStatus,
+  type CloudBackupCaptureStatus,
+  type CloudBackupPoint,
+  type CloudBackupOperation,
+} from "../shared/cloud-backups";
+export { downloadCloudBackup, previewCloudBackupRestore } from "./cloud-backups";

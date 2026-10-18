@@ -1,3 +1,4 @@
+import { getActivityCurrencyPatch } from "../../activity-currency";
 import {
   isAssetBackedIncomeSubtype,
   isAssetIdentityRequired,
@@ -19,6 +20,27 @@ import type {
 } from "./types";
 import { generateTempActivityId } from "./use-activity-grid-state";
 import { calculateIncomeFinalAmount, calculateTradeFinalAmount } from "@/lib/activity-final-amount";
+
+export function isPairedInternalCashTransfer(transaction: LocalTransaction): boolean {
+  return Boolean(
+    !transaction.isNew &&
+    transaction.sourceGroupId &&
+    transaction.counterpartActivityId &&
+    transaction.counterpartAccountId &&
+    transaction.counterpartAccountId !== transaction.accountId &&
+    transaction.isExternal !== true &&
+    (transaction.activityType === ActivityType.TRANSFER_IN ||
+      transaction.activityType === ActivityType.TRANSFER_OUT) &&
+    !isSecuritiesTransfer(transaction.activityType, transaction.assetSymbol, transaction.assetId),
+  );
+}
+
+export function requiresTransferPairEditor(previous: LocalTransaction, next: LocalTransaction) {
+  return (
+    isPairedInternalCashTransfer(previous) &&
+    (previous.accountId !== next.accountId || previous.currency !== next.currency)
+  );
+}
 
 /**
  * Set of numeric field names for value comparison
@@ -407,15 +429,34 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     updated = { ...updated, accountId: newAccountId };
     const account = accountLookup.get(newAccountId);
     if (account) {
-      updated = { ...updated, accountName: account.name, accountCurrency: account.currency };
-
-      // Auto-fill currency: account currency (users enter prices in account currency)
-      updated = { ...updated, currency: account.currency };
+      updated = {
+        ...updated,
+        ...getActivityCurrencyPatch({
+          currency: updated.currency,
+          previousCurrency: updated.currency,
+          accountCurrency: account.currency,
+          previousAccountCurrency: updated.accountCurrency,
+          useAccountDefault: Boolean(updated.isNew || !updated.currency),
+        }),
+        accountName: account.name,
+        accountCurrency: account.currency,
+      };
     }
     updated = applyCashDefaults(updated, resolveTransactionCurrency, fallbackCurrency);
     updated = applySplitDefaults(updated);
   } else if (field === "currency") {
-    updated = { ...updated, currency: typeof value === "string" ? value : updated.currency };
+    const currency = typeof value === "string" ? value : updated.currency;
+    updated = {
+      ...updated,
+      currency,
+      ...getActivityCurrencyPatch({
+        currency,
+        previousCurrency: updated.currency,
+        accountCurrency: updated.accountCurrency,
+        previousAccountCurrency: updated.accountCurrency,
+        useAccountDefault: false,
+      }),
+    };
     updated = applyCashDefaults(updated, resolveTransactionCurrency, fallbackCurrency);
     updated = applySplitDefaults(updated);
   } else if (field === "comment") {

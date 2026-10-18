@@ -1145,7 +1145,7 @@ describe("createDraftActivities explicit activity mapping", () => {
 
     expect(draft.status).toBe("error");
     expect(draft.errors.activityType).toContain(
-      "Credit card imports only support charges, payments, refunds, fees, and interest",
+      "Credit card imports only support charges, payments, transfers out, refunds, fees, and interest",
     );
   });
 

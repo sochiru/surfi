@@ -1,11 +1,15 @@
 import { openUrlInBrowser } from "@/adapters";
+import { CloudBackupSummary } from "@/pages/settings/exports/cloud-backup-card";
 import { ExternalLink } from "@/components/external-link";
+import { BankIcon } from "@phosphor-icons/react/dist/csr/Bank";
+import { WalletIcon } from "@phosphor-icons/react/dist/csr/Wallet";
 import { DeviceSyncSection } from "@/features/devices-sync";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { formatDate } from "@/lib/utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ActionConfirm, useDateFormatting } from "@wealthfolio/ui";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -16,7 +20,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/compone
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useCallback, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { hasBrokerSync } from "../lib/plan-capabilities";
+import { hasBrokerSync, isSubscriptionStatusActive } from "../lib/plan-capabilities";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
 import {
   listBrokerAccounts,
@@ -24,6 +28,8 @@ import {
   syncBrokerData,
 } from "../services/broker-service";
 import type { BrokerAccount, BrokerConnection } from "../types";
+import { BrokerageLogo } from "./brokerage-logo";
+import { PortalLink } from "./portal-link";
 import { SubscriptionPlans } from "./subscription-plans";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -143,8 +149,6 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
 
   // Find the connection that matches this account's brokerage_authorization
   const connection = connections.find((c) => c.id === account.brokerage_authorization);
-  const logoUrl =
-    connection?.brokerage?.aws_s3_square_logo_url ?? connection?.brokerage?.aws_s3_logo_url;
 
   const lastSyncedText = lastSyncDate
     ? t("connect:accounts.dataAsOf", { date: formatDate(lastSyncDate, dateFormatting) })
@@ -154,16 +158,11 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
     <div className="bg-muted/30 rounded-lg border p-3">
       <div className="flex items-start gap-3">
         {/* Logo */}
-        <Avatar className="mt-0.5 h-9 w-9 shrink-0 rounded-lg">
-          <AvatarImage
-            src={logoUrl}
-            alt={account.institution_name || t("connect:accounts.brokerFallback")}
-            className="bg-white object-contain p-1"
-          />
-          <AvatarFallback className="rounded-lg text-sm font-semibold">
-            {(account.institution_name || account.name || "B").charAt(0)}
-          </AvatarFallback>
-        </Avatar>
+        <BrokerageLogo
+          brokerage={connection?.brokerage}
+          name={account.institution_name || account.name || "B"}
+          className="mt-0.5"
+        />
 
         {/* Main info - takes remaining space */}
         <div className="min-w-0 flex-1">
@@ -239,17 +238,13 @@ function BrokerConnectionsCard({
   isRefreshing,
 }: BrokerConnectionsCardProps) {
   const { t } = useTranslation();
-  const openConnectionsPortal = () => {
-    openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`);
-  };
-
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-              <Icons.Link className="text-muted-foreground h-4 w-4" />
+              <BankIcon weight="duotone" className="text-muted-foreground h-4 w-4" />
             </div>
             <h3 className="text-base font-semibold">{t("connect:connections.title")}</h3>
           </div>
@@ -257,31 +252,17 @@ function BrokerConnectionsCard({
             <Button
               variant="ghost"
               size="icon"
-              className="text-muted-foreground hover:text-foreground h-8 w-8"
+              className="text-muted-foreground hover:text-foreground size-11 sm:size-8"
+              aria-label={t("common:refresh")}
               onClick={onRefresh}
               disabled={isRefreshing}
             >
               <Icons.RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>
-            {/* Mobile: icon only */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-foreground sm:hidden"
-              onClick={openConnectionsPortal}
-            >
-              <Icons.ExternalLink className="h-4 w-4" />
-            </Button>
-            {/* Desktop: full text */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground hidden sm:inline-flex"
-              onClick={openConnectionsPortal}
-            >
-              {t("connect:connections.manage")}
-              <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
-            </Button>
+            <PortalLink
+              href={`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`}
+              label={t("connect:connections.manage")}
+            />
           </div>
         </div>
 
@@ -294,16 +275,18 @@ function BrokerConnectionsCard({
           ) : connections.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 text-center">
               <p className="text-muted-foreground text-sm">{t("connect:connections.empty")}</p>
-              <Button className="mt-3" onClick={openConnectionsPortal}>
+              <Button
+                className="mt-3"
+                onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`)}
+                title={t("connect:opensInBrowser")}
+              >
                 <Icons.Plus className="h-4 w-4" />
                 {t("connect:connections.connectBroker")}
+                <Icons.ExternalLink className="size-4" aria-hidden="true" />
               </Button>
             </div>
           ) : (
             connections.map((connection) => {
-              const logoUrl =
-                connection.brokerage?.aws_s3_square_logo_url ??
-                connection.brokerage?.aws_s3_logo_url;
               const brokerageName =
                 connection.brokerage?.display_name ??
                 connection.brokerage?.name ??
@@ -315,16 +298,7 @@ function BrokerConnectionsCard({
                   key={connection.id}
                   className="bg-muted/30 flex items-center gap-3 rounded-lg border p-3"
                 >
-                  <Avatar className="h-9 w-9 shrink-0 rounded-lg">
-                    <AvatarImage
-                      src={logoUrl}
-                      alt={brokerageName}
-                      className="bg-white object-contain p-1"
-                    />
-                    <AvatarFallback className="rounded-lg text-sm font-semibold">
-                      {brokerageName.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <BrokerageLogo brokerage={connection.brokerage} name={brokerageName} />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">
                     {brokerageName}
                   </span>
@@ -376,9 +350,7 @@ export function ConnectedView() {
   const isServiceUnavailable = !!error && !isLoadingUserInfo && !userInfo;
 
   // Check if user has an active subscription
-  const hasSubscription =
-    userInfo?.team?.subscription_status === "active" ||
-    userInfo?.team?.subscription_status === "trialing";
+  const hasSubscription = isSubscriptionStatusActive(userInfo?.team?.subscription_status);
 
   // Check if user's plan includes broker sync
   const showBrokerSync = hasBrokerSync(userInfo);
@@ -518,14 +490,22 @@ export function ConnectedView() {
 
       {/* Show Subscription Plans if user has no active subscription (keep mounted during refresh) */}
       {!isServiceUnavailable && !hasSubscription && !!userInfo && (
-        <SubscriptionPlans
-          enabled={isConnected && !hasSubscription}
-          onRefresh={refetchUserInfo}
-          isRefreshing={isLoadingUserInfo}
-        />
+        <>
+          <Alert role="status" className="bg-muted/30">
+            <Icons.PauseCircle className="h-4 w-4" aria-hidden="true" />
+            <AlertTitle>{t("connect:subscription.syncPausedTitle")}</AlertTitle>
+            <AlertDescription>{t("connect:subscription.syncPausedDescription")}</AlertDescription>
+          </Alert>
+          <SubscriptionPlans
+            enabled={isConnected && !hasSubscription}
+            onRefresh={refetchUserInfo}
+            isRefreshing={isLoadingUserInfo}
+          />
+        </>
       )}
 
       {/* Broker Connections Card - Only show if user has broker sync */}
+      <CloudBackupSummary />
       {showBrokerSync && (
         <BrokerConnectionsCard
           connections={connections}
@@ -539,10 +519,10 @@ export function ConnectedView() {
       {showBrokerSync && (
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                  <Icons.Wallet className="text-muted-foreground h-4 w-4" />
+                  <WalletIcon weight="duotone" className="text-muted-foreground h-4 w-4" />
                 </div>
                 <h3 className="text-base font-semibold">{t("connect:accounts.title")}</h3>
               </div>
@@ -556,25 +536,10 @@ export function ConnectedView() {
                   <Icons.CloudSync2 className={`h-4 w-4 ${isSyncing ? "animate-pulse" : ""}`} />
                   {t("connect:sync.syncNow")}
                 </Button>
-                {/* Mobile: icon only */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-foreground sm:hidden"
-                  onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/accounts`)}
-                >
-                  <Icons.ExternalLink className="h-4 w-4" />
-                </Button>
-                {/* Desktop: full text */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground hidden sm:inline-flex"
-                  onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/accounts`)}
-                >
-                  {t("connect:accounts.manage")}
-                  <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
-                </Button>
+                <PortalLink
+                  href={`${WEALTHFOLIO_CONNECT_PORTAL_URL}/accounts`}
+                  label={t("connect:accounts.manage")}
+                />
               </div>
             </div>
 
@@ -625,12 +590,13 @@ export function ConnectedView() {
               </div>
               <Button
                 size="sm"
+                title={t("connect:opensInBrowser")}
                 onClick={() =>
                   openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/settings/billing`)
                 }
               >
                 {t("connect:upgrade.button")}
-                <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
+                <Icons.ExternalLink className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
               </Button>
             </div>
           </CardContent>

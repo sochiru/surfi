@@ -1,4 +1,9 @@
+import {
+  useLoanActions,
+  type LoanActionCallbacks,
+} from "./alternative-assets/hooks/use-loan-actions";
 import HistoryChart from "@/components/history-chart-symbol";
+import { useLoanCalculation } from "./alternative-assets/hooks/use-loan-calculation";
 import { useAlternativeHoldings, useLinkedLiabilities } from "@/hooks/use-alternative-assets";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import type { AlternativeAssetHolding, Asset, DateRange, Quote, TimePeriod } from "@/lib/types";
@@ -6,14 +11,11 @@ import { AlternativeAssetKind } from "@/lib/types";
 import {
   AmountDisplay,
   EmptyPlaceholder,
-  type FormattingApi,
   Icons,
   IntervalSelector,
   useDateFormatting,
   useNumberFormatting,
 } from "@wealthfolio/ui";
-import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
-import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,12 +26,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@wealthfolio/ui/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
-import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
 import type { TFunction } from "i18next";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,16 +37,16 @@ import {
   AlternativeAssetQuickAddModal,
   AssetDetailsSheet,
   type AssetDetailsSheetAsset,
+  toLinkedLiability,
   UpdateValuationModal,
   ValueHistoryDataGrid,
 } from "./alternative-assets";
+import { LoanHistory } from "./alternative-assets/components/loan-history";
+import { MortgageOverview, LoanOverview } from "./alternative-assets/components/loan-overview";
 import { useAlternativeAssetMutations } from "./alternative-assets/hooks/use-alternative-asset-mutations";
 import { useQuoteMutations } from "./hooks/use-quote-mutations";
-import { LinkedAssetSection, LinkedLiabilitiesSection } from "./linked-liabilities-card";
-import { parseLocalDate } from "@/lib/utils";
-import { isAmortizationPaused } from "./alternative-assets/components/asset-details-sheet-schema";
-import { syncLiabilityAmortization } from "@/adapters";
-import { QueryKeys } from "@/lib/query-keys";
+import { LinkedLiabilitiesSection } from "./linked-liabilities-card";
+import type { LoanSetup } from "@/adapters/shared/alternative-assets";
 
 interface AlternativeAssetContentProps {
   assetId: string;
@@ -55,18 +55,41 @@ interface AlternativeAssetContentProps {
   quoteHistory: Quote[];
   activeTab: "overview" | "history";
   isMobile?: boolean;
+  loanActions: LoanActionCallbacks;
+  onEditDetails: () => void;
 }
 
 /**
  * Content component for alternative asset detail pages.
  * Handles Overview and History tabs with alternative-specific layouts.
  */
+/** Lock-in date once it has passed and no later rate change was recorded. */
+function passedLockInWithoutRate(metadata: Record<string, unknown>): string | null {
+  const maturity = metadata.renewal_maturity_date;
+  if (typeof maturity !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(maturity)) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  if (maturity >= today) return null;
+  const events = Array.isArray(metadata.loan_events) ? metadata.loan_events : [];
+  const hasLaterRate = events.some((event) => {
+    if (!event || typeof event !== "object") return false;
+    const record = event as Record<string, unknown>;
+    return (
+      record.type === "rate_change" &&
+      typeof record.effectiveDate === "string" &&
+      record.effectiveDate > maturity
+    );
+  });
+  return hasLaterRate ? null : maturity;
+}
+
 export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = ({
   assetId,
   assetProfile,
   holding,
   quoteHistory,
   activeTab,
+  loanActions,
+  onEditDetails,
 }) => {
   const formatting = useNumberFormatting();
   const { t } = useTranslation();
@@ -98,6 +121,15 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
     { invalidateOnSuccess: false },
   );
 
+  // Loan-specific computations (used in history tab and handlers)
+  const metadata = useMemo(() => holding.metadata || {}, [holding.metadata]);
+  const isLiability = holding.kind.toLowerCase() === "liability";
+  const { data: loanCalculation } = useLoanCalculation(
+    assetId,
+    metadata,
+    quoteHistory,
+    isLiability,
+  );
   // Filter chart data by date range
   const filteredChartData = useMemo(() => {
     if (!quoteHistory || quoteHistory.length === 0) return [];
@@ -170,25 +202,14 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
     setDateRange(range);
   };
 
-  const isLiability = holding.kind.toLowerCase() === "liability";
   const marketValue = parseFloat(holding.marketValue);
-  const queryClient = useQueryClient();
-  const amortizationPaused = isLiability && isAmortizationPaused(holding.metadata);
-  const syncAmortizationMutation = useMutation({
-    mutationFn: () => syncLiabilityAmortization(assetId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_DATA, assetId] });
-      toast({
-        title: t("asset:altContent.amortization_synced"),
-        variant: "success",
-      });
-    },
-  });
 
   // Calculate net equity for linkable assets
   const netEquity = useMemo(() => {
-    if (linkedLiabilities.length === 0) {
+    if (
+      linkedLiabilities.length === 0 ||
+      linkedLiabilities.some((loan) => loan.loan?.balanceSource === null)
+    ) {
       return null;
     }
     const liabilityTotal = linkedLiabilities.reduce((sum, liability) => {
@@ -198,112 +219,95 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
   }, [marketValue, linkedLiabilities]);
 
   if (activeTab === "overview") {
+    const LiabilityOverview =
+      (metadata.sub_type ?? metadata.liability_type) === "mortgage"
+        ? MortgageOverview
+        : LoanOverview;
+    const lockInDate = isLiability ? passedLockInWithoutRate(metadata) : null;
     return (
       <div className="space-y-4">
-        {amortizationPaused && (
+        {lockInDate && (
           <Alert>
             <Icons.AlertTriangle className="h-4 w-4" />
             <AlertTitle>{t("asset:altContent.lock_in_ended_title")}</AlertTitle>
-            <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <span>{t("asset:altContent.lock_in_ended_description")}</span>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => syncAmortizationMutation.mutate()}
-                disabled={syncAmortizationMutation.isPending}
-              >
-                {t("asset:altContent.recalculate_balance")}
-              </Button>
+            <AlertDescription>
+              {t("asset:altContent.lock_in_ended_description", { date: lockInDate })}
             </AlertDescription>
           </Alert>
         )}
-        {/* Main grid: Chart on left, Details on right */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {/* Left: Value history chart with value/gain/equity in header */}
-          <Card className="col-span-1 md:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-md">
-                <div>
-                  <p className="pt-3 text-xl font-bold">
-                    <AmountDisplay
-                      value={isLiability ? -marketValue : marketValue}
-                      currency={holding.currency}
-                      isHidden={isBalanceHidden}
-                    />
-                  </p>
-                  {gainAmount !== null && gainPercent !== null && (
-                    <p
-                      className={`text-sm ${
-                        isLiability
-                          ? gainAmount <= 0
-                            ? "text-success"
-                            : "text-destructive"
-                          : gainAmount >= 0
-                            ? "text-success"
-                            : "text-destructive"
-                      }`}
-                    >
-                      {isLiability ? (
-                        <>
-                          {gainAmount <= 0
-                            ? t("asset:altContent.paid_down")
-                            : t("asset:altContent.increased")}
-                          <AmountDisplay
-                            value={Math.abs(gainAmount)}
-                            currency={holding.currency}
-                            isHidden={isBalanceHidden}
-                          />{" "}
-                          ({formatting.formatPercent(Math.abs(gainPercent))}) {selectedIntervalDesc}
-                        </>
-                      ) : (
-                        <>
-                          <AmountDisplay
-                            value={gainAmount}
-                            currency={holding.currency}
-                            isHidden={isBalanceHidden}
-                          />{" "}
-                          ({formatting.formatPercent(gainPercent)}) {selectedIntervalDesc}
-                        </>
-                      )}
-                    </p>
-                  )}
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="relative p-0">
-              {filteredChartData.length > 0 ? (
-                <>
-                  <HistoryChart data={filteredChartData} />
-                  <IntervalSelector
-                    onIntervalSelect={handleIntervalSelect}
-                    className="absolute bottom-2 left-1/2 -translate-x-1/2 transform"
-                    defaultValue="ALL"
-                  />
-                </>
-              ) : (
-                <div className="flex h-[200px] items-center justify-center">
-                  <EmptyPlaceholder
-                    icon={<Icons.Activity className="text-muted-foreground h-8 w-8" />}
-                    title={t("asset:altContent.no_valuation_data")}
-                    description={t("asset:altContent.no_valuation_description")}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Right: Detail card */}
-          <AlternativeAssetDetailCard
+        {isLiability ? (
+          <LiabilityOverview
             holding={holding}
+            calculation={loanCalculation ?? null}
+            quotes={quoteHistory}
             linkedAsset={linkedAsset}
-            netEquity={isLinkableAsset ? (netEquity ?? marketValue) : null}
-            hasLinkedLiabilities={linkedLiabilities.length > 0}
-            linkedLiabilities={isLinkableAsset ? linkedLiabilities : []}
-            isLiability={isLiability}
-            className="col-span-1"
+            actions={loanActions}
+            onEdit={onEditDetails}
           />
-        </div>
+        ) : (
+          /* Main grid: Chart on left, Details on right */
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {/* Left: Value history chart with value/gain/equity in header */}
+            <Card className="col-span-1 md:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-md">
+                  <div>
+                    <p className="pt-3 text-xl font-bold">
+                      <AmountDisplay
+                        value={marketValue}
+                        currency={holding.currency}
+                        isHidden={isBalanceHidden}
+                      />
+                    </p>
+                    {gainAmount !== null && gainPercent !== null && (
+                      <p
+                        className={`text-sm ${gainAmount >= 0 ? "text-success" : "text-destructive"}`}
+                      >
+                        <AmountDisplay
+                          value={gainAmount}
+                          currency={holding.currency}
+                          isHidden={isBalanceHidden}
+                        />{" "}
+                        ({formatting.formatPercent(gainPercent)}) {selectedIntervalDesc}
+                      </p>
+                    )}
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="relative p-0">
+                {filteredChartData.length > 0 ? (
+                  <>
+                    <HistoryChart data={filteredChartData} />
+                    <IntervalSelector
+                      onIntervalSelect={handleIntervalSelect}
+                      className="absolute bottom-2 left-1/2 -translate-x-1/2 transform"
+                      defaultValue="ALL"
+                    />
+                  </>
+                ) : (
+                  <div className="flex h-[200px] items-center justify-center">
+                    <EmptyPlaceholder
+                      icon={<Icons.Activity className="text-muted-foreground h-8 w-8" />}
+                      title={t("asset:altContent.no_valuation_data")}
+                      description={t("asset:altContent.no_valuation_description")}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Right: Detail card */}
+            <AlternativeAssetDetailCard
+              holding={holding}
+              netEquity={
+                isLinkableAsset ? (linkedLiabilities.length ? netEquity : marketValue) : null
+              }
+              hasLinkedLiabilities={linkedLiabilities.length > 0}
+              linkedLiabilities={isLinkableAsset ? linkedLiabilities : []}
+              className="col-span-1"
+            />
+          </div>
+        )}
 
         {/* Second row: About section */}
         <div className="space-y-4">
@@ -358,18 +362,28 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
     );
   }
 
-  // History tab
+  if (isLiability)
+    return (
+      <LoanHistory
+        holding={holding}
+        calculation={loanCalculation ?? null}
+        quotes={quoteHistory}
+        actions={loanActions}
+        onEditDetails={onEditDetails}
+      />
+    );
   return (
-    <ValueHistoryDataGrid
-      key={assetId}
-      data={quoteHistory}
-      assetId={assetId}
-      currency={holding.currency}
-      isLiability={isLiability}
-      onSaveQuote={(quote: Quote) => saveQuoteMutation.mutateAsync(quote)}
-      onDeleteQuote={(id: string) => deleteQuoteMutation.mutateAsync(id)}
-      onPersistComplete={invalidateQuoteQueries}
-    />
+    <div className="space-y-4">
+      <ValueHistoryDataGrid
+        key={assetId}
+        data={quoteHistory}
+        assetId={assetId}
+        currency={holding.currency}
+        onSaveQuote={(quote: Quote) => saveQuoteMutation.mutateAsync(quote)}
+        onDeleteQuote={(id: string) => deleteQuoteMutation.mutateAsync(id)}
+        onPersistComplete={invalidateQuoteQueries}
+      />
+    </div>
   );
 };
 
@@ -422,6 +436,7 @@ const LIABILITY_TYPE_LABEL_KEYS: Record<string, string> = {
   credit_card: "asset:altContent.liabilityType.credit_card",
   personal_loan: "asset:altContent.liabilityType.personal_loan",
   heloc: "asset:altContent.liabilityType.heloc",
+  other: "asset:altContent.liabilityType.other",
 };
 
 const WEIGHT_UNIT_LABEL_KEYS: Record<string, string> = {
@@ -432,12 +447,10 @@ const WEIGHT_UNIT_LABEL_KEYS: Record<string, string> = {
 
 interface AlternativeAssetDetailCardProps {
   holding: AlternativeAssetHolding;
-  linkedAsset?: AlternativeAssetHolding;
   netEquity: number | null;
   hasLinkedLiabilities: boolean;
   linkedLiabilities: AlternativeAssetHolding[];
   className?: string;
-  isLiability?: boolean;
 }
 
 /**
@@ -488,55 +501,32 @@ function getSubtypeLabel(
 /**
  * Detail card for alternative assets showing:
  * - Net equity in header (for property/vehicle)
- * - Amount paid in header (for liabilities)
  * - Purchase info and last valued date
  * - Type-specific metadata
  */
 const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
   holding,
-  linkedAsset,
   netEquity,
   hasLinkedLiabilities,
   linkedLiabilities,
-  isLiability,
   className,
 }) => {
-  const numberFormatting = useNumberFormatting();
   const dateFormatting = useDateFormatting();
 
   const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
 
-  const metadata = holding.metadata || {};
+  const metadata = useMemo(() => holding.metadata || {}, [holding.metadata]);
   const kind = holding.kind.toLowerCase();
 
   // Build detail rows based on asset type
-  const detailRows = getDetailRows(kind, metadata, holding, isBalanceHidden, t, dateFormatting);
-
-  // Calculate liability progress
-  const liabilityProgress = useMemo(() => {
-    if (!isLiability) return null;
-
-    const currentBalance = Math.abs(parseFloat(holding.marketValue));
-    // Check both new field (original_amount) and legacy field (purchase_price) for backwards compatibility
-    const origAmountStr = (metadata.original_amount ?? metadata.purchase_price) as
-      | string
-      | undefined;
-    const originalAmount = origAmountStr ? parseFloat(origAmountStr) : null;
-
-    if (!originalAmount || originalAmount <= 0) {
-      return { amountPaid: null, percentPaid: null, originalAmount: null, currentBalance };
-    }
-
-    const amountPaid = originalAmount - currentBalance;
-    const percentPaid = amountPaid / originalAmount;
-
-    return { amountPaid, percentPaid, originalAmount, currentBalance };
-  }, [isLiability, holding.marketValue, metadata.original_amount, metadata.purchase_price]);
+  const detailRows = useMemo(
+    () => getDetailRows(kind, metadata, holding, isBalanceHidden, t),
+    [kind, metadata, holding, isBalanceHidden, t],
+  );
 
   // Determine if we should show a header with value info
   const showNetEquityHeader = netEquity !== null;
-  const showLiabilityHeader = isLiability && liabilityProgress;
 
   return (
     <Card className={className}>
@@ -572,52 +562,18 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
         </CardHeader>
       )}
 
-      {/* Header: Amount Paid for liabilities */}
-      {showLiabilityHeader && liabilityProgress.amountPaid !== null && (
-        <CardHeader className="flex flex-row items-center justify-between pb-0">
-          <CardTitle className="flex w-full justify-between text-lg font-bold">
-            <div>
-              <div className="text-muted-foreground text-sm font-normal">
-                {t("asset:altContent.amount_paid")}
-              </div>
-              {liabilityProgress.percentPaid !== null && (
-                <div className="text-muted-foreground text-xs font-normal">
-                  {t("asset:altContent.percent_of_original", {
-                    percent: numberFormatting.formatPercent(liabilityProgress.percentPaid),
-                  })}
-                </div>
-              )}
-            </div>
-            <div>
-              <div
-                className={`text-xl font-extrabold ${liabilityProgress.amountPaid >= 0 ? "text-success" : "text-destructive"}`}
-              >
-                <AmountDisplay
-                  value={liabilityProgress.amountPaid}
-                  currency={holding.currency}
-                  isHidden={isBalanceHidden}
-                />
-              </div>
-              <div className="text-muted-foreground text-right text-sm font-normal">
-                {holding.currency}
-              </div>
-            </div>
-          </CardTitle>
-        </CardHeader>
-      )}
-
       {/* Fallback header for assets without special headers */}
-      {!showNetEquityHeader && !showLiabilityHeader && (
+      {!showNetEquityHeader && (
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">{t("asset:altContent.details")}</CardTitle>
         </CardHeader>
       )}
 
       <CardContent>
-        {(showNetEquityHeader || showLiabilityHeader) && <Separator className="my-3" />}
-        {/* Summary rows - skip purchase info for liabilities (shown in detail rows) */}
+        {showNetEquityHeader && <Separator className="my-3" />}
+        {/* Summary rows */}
         <div className="space-y-4 text-sm">
-          {!isLiability && holding.purchasePrice && (
+          {holding.purchasePrice && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t("asset:altContent.purchase_price")}</span>
               <span className="font-medium">
@@ -630,7 +586,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
             </div>
           )}
 
-          {!isLiability && holding.purchaseDate && (
+          {holding.purchaseDate && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t("asset:altContent.purchase_date")}</span>
               <span className="font-medium">
@@ -661,20 +617,6 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
           </div>
         )}
 
-        {/* Linked Asset (for liabilities) */}
-        {isLiability && linkedAsset && (
-          <>
-            <Separator className="my-4" />
-            <LinkedAssetSection
-              assetId={linkedAsset.id}
-              assetName={linkedAsset.name}
-              assetKind={linkedAsset.kind}
-              assetValue={linkedAsset.marketValue}
-              currency={linkedAsset.currency}
-            />
-          </>
-        )}
-
         {/* Linked Liabilities (for property/vehicle) */}
         {linkedLiabilities.length > 0 && (
           <>
@@ -698,7 +640,6 @@ function getDetailRows(
   holding: AlternativeAssetHolding,
   isBalanceHidden: boolean,
   t: TFunction,
-  formatting: Pick<FormattingApi, "formatCalendarDate">,
 ): DetailRow[] {
   const rows: DetailRow[] = [];
 
@@ -764,92 +705,6 @@ function getDetailRows(
       break;
     }
 
-    case "liability": {
-      // Current balance (shown prominently for liabilities)
-      const currentBalance = Math.abs(parseFloat(holding.marketValue));
-      rows.push({
-        label: t("asset:altContent.current_balance"),
-        value: (
-          <AmountDisplay
-            value={currentBalance}
-            currency={holding.currency}
-            isHidden={isBalanceHidden}
-          />
-        ),
-      });
-
-      // Original amount (check both new and legacy field names)
-      const originalAmount = (metadata.original_amount ?? metadata.purchase_price) as
-        | string
-        | undefined;
-      if (originalAmount) {
-        rows.push({
-          label: t("asset:altContent.original_amount"),
-          value: (
-            <AmountDisplay
-              value={parseFloat(originalAmount)}
-              currency={holding.currency}
-              isHidden={isBalanceHidden}
-            />
-          ),
-        });
-      }
-
-      // Interest rate
-      const interestRate = metadata.interest_rate as string | undefined;
-      if (interestRate) {
-        rows.push({ label: t("asset:altContent.interest_rate"), value: `${interestRate}%` });
-      }
-
-      // Note: Linked asset is shown in its own section with LinkedAssetSection
-
-      // Origination date (check both new and legacy field names)
-      const originationDate = (metadata.origination_date ?? metadata.purchase_date) as
-        | string
-        | undefined;
-      if (originationDate) {
-        rows.push({
-          label: t("asset:altContent.origination_date"),
-          value: formatting.formatCalendarDate(originationDate),
-        });
-      }
-
-      const monthlyPayment = metadata.monthly_payment as string | undefined;
-      if (monthlyPayment) {
-        rows.push({
-          label: t("asset:altContent.monthly_payment"),
-          value: (
-            <AmountDisplay
-              value={parseFloat(monthlyPayment)}
-              currency={holding.currency}
-              isHidden={isBalanceHidden}
-            />
-          ),
-        });
-      }
-      const remainingTerm = metadata.original_term_months as string | undefined;
-      if (remainingTerm) {
-        rows.push({
-          label: t("asset:altContent.remaining_term"),
-          value: t("asset:altContent.remaining_term_value", { count: parseInt(remainingTerm, 10) }),
-        });
-      }
-      const lockIn = metadata.lock_in_end_date as string | undefined;
-      if (lockIn) {
-        rows.push({
-          label: t("asset:altContent.lock_in_end"),
-          value: format(parseLocalDate(lockIn), "MMM d, yyyy"),
-        });
-      }
-      if (monthlyPayment || remainingTerm) {
-        rows.push({
-          label: t("asset:altContent.auto_sync"),
-          value: t("asset:altContent.auto_sync_on"),
-        });
-      }
-      break;
-    }
-
     case "other":
     default: {
       const description = metadata.description as string | undefined;
@@ -868,6 +723,7 @@ interface AlternativeAssetActionsProps {
   assetProfile: Asset | null | undefined;
   allHoldings: AlternativeAssetHolding[];
   onNavigateBack: () => void;
+  quoteHistory: Quote[];
 }
 
 /**
@@ -877,8 +733,10 @@ export function useAlternativeAssetActions({
   holding,
   allHoldings,
   onNavigateBack,
+  quoteHistory,
 }: AlternativeAssetActionsProps) {
   const { t } = useTranslation();
+  const loan = useLoanActions(holding, quoteHistory);
   // Modal state
   const [updateValuationOpen, setUpdateValuationOpen] = useState(false);
   const [editDetailsOpen, setEditDetailsOpen] = useState(false);
@@ -927,6 +785,7 @@ export function useAlternativeAssetActions({
     metadata: Record<string, string>,
     name?: string,
     notes?: string | null,
+    loan?: LoanSetup,
   ) => {
     if (!holding) return;
     await updateMetadataMutation.mutateAsync({
@@ -934,6 +793,7 @@ export function useAlternativeAssetActions({
       metadata,
       name,
       notes,
+      loan,
     });
   };
 
@@ -972,6 +832,7 @@ export function useAlternativeAssetActions({
   // Render modals (only if holding exists)
   const modals = holding ? (
     <>
+      {loan.dialogs}
       {/* Update Valuation Modal */}
       <UpdateValuationModal
         open={updateValuationOpen}
@@ -991,16 +852,8 @@ export function useAlternativeAssetActions({
         onSave={handleEditSave}
         linkedAssetName={linkedAssetName}
         linkableAssets={linkableAssets.map((a) => ({ id: a.id, name: a.name }))}
-        linkedLiabilities={linkedLiabilities.map((l) => ({
-          id: l.id,
-          name: l.name,
-          balance: l.marketValue,
-        }))}
-        availableMortgages={availableMortgages.map((m) => ({
-          id: m.id,
-          name: m.name,
-          balance: m.marketValue,
-        }))}
+        linkedLiabilities={linkedLiabilities.map(toLinkedLiability)}
+        availableMortgages={availableMortgages.map(toLinkedLiability)}
         onLinkMortgage={handleLinkMortgage}
         onUnlinkMortgage={handleUnlinkMortgage}
         isSaving={updateMetadataMutation.isPending}
@@ -1050,7 +903,12 @@ export function useAlternativeAssetActions({
   ) : null;
 
   return {
-    openUpdateValuation: () => setUpdateValuationOpen(true),
+    loanActions: loan.actions,
+    loanAvailability: loan.availability,
+    openUpdateValuation: () =>
+      holding?.kind.toLowerCase() === "liability"
+        ? loan.actions.confirmBalance()
+        : setUpdateValuationOpen(true),
     openEditDetails: () => setEditDetailsOpen(true),
     openAddLiability: () => setAddLiabilityOpen(true),
     openDeleteConfirm: () => setDeleteConfirmOpen(true),
