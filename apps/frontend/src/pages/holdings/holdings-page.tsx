@@ -27,6 +27,7 @@ import {
 } from "@/lib/constants";
 import {
   AccountScope,
+  Holding,
   HoldingType,
   AlternativeAssetHolding,
   AlternativeAssetKind,
@@ -36,6 +37,7 @@ import { useIsMobileViewport } from "@/hooks/use-platform";
 import { HoldingsTable } from "./components/holdings-table";
 import { HoldingsTableMobile } from "./components/holdings-table-mobile";
 import { AlternativeHoldingsTable } from "./components/alternative-holdings-table";
+import { LiabilityOverview } from "./components/liability-overview";
 import { AlternativeHoldingsListMobile } from "./components/alternative-holdings-list-mobile";
 import { CashHoldingsTable } from "./components/cash-holdings-table";
 import { CashHoldingsListMobile } from "./components/cash-holdings-list-mobile";
@@ -61,6 +63,7 @@ import {
   AlternativeAssetQuickAddModal,
   AssetDetailsSheet,
   UpdateValuationModal,
+  toLinkedLiability,
   type AssetDetailsSheetAsset,
   type LinkableAsset,
   type LinkedLiability,
@@ -71,6 +74,7 @@ import { useUpdatePortfolioMutation } from "@/hooks/use-calculate-portfolio";
 import { useQueryClient } from "@tanstack/react-query";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
+import type { LoanSetup } from "@/adapters/shared/alternative-assets";
 
 export const HoldingsPage = () => {
   const { t } = useTranslation();
@@ -241,15 +245,33 @@ export const HoldingsPage = () => {
     setEditAsset(assetForSheet);
   }, []);
 
+  // Stable so HoldingsTable keeps its memoized columns across page re-renders.
+  const handleClassify = useCallback((holding: Holding) => {
+    setClassifyAsset({
+      id: holding.instrument?.id ?? holding.id,
+      symbol: holding.instrument?.symbol ?? holding.id,
+      name: holding.instrument?.name ?? undefined,
+      exchangeMic: holding.instrument?.exchangeMic,
+      instrumentType: holding.instrument?.instrumentType,
+    });
+  }, []);
+
   // Handler to save asset details
   const handleSaveAssetDetails = useCallback(
-    async (assetId: string, metadata: Record<string, string>, name?: string) => {
+    async (
+      assetId: string,
+      metadata: Record<string, string>,
+      name?: string,
+      notes?: string | null,
+      loan?: LoanSetup,
+    ) => {
       setIsSavingDetails(true);
       try {
-        await updateAlternativeAssetMetadata(assetId, metadata, name);
-        // Invalidate queries to refresh the list
+        await updateAlternativeAssetMetadata(assetId, metadata, name, notes, loan);
+        // Invalidate queries to refresh the list and the asset detail page
         queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
         queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH] });
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_DATA] });
       } finally {
         setIsSavingDetails(false);
       }
@@ -314,11 +336,7 @@ export const HoldingsPage = () => {
           const linkedAssetId = metadata?.linked_asset_id;
           return linkedAssetId === propertyId;
         })
-        .map((h) => ({
-          id: h.id,
-          name: h.name,
-          balance: h.marketValue,
-        }));
+        .map(toLinkedLiability);
     },
     [liabilitiesHoldings],
   );
@@ -329,18 +347,14 @@ export const HoldingsPage = () => {
       return liabilitiesHoldings
         .filter((h) => {
           const metadata = h.metadata as Record<string, unknown> | null | undefined;
-          const liabilityType = metadata?.liability_type;
+          const liabilityType = metadata?.sub_type ?? metadata?.liability_type;
           const linkedAssetId = metadata?.linked_asset_id;
           // Only mortgages that are not linked to any asset (or linked to this property for re-linking)
           return (
             liabilityType === "mortgage" && (!linkedAssetId || linkedAssetId === excludePropertyId)
           );
         })
-        .map((h) => ({
-          id: h.id,
-          name: h.name,
-          balance: h.marketValue,
-        }));
+        .map(toLinkedLiability);
     },
     [liabilitiesHoldings],
   );
@@ -556,15 +570,7 @@ export const HoldingsPage = () => {
               visibilityFilters={effectiveVisibilityFilters}
               setVisibilityFilters={handleVisibilityFiltersChange}
               showClosedPositions={showClosedPositions}
-              onClassify={(holding) =>
-                setClassifyAsset({
-                  id: holding.instrument?.id ?? holding.id,
-                  symbol: holding.instrument?.symbol ?? holding.id,
-                  name: holding.instrument?.name ?? undefined,
-                  exchangeMic: holding.instrument?.exchangeMic,
-                  instrumentType: holding.instrument?.instrumentType,
-                })
-              }
+              onClassify={handleClassify}
             />
           </div>
 
@@ -682,39 +688,18 @@ export const HoldingsPage = () => {
           </EmptyPlaceholder>
         </div>
       ) : (
-        <>
-          {/* Desktop View */}
-          <div className="hidden md:block">
-            <AlternativeHoldingsTable
-              holdings={liabilitiesHoldings}
-              isLoading={isDataLoading}
-              emptyTitle={t("holdings:empty_no_liabilities")}
-              emptyDescription={t("holdings:empty_add_first_liability_button")}
-              onEdit={handleEditAsset}
-              onUpdateValue={setUpdateValueAsset}
-              onViewHistory={handleViewHistory}
-              onDelete={handleDeleteAsset}
-              onRowClick={handleRowClick}
-              isDeleting={isDeleting}
-            />
-          </div>
-          {/* Mobile View */}
-          <div className="block md:hidden">
-            <AlternativeHoldingsListMobile
-              holdings={liabilitiesHoldings}
-              isLoading={isDataLoading}
-              onRowClick={handleRowClick}
-              onEdit={handleEditAsset}
-              onUpdateValue={setUpdateValueAsset}
-              onDelete={handleDeleteAsset}
-            />
-          </div>
-        </>
+        <LiabilityOverview
+          holdings={liabilitiesHoldings}
+          isLoading={isDataLoading}
+          onEdit={handleEditAsset}
+          onViewHistory={handleViewHistory}
+          onDelete={handleDeleteAsset}
+          isDeleting={isDeleting}
+        />
       )}
     </>
   );
 
-  // Cash & fixed income content
   const isCashLoading = isAccountsLoading || isValuationsLoading;
   const cashContent = (
     <>

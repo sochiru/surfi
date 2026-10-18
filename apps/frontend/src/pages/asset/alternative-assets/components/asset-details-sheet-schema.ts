@@ -1,6 +1,10 @@
 import * as z from "zod";
-import { AlternativeAssetKind } from "@/lib/types";
+import type { LoanSetup } from "@/adapters/shared/alternative-assets";
+import { readActiveLoanProjection, LOAN_RENEWAL_MATURITY_METADATA_KEY } from "../lib/loan-events";
+import { calculateAmortizationMonths, calculateLoanPaymentDate } from "../lib/loan-calculator";
+import { AlternativeAssetKind, type AlternativeAssetHolding } from "@/lib/types";
 import { parseLocalDate } from "@/lib/utils";
+import type { LinkedLiability } from "./asset-details-sheet";
 
 // Property types
 export const PROPERTY_TYPES = [
@@ -42,6 +46,7 @@ export const LIABILITY_TYPES = [
   { value: "credit_card", label: "Credit Card" },
   { value: "personal_loan", label: "Personal Loan" },
   { value: "heloc", label: "HELOC" },
+  { value: "other", label: "Other" },
 ] as const;
 
 // Vehicle types (optional, for future use)
@@ -112,7 +117,15 @@ export const preciousMetalDetailsSchema = baseSchema.extend({
 export const liabilityDetailsSchema = baseSchema.extend({
   kind: z.literal(AlternativeAssetKind.LIABILITY),
   liabilityType: z
-    .enum(["mortgage", "auto_loan", "student_loan", "credit_card", "personal_loan", "heloc"])
+    .enum([
+      "mortgage",
+      "auto_loan",
+      "student_loan",
+      "credit_card",
+      "personal_loan",
+      "heloc",
+      "other",
+    ])
     .optional()
     .nullable(),
   originalAmount: z.coerce
@@ -121,41 +134,27 @@ export const liabilityDetailsSchema = baseSchema.extend({
     .optional()
     .nullable(),
   originationDate: z.date().optional().nullable(),
+  amortizationYears: z.number().int().min(0).max(100).optional().nullable(),
+  amortizationMonths: z.number().int().min(0).max(1200).optional().nullable(),
+  /** Stored horizon, kept unless the entered amortization no longer matches it. */
+  amortizationEndDate: z.date().optional().nullable(),
   interestRate: z.coerce
     .number()
     .min(0, "Interest rate must be 0 or greater")
     .max(100, "Interest rate must be 100 or less")
     .optional()
     .nullable(),
-  monthlyPayment: z.coerce
-    .number()
-    .positive("Monthly payment must be greater than 0")
-    .optional()
-    .nullable(),
-  originalTermMonths: z.coerce
-    .number()
-    .int("Term must be a whole number")
-    .min(1, "Term must be at least 1 month")
-    .max(720, "Term must be 720 months or less")
-    .optional()
-    .nullable(),
-  paymentDay: z.coerce
-    .number()
-    .int()
-    .min(1, "Payment day must be between 1 and 28")
-    .max(28, "Payment day must be between 1 and 28")
-    .optional()
-    .nullable(),
-  lockInEndDate: z.date().optional().nullable(),
-  rateSchedule: z
-    .array(
-      z.object({
-        effectiveFrom: z.date().optional().nullable(),
-        rate: z.coerce.number().min(0).max(100).optional().nullable(),
-      }),
-    )
-    .optional(),
+  automaticLoan: z.boolean().optional(),
+  renewalMaturity: z.date().optional().nullable(),
+  paymentAmount: z.number().finite().positive().optional().nullable(),
+  paymentFrequency: z.enum(["monthly", "biweekly", "accelerated_biweekly"]).optional(),
+  interestMethod: z.enum(["nominal_periodic", "monthly", "semiannual"]).optional(),
+  firstPaymentDate: z.date().optional().nullable(),
   linkedAssetId: z.string().optional().nullable(),
+  /** "Paid from" cash account; saved by a loan action, not with the metadata. */
+  paymentAccountId: z.string().optional().nullable(),
+  /** Escrow usually included in a payment; saved with the "Paid from" account. */
+  escrowAmount: z.number().finite().min(0).optional().nullable(),
 });
 
 // Other asset schema (generic)
@@ -168,18 +167,57 @@ export const otherDetailsSchema = baseSchema.extend({
     .nullable(),
 });
 
+/** Loan messages are translation keys; the sheet translates them. */
+const REQUIRED = "asset:loanActions.validation.required";
+
 // Discriminated union of all asset type schemas
-export const assetDetailsSchema = z.discriminatedUnion("kind", [
-  propertyDetailsSchema,
-  vehicleDetailsSchema,
-  collectibleDetailsSchema,
-  preciousMetalDetailsSchema,
-  liabilityDetailsSchema,
-  otherDetailsSchema,
-]);
+export const assetDetailsSchema = z
+  .discriminatedUnion("kind", [
+    propertyDetailsSchema,
+    vehicleDetailsSchema,
+    collectibleDetailsSchema,
+    preciousMetalDetailsSchema,
+    liabilityDetailsSchema,
+    otherDetailsSchema,
+  ])
+  .superRefine((values, ctx) => {
+    if (values.kind !== AlternativeAssetKind.LIABILITY || !values.automaticLoan) return;
+    for (const field of [
+      "originalAmount",
+      "originationDate",
+      "interestRate",
+      "paymentAmount",
+      "paymentFrequency",
+      "firstPaymentDate",
+    ] as const) {
+      if (values[field] == null)
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: REQUIRED });
+    }
+    if (
+      values.firstPaymentDate &&
+      values.originationDate &&
+      values.firstPaymentDate <= values.originationDate
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["firstPaymentDate"],
+        message: "asset:loanActions.validation.first_payment_after_origination",
+      });
+    }
+    if (totalAmortizationMonths(values) <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["amortizationYears"], message: REQUIRED });
+    }
+  });
 
 // Type for the combined form values
 export type AssetDetailsFormValues = z.infer<typeof assetDetailsSchema>;
+
+/** Total amortization entered as years plus months. */
+export function totalAmortizationMonths(
+  values: Pick<LiabilityDetailsFormValues, "amortizationYears" | "amortizationMonths">,
+): number {
+  return (values.amortizationYears ?? 0) * 12 + (values.amortizationMonths ?? 0);
+}
 
 // Type-specific form value types for convenience
 export type PropertyDetailsFormValues = z.infer<typeof propertyDetailsSchema>;
@@ -204,7 +242,7 @@ export function getDefaultDetailsFormValues(
   };
 
   // Read sub_type from metadata (unified field for all asset types)
-  const subType = (metadata?.sub_type as string) ?? null;
+  const subType = (metadata?.sub_type ?? metadata?.liability_type) as string | null;
 
   switch (kind) {
     case AlternativeAssetKind.PROPERTY:
@@ -249,40 +287,49 @@ export function getDefaultDetailsFormValues(
       const origAmount = metadata?.original_amount ?? metadata?.purchase_price;
       // For origination date, check both new field (origination_date) and legacy field (purchase_date)
       const origDate = metadata?.origination_date ?? metadata?.purchase_date;
-      const interestRate = metadata?.interest_rate
-        ? parseFloat(metadata.interest_rate as string)
-        : null;
-      const parsedSchedule = parseRateSchedule(metadata?.rate_schedule);
-      const rateSchedule =
-        parsedSchedule.length > 0
-          ? parsedSchedule
-          : interestRate != null
-            ? [
-                {
-                  effectiveFrom: origDate ? parseLocalDate(origDate as string) : null,
-                  rate: interestRate,
-                },
-              ]
-            : [];
+      const projection = readActiveLoanProjection(metadata);
+      const firstPaymentDate = projection ? parseLocalDate(projection.firstPaymentDate) : null;
+      const endDate = projection?.amortizationEndDate
+        ? parseLocalDate(projection.amortizationEndDate)
+        : projection?.paymentCount && firstPaymentDate
+          ? calculateLoanPaymentDate(
+              firstPaymentDate,
+              projection.paymentCount - 1,
+              projection.frequency,
+            )
+          : null;
+      const amortization =
+        firstPaymentDate && endDate
+          ? calculateAmortizationMonths(firstPaymentDate, endDate, projection?.frequency)
+          : null;
       return {
         ...base,
         kind: AlternativeAssetKind.LIABILITY,
         liabilityType: subType as LiabilityDetailsFormValues["liabilityType"],
         originalAmount: origAmount ? parseFloat(origAmount as string) : null,
         originationDate: origDate ? parseLocalDate(origDate as string) : null,
-        interestRate,
-        monthlyPayment: metadata?.monthly_payment
-          ? parseFloat(metadata.monthly_payment as string)
-          : null,
-        originalTermMonths: metadata?.original_term_months
-          ? parseInt(metadata.original_term_months as string, 10)
-          : null,
-        paymentDay: metadata?.payment_day ? parseInt(metadata.payment_day as string, 10) : null,
-        lockInEndDate: metadata?.lock_in_end_date
-          ? parseLocalDate(metadata.lock_in_end_date as string)
-          : null,
-        rateSchedule,
+        amortizationYears: amortization == null ? null : Math.floor(amortization / 12),
+        amortizationMonths: amortization == null ? null : amortization % 12 || null,
+        amortizationEndDate: endDate,
+        interestRate:
+          projection?.annualRate ??
+          (typeof metadata?.interest_rate === "number"
+            ? metadata.interest_rate
+            : typeof metadata?.interest_rate === "string"
+              ? parseFloat(metadata.interest_rate)
+              : null),
+        automaticLoan: !!projection,
+        renewalMaturity:
+          typeof metadata?.[LOAN_RENEWAL_MATURITY_METADATA_KEY] === "string"
+            ? parseLocalDate(metadata[LOAN_RENEWAL_MATURITY_METADATA_KEY])
+            : null,
+        firstPaymentDate,
+        paymentAmount: projection?.paymentAmount ?? null,
+        paymentFrequency: projection?.frequency ?? "monthly",
+        interestMethod: projection?.interestMethod ?? "nominal_periodic",
         linkedAssetId: (metadata?.linked_asset_id as string) ?? null,
+        paymentAccountId: storedPaymentAccount(metadata),
+        escrowAmount: storedEscrow(metadata) || null,
       };
     }
 
@@ -341,28 +388,9 @@ export function formValuesToMetadata(values: AssetDetailsFormValues): Record<str
       break;
 
     case AlternativeAssetKind.LIABILITY: {
+      // The loan section is saved by the backend from a loan setup; see loanSetupAction.
       if (values.liabilityType) metadata.sub_type = values.liabilityType;
-      metadata.original_amount =
-        values.originalAmount != null ? values.originalAmount.toString() : "";
-      metadata.origination_date = values.originationDate
-        ? formatDateToISO(values.originationDate)
-        : "";
-      metadata.interest_rate = values.interestRate != null ? values.interestRate.toString() : "";
-      metadata.monthly_payment =
-        values.monthlyPayment != null ? values.monthlyPayment.toString() : "";
-      metadata.original_term_months =
-        values.originalTermMonths != null ? values.originalTermMonths.toString() : "";
-      metadata.payment_day = values.paymentDay != null ? values.paymentDay.toString() : "";
-      metadata.lock_in_end_date = values.lockInEndDate ? formatDateToISO(values.lockInEndDate) : "";
-      const scheduleRows = (values.rateSchedule ?? [])
-        .filter((row) => row.effectiveFrom && row.rate != null)
-        .map((row) => ({
-          effective_from: formatDateToISO(row.effectiveFrom!),
-          rate: String(row.rate),
-        }));
-      metadata.rate_schedule = scheduleRows.length > 0 ? JSON.stringify(scheduleRows) : "";
       if (values.linkedAssetId) metadata.linked_asset_id = values.linkedAssetId;
-      else metadata.linked_asset_id = "";
       break;
     }
 
@@ -374,6 +402,15 @@ export function formValuesToMetadata(values: AssetDetailsFormValues): Record<str
   return metadata;
 }
 
+/** A liability as the details sheet lists it; an unavailable balance is left out, not shown as zero. */
+export function toLinkedLiability(holding: AlternativeAssetHolding): LinkedLiability {
+  return {
+    id: holding.id,
+    name: holding.name,
+    balance: holding.loan?.balanceSource === null ? undefined : holding.marketValue,
+  };
+}
+
 // Helper to format date to ISO string (YYYY-MM-DD)
 function formatDateToISO(date: Date): string {
   const year = date.getFullYear();
@@ -382,81 +419,37 @@ function formatDateToISO(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export interface RateScheduleRow {
-  effectiveFrom: Date | null;
-  rate: number | null;
+function storedPaymentAccount(metadata?: Record<string, unknown>): string | null {
+  const account = metadata?.payment_account_id;
+  return typeof account === "string" && account ? account : null;
 }
 
-export function parseRateSchedule(raw: unknown): RateScheduleRow[] {
-  if (!raw) return [];
-  let parsed: unknown = raw;
-  if (typeof raw === "string") {
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return [];
-    }
-  }
-  if (!Array.isArray(parsed)) return [];
-  return parsed
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const row = item as Record<string, unknown>;
-      const from = (row.effective_from ?? row.effectiveFrom) as string | undefined;
-      const rateRaw = row.rate;
-      const rate =
-        typeof rateRaw === "number"
-          ? rateRaw
-          : typeof rateRaw === "string"
-            ? parseFloat(rateRaw)
-            : NaN;
-      return {
-        effectiveFrom: from ? parseLocalDate(from) : null,
-        rate: Number.isFinite(rate) ? rate : null,
-      };
-    })
-    .filter((row): row is RateScheduleRow => row != null);
+function storedEscrow(metadata?: Record<string, unknown>): number {
+  const escrow = Number(metadata?.escrow_amount);
+  return Number.isFinite(escrow) && escrow > 0 ? escrow : 0;
 }
 
-const REVOLVING_SUBTYPES = new Set(["credit_card", "heloc"]);
-
-export function isRevolvingLiability(subType?: string | null): boolean {
-  return !!subType && REVOLVING_SUBTYPES.has(subType);
-}
-
-export interface RateReviewStatus {
-  dueOn: Date;
-  isDue: boolean;
-}
-
-export function getRateReviewStatus(
-  metadata?: Record<string, unknown>,
-  today = new Date(),
-): RateReviewStatus | null {
-  const lockIn = metadata?.lock_in_end_date as string | undefined;
-  if (!lockIn) return null;
-
-  const lockInDate = parseLocalDate(lockIn);
-  const todayIso = formatDateToISO(today);
-  const adjustments = parseRateSchedule(metadata?.rate_schedule)
-    .filter(
-      (row): row is { effectiveFrom: Date; rate: number | null } =>
-        !!row.effectiveFrom &&
-        formatDateToISO(row.effectiveFrom) >= lockIn &&
-        formatDateToISO(row.effectiveFrom) <= todayIso,
-    )
-    .sort((a, b) => a.effectiveFrom.getTime() - b.effectiveFrom.getTime());
-
-  if (adjustments.length === 0) {
-    return { dueOn: lockInDate, isDue: todayIso > lockIn };
-  }
-
-  const latest = adjustments.at(-1)!.effectiveFrom;
-  const dueOn = new Date(latest);
-  dueOn.setFullYear(dueOn.getFullYear() + 1);
-  return { dueOn, isDue: todayIso >= formatDateToISO(dueOn) };
-}
-
-export function isAmortizationPaused(metadata?: Record<string, unknown>): boolean {
-  return getRateReviewStatus(metadata)?.isDue ?? false;
+/** The loan section as entered; the backend checks it and derives the stored terms. */
+export function liabilityLoanSetup(values: LiabilityDetailsFormValues): LoanSetup {
+  const day = (date?: Date | null) => (date ? formatDateToISO(date) : undefined);
+  const amounts = {
+    originalAmount: values.originalAmount ?? undefined,
+    originationDate: day(values.originationDate),
+    interestRate: values.interestRate ?? undefined,
+  };
+  if (!values.automaticLoan) return amounts;
+  const months = totalAmortizationMonths(values);
+  return {
+    ...amounts,
+    schedule: {
+      frequency: values.paymentFrequency ?? "monthly",
+      interestMethod: values.interestMethod ?? "nominal_periodic",
+      firstPaymentDate: day(values.firstPaymentDate),
+      amortizationMonths: months > 0 ? months : undefined,
+      paymentAmount: values.paymentAmount ?? undefined,
+      renewalMaturity: day(values.renewalMaturity),
+      paymentAccountId: values.paymentAccountId || undefined,
+      escrowAmount: values.escrowAmount ?? undefined,
+    },
+  };
 }

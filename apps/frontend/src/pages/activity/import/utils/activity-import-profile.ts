@@ -62,6 +62,7 @@ const CASH_ACTIVITY_TYPES = [
 const CREDIT_CARD_ACTIVITY_TYPES = [
   ActivityType.WITHDRAWAL,
   ActivityType.TRANSFER_IN,
+  ActivityType.TRANSFER_OUT,
   ActivityType.CREDIT,
   ActivityType.FEE,
   ActivityType.INTEREST,
@@ -140,6 +141,7 @@ export const CREDIT_CARD_TRANSACTION_IMPORT_PROFILE: ActivityImportProfile = {
   activityTypeLabels: {
     [ActivityType.WITHDRAWAL]: "Charge",
     [ActivityType.TRANSFER_IN]: "Payment",
+    [ActivityType.TRANSFER_OUT]: "Balance Transfer / Cash Advance",
     [ActivityType.CREDIT]: "Refund / Credit",
     [ActivityType.INTEREST]: "Interest Charge",
   },

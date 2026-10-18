@@ -68,7 +68,9 @@ export interface AccountProductMeta {
 export function parseAccountMeta(meta?: string | null): AccountProductMeta {
   if (!meta?.trim()) return {};
   try {
-    return JSON.parse(meta) as AccountProductMeta;
+    const parsed: unknown = JSON.parse(meta);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed as AccountProductMeta;
   } catch {
     return {};
   }

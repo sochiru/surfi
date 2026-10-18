@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import { FormProvider, useForm, type Resolver } from "react-hook-form";
 import { z } from "zod";
 import type { TFunction } from "i18next";
+import { useActivityCurrency } from "../../hooks/use-activity-currency";
 import {
   AccountSelect,
   AdvancedOptionsSection,
@@ -23,6 +24,7 @@ import {
   type AccountSelectOption,
 } from "./fields";
 import { calculateIncomeFinalAmount } from "@/lib/activity-final-amount";
+import { assetMetadataSchema } from "./schemas";
 
 // Non-UI sentinel for the "cash" income mode (not a DB value; internal only).
 const INCOME_MODE_CASH = "CASH";
@@ -87,7 +89,8 @@ export const createDividendFormSchema = (t?: TFunction) =>
         .positive({
           message: msg(t, "activity:form.err_fxrate_positive", "FX Rate must be positive."),
         })
-        .optional(),
+        .optional()
+        .nullable(),
       subtype: z.string().optional().nullable(),
       // Positivity for unitPrice/quantity is enforced in superRefine, only for
       // asset-backed subtypes: cash records persist 0 for these hidden fields,
@@ -112,6 +115,7 @@ export const createDividendFormSchema = (t?: TFunction) =>
         .optional(),
       symbolQuoteCcy: z.string().nullable().optional(),
       symbolInstrumentType: z.string().nullable().optional(),
+      assetMetadata: assetMetadataSchema,
     })
     .superRefine((data, ctx) => {
       const isAssetBacked =
@@ -219,6 +223,8 @@ export function DividendForm({
     },
   });
 
+  useActivityCurrency(form, accounts, { isEditing });
+
   const { watch } = form;
   const { getFieldState, getValues, setValue } = form;
   const accountId = watch("accountId");
@@ -264,7 +270,7 @@ export function DividendForm({
       shouldDirty: true,
       shouldValidate: true,
     });
-    if (value === INCOME_MODE_CASH) {
+    if (value === INCOME_MODE_CASH || value === ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL) {
       setValue("quantity", undefined, { shouldDirty: true, shouldValidate: false });
       setValue("unitPrice", undefined, { shouldDirty: true, shouldValidate: false });
     }
@@ -295,12 +301,15 @@ export function DividendForm({
             quoteCcyName="symbolQuoteCcy"
             instrumentTypeName="symbolInstrumentType"
             existingAssetIdName="existingAssetId"
+            assetMetadataName="assetMetadata"
           />
+          <input type="hidden" {...form.register("assetMetadata.providerId")} />
+          <input type="hidden" {...form.register("assetMetadata.providerSymbol")} />
           <input type="hidden" {...form.register("symbolQuoteCcy")} />
           <input type="hidden" {...form.register("symbolInstrumentType")} />
           <input type="hidden" {...form.register("existingAssetId")} />
 
-          <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
+          <AccountSelect name="accountId" accounts={accounts} />
           <DatePicker name="activityDate" label={t("activity:field_date")} />
         </FormSection>
 
@@ -334,6 +343,18 @@ export function DividendForm({
                   className="cursor-pointer text-sm font-normal"
                 >
                   {t("activity:form.type_in_kind")}
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value={ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL}
+                  id="dividend-type-return-of-capital"
+                />
+                <Label
+                  htmlFor="dividend-type-return-of-capital"
+                  className="cursor-pointer text-sm font-normal"
+                >
+                  {t("activity:form.type_return_of_capital")}
                 </Label>
               </div>
             </RadioGroup>

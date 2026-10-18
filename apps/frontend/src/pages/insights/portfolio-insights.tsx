@@ -50,12 +50,17 @@ export default function PortfolioInsightsPage() {
   const setAccountScope = useAccountScopeStore((state) => state.setScope);
   const [overviewToolbarActions, setOverviewToolbarActions] = useState<ReactNode | null>(null);
 
+  const [customizeAction, setCustomizeAction] = useState<ReactNode | null>(null);
+
   const holdingsActions = useMemo(
     () =>
       overviewToolbarActions ?? (
-        <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
+        <div className="flex items-center gap-2">
+          <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
+          {customizeAction}
+        </div>
       ),
-    [accountFilter, overviewToolbarActions, setAccountScope],
+    [accountFilter, overviewToolbarActions, customizeAction, setAccountScope],
   );
 
   const dividendActions = useMemo(
@@ -81,6 +86,7 @@ export default function PortfolioInsightsPage() {
               filter={accountFilter}
               onFilterChange={setAccountScope}
               onToolbarActionsChange={setOverviewToolbarActions}
+              onCustomizeActionChange={setCustomizeAction}
             />
           </Suspense>
         ),

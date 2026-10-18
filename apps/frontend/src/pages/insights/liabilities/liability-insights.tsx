@@ -5,11 +5,6 @@ import { Link } from "react-router-dom";
 
 import { useAlternativeHoldings } from "@/hooks/use-alternative-assets";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import {
-  getRateReviewStatus,
-  isRevolvingLiability,
-  parseRateSchedule,
-} from "@/pages/asset/alternative-assets/components/asset-details-sheet-schema";
 import type { AlternativeAssetHolding } from "@/lib/types";
 import { AmountDisplay, EmptyPlaceholder, Icons } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
@@ -24,13 +19,41 @@ function metadataNumber(metadata: Record<string, unknown>, key: string): number 
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function isRevolvingLiability(subtype: string | undefined): boolean {
+  return subtype === "credit_card" || subtype === "heloc";
+}
+
+function projectionNumber(metadata: Record<string, unknown>, key: string): number | null {
+  const projection = metadata.loan_projection;
+  if (!projection || typeof projection !== "object") return null;
+  return metadataNumber(projection as Record<string, unknown>, key);
+}
+
 function currentRate(metadata: Record<string, unknown>): number | null {
-  const today = new Date();
-  const scheduled = parseRateSchedule(metadata.rate_schedule)
-    .filter((row) => row.effectiveFrom && row.effectiveFrom <= today && row.rate != null)
-    .sort((a, b) => b.effectiveFrom!.getTime() - a.effectiveFrom!.getTime())
-    .at(0)?.rate;
-  return scheduled ?? metadataNumber(metadata, "interest_rate");
+  return projectionNumber(metadata, "annualRate") ?? metadataNumber(metadata, "interest_rate");
+}
+
+function monthlyPayment(metadata: Record<string, unknown>): number | null {
+  return projectionNumber(metadata, "paymentAmount") ?? metadataNumber(metadata, "monthly_payment");
+}
+
+/** True once a recorded lock-in date has passed and no later rate change exists. */
+function rateReviewDue(metadata: Record<string, unknown> | null | undefined): boolean {
+  if (!metadata) return false;
+  const maturity = metadata.renewal_maturity_date;
+  if (typeof maturity !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(maturity)) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  if (maturity >= today) return false;
+  const events = Array.isArray(metadata.loan_events) ? metadata.loan_events : [];
+  return !events.some((event) => {
+    if (!event || typeof event !== "object") return false;
+    const record = event as Record<string, unknown>;
+    return (
+      record.type === "rate_change" &&
+      typeof record.effectiveDate === "string" &&
+      record.effectiveDate > maturity
+    );
+  });
 }
 
 function paydownPercent(holding: AlternativeAssetHolding): number | null {
@@ -60,8 +83,8 @@ export function LiabilityInsights() {
       }),
     [liabilities],
   );
-  const rateUpdatesDue = installmentLoans.filter(
-    (holding) => getRateReviewStatus(holding.metadata)?.isDue,
+  const rateUpdatesDue = installmentLoans.filter((holding) =>
+    rateReviewDue(holding.metadata),
   ).length;
   const paydownValues = installmentLoans
     .map(paydownPercent)
@@ -71,7 +94,7 @@ export function LiabilityInsights() {
       ? paydownValues.reduce((sum, value) => sum + value, 0) / paydownValues.length
       : null;
   const paymentsByCurrency = installmentLoans.reduce<Record<string, number>>((totals, holding) => {
-    const payment = metadataNumber(holding.metadata ?? {}, "monthly_payment");
+    const payment = monthlyPayment(holding.metadata ?? {});
     if (payment != null) {
       totals[holding.currency] = (totals[holding.currency] ?? 0) + payment;
     }
@@ -193,10 +216,13 @@ function LiabilityCard({ holding }: { holding: AlternativeAssetHolding }) {
   const subtype = (metadata.sub_type ?? metadata.liability_type) as string | undefined;
   const revolving = isRevolvingLiability(subtype);
   const rate = currentRate(metadata);
-  const payment = metadataNumber(metadata, "monthly_payment");
-  const term = metadataNumber(metadata, "original_term_months");
+  const payment = monthlyPayment(metadata);
+  const term =
+    projectionNumber(metadata, "paymentCount") ?? metadataNumber(metadata, "original_term_months");
   const paidDown = paydownPercent(holding);
-  const review = getRateReviewStatus(metadata);
+  const reviewDue = rateReviewDue(metadata);
+  const lockIn =
+    typeof metadata.renewal_maturity_date === "string" ? metadata.renewal_maturity_date : null;
 
   return (
     <Card>
@@ -212,7 +238,7 @@ function LiabilityCard({ holding }: { holding: AlternativeAssetHolding }) {
           </div>
           {revolving ? (
             <Badge variant="secondary">{t("insights:liabilities.snapshot_only")}</Badge>
-          ) : review?.isDue ? (
+          ) : reviewDue ? (
             <Badge variant="destructive">{t("insights:liabilities.rate_due")}</Badge>
           ) : (
             <Badge variant="secondary">{t("insights:liabilities.auto_amortizing")}</Badge>
@@ -257,7 +283,9 @@ function LiabilityCard({ holding }: { holding: AlternativeAssetHolding }) {
           />
           <Metric
             label={t("insights:liabilities.next_rate_review")}
-            value={review ? format(review.dueOn, "MMM d, yyyy") : "—"}
+            value={
+              lockIn ? format(new Date(`${lockIn}T00:00:00`), "MMM d, yyyy") : "—"
+            }
           />
         </div>
 

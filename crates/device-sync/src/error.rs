@@ -61,6 +61,10 @@ pub enum DeviceSyncError {
     #[error("Invalid request: {0}")]
     InvalidRequest(String),
 
+    /// Keep local backup failures typed for capture scheduling.
+    #[error(transparent)]
+    Backup(#[from] crate::backups::BackupError),
+
     /// Authentication error (missing or invalid token)
     #[error("Authentication error: {0}")]
     Auth(String),
@@ -145,13 +149,15 @@ impl DeviceSyncError {
         match self {
             Self::Api { status, .. } => match *status {
                 401 | 403 => ApiRetryClass::ReauthRequired,
-                408 | 409 | 423 | 425 | 429 => ApiRetryClass::Retryable,
+                402 | 408 | 409 | 423 | 425 | 429 => ApiRetryClass::Retryable,
                 500..=599 => ApiRetryClass::Retryable,
                 _ => ApiRetryClass::Permanent,
             },
             Self::Http(_) => ApiRetryClass::Retryable,
             Self::Json(_) => ApiRetryClass::Permanent,
             Self::InvalidRequest(_) => ApiRetryClass::Permanent,
+            Self::Backup(crate::backups::BackupError::Io(_)) => ApiRetryClass::Retryable,
+            Self::Backup(_) => ApiRetryClass::Permanent,
             Self::Auth(_) => ApiRetryClass::ReauthRequired,
         }
     }

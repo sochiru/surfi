@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Extension, Path},
     routing::{delete, get, post},
     Json, Router,
 };
@@ -12,14 +12,14 @@ use wealthfolio_core::dividends::{
 use crate::{error::ApiResult, main_lib::AppState};
 
 async fn get_dividend_sync_settings(
-    State(state): State<Arc<AppState>>,
+    Extension(state): Extension<Arc<AppState>>,
 ) -> ApiResult<Json<DividendSyncSettings>> {
     let settings = state.dividend_sync_service.get_settings()?;
     Ok(Json(settings))
 }
 
 async fn update_dividend_sync_settings(
-    State(state): State<Arc<AppState>>,
+    Extension(state): Extension<Arc<AppState>>,
     Json(settings): Json<DividendSyncSettings>,
 ) -> ApiResult<Json<DividendSyncSettings>> {
     let updated = state
@@ -29,14 +29,16 @@ async fn update_dividend_sync_settings(
     Ok(Json(updated))
 }
 
-async fn sync_dividends(State(state): State<Arc<AppState>>) -> ApiResult<Json<DividendSyncResult>> {
+async fn sync_dividends(
+    Extension(state): Extension<Arc<AppState>>,
+) -> ApiResult<Json<DividendSyncResult>> {
     let result = state.dividend_sync_service.sync().await?;
     Ok(Json(result))
 }
 
 async fn sync_dividends_account(
     Path(account_id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    Extension(state): Extension<Arc<AppState>>,
 ) -> ApiResult<Json<DividendSyncResult>> {
     let result = state
         .dividend_sync_service
@@ -45,14 +47,16 @@ async fn sync_dividends_account(
     Ok(Json(result))
 }
 
-async fn remove_auto_dividends(State(state): State<Arc<AppState>>) -> ApiResult<Json<usize>> {
+async fn remove_auto_dividends(
+    Extension(state): Extension<Arc<AppState>>,
+) -> ApiResult<Json<usize>> {
     let n = state.dividend_sync_service.remove_auto_created().await?;
     Ok(Json(n))
 }
 
 async fn remove_auto_dividends_account(
     Path(account_id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    Extension(state): Extension<Arc<AppState>>,
 ) -> ApiResult<Json<usize>> {
     let n = state
         .dividend_sync_service
@@ -62,7 +66,7 @@ async fn remove_auto_dividends_account(
 }
 
 async fn get_dividend_calendar_events(
-    State(state): State<Arc<AppState>>,
+    Extension(state): Extension<Arc<AppState>>,
 ) -> ApiResult<Json<Vec<DividendCalendarEvent>>> {
     let events = state.dividend_sync_service.build_calendar_events().await?;
     Ok(Json(events))
@@ -70,7 +74,7 @@ async fn get_dividend_calendar_events(
 
 async fn get_asset_dividend_view(
     Path(asset_id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    Extension(state): Extension<Arc<AppState>>,
 ) -> ApiResult<Json<AssetDividendView>> {
     let view = state
         .dividend_sync_service
@@ -79,7 +83,7 @@ async fn get_asset_dividend_view(
     Ok(Json(view))
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route(
             "/dividends/settings",

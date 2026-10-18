@@ -25,7 +25,7 @@ use crate::activities::{
 };
 use crate::errors::{Error, Result};
 use crate::portfolio::holdings::{Holding, HoldingType, HoldingsServiceTrait};
-use crate::portfolio::snapshot::SnapshotRepositoryTrait;
+use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::quotes::{FetchDividendsParams, QuoteServiceTrait};
 use crate::settings::SettingsServiceTrait;
 use wealthfolio_market_data::DividendEvent;
@@ -74,7 +74,7 @@ pub struct DividendSyncService {
     activities: Arc<dyn ActivityServiceTrait>,
     holdings: Arc<dyn HoldingsServiceTrait>,
     quotes: Arc<dyn QuoteServiceTrait>,
-    snapshots: Arc<dyn SnapshotRepositoryTrait>,
+    snapshots: Arc<dyn SnapshotServiceTrait>,
     base_currency: Arc<std::sync::RwLock<String>>,
 }
 
@@ -85,7 +85,7 @@ impl DividendSyncService {
         activities: Arc<dyn ActivityServiceTrait>,
         holdings: Arc<dyn HoldingsServiceTrait>,
         quotes: Arc<dyn QuoteServiceTrait>,
-        snapshots: Arc<dyn SnapshotRepositoryTrait>,
+        snapshots: Arc<dyn SnapshotServiceTrait>,
         base_currency: Arc<std::sync::RwLock<String>>,
     ) -> Self {
         Self {
@@ -281,15 +281,19 @@ impl DividendSyncService {
             return compute_shares_at_ex_date(trades, ex_date);
         }
         if tracking_mode == TrackingMode::Holdings {
-            if let Ok(Some(snap)) = self
+            // Holdings snapshots state quantities as of their own date. The
+            // snapshot service carries those quantities across later splits.
+            if let Ok(snaps) = self
                 .snapshots
-                .get_latest_snapshot_before_date(account_id, ex_date)
+                .get_latest_snapshots_as_of(&[account_id.to_string()], ex_date)
             {
-                return snap
-                    .positions
-                    .get(asset_id)
-                    .map(|p| p.quantity.abs())
-                    .unwrap_or(Decimal::ZERO);
+                if let Some(snap) = snaps.get(account_id) {
+                    return snap
+                        .positions
+                        .get(asset_id)
+                        .map(|p| p.quantity.abs())
+                        .unwrap_or(Decimal::ZERO);
+                }
             }
         }
         Decimal::ZERO
