@@ -10,23 +10,23 @@ export interface AccountTypeVisual {
 export const ACCOUNT_TYPE_VISUALS: Record<AccountType, AccountTypeVisual> = {
   SECURITIES: {
     icon: Icons.Briefcase,
-    bgClass: "bg-blue-500/10",
-    iconClass: "text-blue-500",
+    bgClass: "bg-info-subtle",
+    iconClass: "text-info-subtle-foreground",
   },
   CASH: {
     icon: Icons.DollarSign,
-    bgClass: "bg-green-500/10",
-    iconClass: "text-green-500",
+    bgClass: "bg-success-subtle",
+    iconClass: "text-success-subtle-foreground",
   },
   CREDIT_CARD: {
     icon: Icons.CreditCard,
-    bgClass: "bg-rose-500/10",
-    iconClass: "text-rose-500",
+    bgClass: "bg-destructive-subtle",
+    iconClass: "text-destructive-subtle-foreground",
   },
   CRYPTOCURRENCY: {
     icon: Icons.Bitcoin,
-    bgClass: "bg-orange-500/10",
-    iconClass: "text-orange-500",
+    bgClass: "bg-warning-subtle",
+    iconClass: "text-warning-subtle-foreground",
   },
 };
 

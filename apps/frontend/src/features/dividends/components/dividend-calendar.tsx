@@ -33,15 +33,15 @@ interface Props {
 }
 
 const KIND_STYLES: Record<DividendCalendarEvent["kind"], string> = {
-  posted: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  past_unposted: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  upcoming_estimated: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  posted: "bg-success-subtle text-success-subtle-foreground",
+  past_unposted: "bg-info-subtle text-info-subtle-foreground",
+  upcoming_estimated: "bg-warning-subtle text-warning-subtle-foreground",
 };
 
 const DOT_STYLES: Record<DividendCalendarEvent["kind"], string> = {
-  posted: "bg-emerald-500",
-  past_unposted: "bg-sky-500",
-  upcoming_estimated: "bg-amber-500",
+  posted: "bg-success",
+  past_unposted: "bg-info",
+  upcoming_estimated: "bg-warning",
 };
 
 const KIND_LABELS: Record<DividendCalendarEvent["kind"], string> = {
@@ -178,7 +178,7 @@ export function DividendCalendar({ events, isLoading }: Props) {
       const dayNumber = (
         <span
           className={cn(
-            "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] tabular-nums",
+            "text-2xs flex size-5 shrink-0 items-center justify-center rounded-full tabular-nums",
             modifiers.today && "bg-primary text-primary-foreground font-semibold",
             modifiers.outside && "text-muted-foreground/50",
           )}
@@ -192,7 +192,7 @@ export function DividendCalendar({ events, isLoading }: Props) {
           <div className="flex items-center justify-between gap-1">
             {dayNumber}
             {dayEvents.length > 1 ? (
-              <span className="text-muted-foreground text-[10px] tabular-nums">
+              <span className="text-muted-foreground text-2xs tabular-nums">
                 {dayEvents.length}
               </span>
             ) : null}
@@ -202,12 +202,12 @@ export function DividendCalendar({ events, isLoading }: Props) {
               <span
                 key={event.id}
                 className={cn(
-                  "flex items-center gap-1 rounded px-1 py-0.5 text-[10px] leading-tight",
+                  "text-2xs flex items-center gap-1 rounded px-1 py-0.5 leading-tight",
                   KIND_STYLES[event.kind],
                 )}
               >
                 <span className="truncate font-medium">{event.symbol}</span>
-                <span className="ml-auto shrink-0 tabular-nums">
+                <span className="ms-auto shrink-0 tabular-nums">
                   {compactFormatter.format(amountNumber(event.displayAmount))}
                 </span>
               </span>
@@ -225,7 +225,7 @@ export function DividendCalendar({ events, isLoading }: Props) {
       );
 
       const cellClass = cn(
-        "flex h-14 w-full flex-col rounded-md border p-1 text-left sm:h-24 sm:rounded-lg sm:p-1.5",
+        "flex h-14 w-full flex-col rounded-md border p-1 text-start sm:h-24 sm:rounded-lg sm:p-1.5",
         modifiers.outside ? "border-transparent" : "border-border/60 bg-card/40",
       );
 
@@ -248,9 +248,9 @@ export function DividendCalendar({ events, isLoading }: Props) {
             <div className={cellClass}>{body}</div>
           ) : isMobile ? (
             <Sheet>
-              <SheetTrigger asChild>{trigger}</SheetTrigger>
+              <SheetTrigger render={trigger} />
               <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-3xl">
-                <SheetHeader className="text-left">
+                <SheetHeader className="text-start">
                   <SheetTitle>{format(day.date, "EEEE, PPP")}</SheetTitle>
                   <SheetDescription>
                     {dayEvents.length} dividend event{dayEvents.length === 1 ? "" : "s"}
@@ -263,7 +263,7 @@ export function DividendCalendar({ events, isLoading }: Props) {
             </Sheet>
           ) : (
             <Popover>
-              <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+              <PopoverTrigger render={trigger} />
               <PopoverContent align="start" className="max-h-[70vh] w-72 overflow-y-auto">
                 <div className="mb-2 text-sm font-semibold">{format(day.date, "EEEE, PPP")}</div>
                 <DayEvents events={dayEvents} />
@@ -359,7 +359,7 @@ export function DividendCalendar({ events, isLoading }: Props) {
               month_grid: "w-full border-collapse",
               weekdays: "flex w-full gap-0.5 sm:gap-1",
               weekday:
-                "text-muted-foreground min-w-0 flex-1 select-none py-1 text-center text-[10px] font-medium uppercase sm:text-xs sm:tracking-wide",
+                "text-muted-foreground text-2xs min-w-0 flex-1 select-none py-1 text-center font-medium uppercase sm:text-xs sm:tracking-wide",
               week: "flex w-full gap-0.5 sm:gap-1 [&:not(:first-child)]:mt-0.5 sm:[&:not(:first-child)]:mt-1",
               day: "",
               today: "",

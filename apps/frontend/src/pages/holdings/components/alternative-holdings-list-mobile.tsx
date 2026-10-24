@@ -79,7 +79,7 @@ export function AlternativeHoldingsListMobile({
                   <p className="text-muted-foreground truncate text-sm">{kindDisplay}</p>
                 </div>
               </div>
-              <div className="ml-2 flex items-center gap-1 text-right">
+              <div className="ms-2 flex items-center gap-1 text-end">
                 <div>
                   <AmountDisplay
                     value={parseFloat(holding.marketValue)}
@@ -103,15 +103,17 @@ export function AlternativeHoldingsListMobile({
                 </div>
                 {(onEdit || onUpdateValue || onDelete) && (
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md"
-                        aria-label={t("holdings:open_actions")}
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <Icons.MoreVertical className="h-4 w-4" />
-                      </button>
+                    <DropdownMenuTrigger
+                      render={
+                        <button
+                          type="button"
+                          className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md"
+                          aria-label={t("holdings:open_actions")}
+                          onClick={(event) => event.stopPropagation()}
+                        />
+                      }
+                    >
+                      <Icons.MoreVertical className="h-4 w-4" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
                       {onUpdateValue && (

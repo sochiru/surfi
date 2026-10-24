@@ -5,7 +5,8 @@ import { getDividendCalendarEvents } from "@/adapters";
 import { DividendIncomeChart } from "@/features/dividends/components/dividend-income-chart";
 import { QueryKeys } from "@/lib/query-keys";
 import type { AccountScope, Holding, PortfolioWithAccounts } from "@/lib/types";
-import { Button } from "@wealthfolio/ui";
+import { buttonVariants } from "@wealthfolio/ui";
+import { cn } from "@wealthfolio/ui/lib/utils";
 
 interface Props {
   accountFilter: AccountScope;
@@ -53,14 +54,15 @@ export function DividendIncomeOverviewCard({
       fallbackCurrency={baseCurrency}
       compact
       headerAction={
-        <Button
-          asChild
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground h-8 px-2 text-xs"
+        <Link
+          to="/insights?tab=dividends"
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "sm" }),
+            "text-muted-foreground h-8 px-2 text-xs",
+          )}
         >
-          <Link to="/insights?tab=dividends">View details</Link>
-        </Button>
+          View details
+        </Link>
       }
     />
   );

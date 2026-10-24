@@ -8,12 +8,14 @@ import {
   AmountDisplay,
   Button,
   Card,
+  buttonVariants,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@wealthfolio/ui";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
+import { cn } from "@wealthfolio/ui/lib/utils";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { usePortfolios } from "@/hooks/use-portfolios";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -63,17 +65,19 @@ export function DividendInsightsActions() {
         aria-label="Sync dividends now"
       >
         {syncMutation.isPending ? (
-          <Icons.Spinner className="size-4 animate-spin sm:mr-2" />
+          <Icons.Spinner className="size-4 animate-spin sm:me-2" />
         ) : (
-          <Icons.Refresh className="size-4 sm:mr-2" />
+          <Icons.Refresh className="size-4 sm:me-2" />
         )}
         <span className="hidden sm:inline">Sync now</span>
       </Button>
-      <Button variant="ghost" size="icon" asChild aria-label="Dividend settings">
-        <Link to="/settings/dividends">
-          <Icons.Settings2 className="size-4" />
-        </Link>
-      </Button>
+      <Link
+        to="/settings/dividends"
+        aria-label="Dividend settings"
+        className={buttonVariants({ variant: "ghost", size: "icon" })}
+      >
+        <Icons.Settings2 className="size-4" />
+      </Link>
     </div>
   );
 }
@@ -121,9 +125,12 @@ export function DividendInsights({ accountFilter }: DividendInsightsProps) {
             <span>
               Automatic dividends are off, so only manually recorded dividends appear here.
             </span>
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" asChild>
-              <Link to="/settings/dividends">Set up dividends</Link>
-            </Button>
+            <Link
+              to="/settings/dividends"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full sm:w-auto")}
+            >
+              Set up dividends
+            </Link>
           </AlertDescription>
         </Alert>
       ) : null}

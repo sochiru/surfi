@@ -156,7 +156,7 @@ export function DividendAutomationSettings() {
                       </span>
                     </Label>
                   </div>
-                  <div className="grid grid-cols-[1fr_5rem_auto] items-center gap-2 pl-11 sm:flex sm:pl-0">
+                  <div className="grid grid-cols-[1fr_5rem_auto] items-center gap-2 ps-11 sm:flex sm:ps-0">
                     <Label
                       htmlFor={`dividend-tax-${account.id}`}
                       className="text-muted-foreground text-xs font-normal"
@@ -189,7 +189,7 @@ export function DividendAutomationSettings() {
                       }}
                     />
                     <span className="text-muted-foreground text-sm">%</span>
-                    <div className="col-span-3 flex items-center justify-end gap-1 sm:col-span-1 sm:ml-2 sm:justify-start">
+                    <div className="col-span-3 flex items-center justify-end gap-1 sm:col-span-1 sm:ms-2 sm:justify-start">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -235,18 +235,18 @@ export function DividendAutomationSettings() {
               disabled={busy || !settings.globalEnabled || enabledCount === 0}
             >
               {syncMutation.isPending ? (
-                <Icons.Spinner className="mr-2 size-4 animate-spin" />
+                <Icons.Spinner className="me-2 size-4 animate-spin" />
               ) : (
-                <Icons.Refresh className="mr-2 size-4" />
+                <Icons.Refresh className="me-2 size-4" />
               )}
               Sync missing dividends (all accounts)
             </Button>
             <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" className="w-full sm:w-auto" disabled={busy}>
-                  <Icons.Trash className="mr-2 size-4" />
-                  Remove auto-created (all accounts)
-                </Button>
+              <AlertDialogTrigger
+                render={<Button variant="outline" className="w-full sm:w-auto" disabled={busy} />}
+              >
+                <Icons.Trash className="me-2 size-4" />
+                Remove auto-created (all accounts)
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>

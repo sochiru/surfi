@@ -222,25 +222,27 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
             </div>
             <div className="text-muted-foreground text-sm font-normal">{quantityLabel}</div>
           </div>
-          <div className="text-right">
+          <div className="text-end">
             <div className="text-xl font-extrabold">
               <AmountDisplay value={marketValue} currency={currency} isHidden={isBalanceHidden} />
             </div>
             <div className="text-muted-foreground flex items-center justify-end gap-1 text-sm font-normal">
               <span>{currency}</span>
-              <TooltipProvider delayDuration={200}>
+              <TooltipProvider>
                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="text-muted-foreground hover:text-foreground inline-flex"
-                      aria-label={t("asset:detailCard.market_value_gross_tooltip")}
-                      data-testid="button-market-value-gross-info"
-                    >
-                      <Icons.Info className="size-3.5" />
-                    </button>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground inline-flex"
+                        aria-label={t("asset:detailCard.market_value_gross_tooltip")}
+                        data-testid="button-market-value-gross-info"
+                      />
+                    }
+                  >
+                    <Icons.Info className="size-3.5" />
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-xs text-left">
+                  <TooltipContent className="max-w-xs text-start">
                     <p>{t("asset:detailCard.market_value_gross_tooltip")}</p>
                   </TooltipContent>
                 </Tooltip>

@@ -40,23 +40,25 @@ export function CashInterestMaintenance() {
             onClick={() => syncMutation.mutate()}
           >
             {syncMutation.isPending ? (
-              <Icons.Spinner className="mr-2 size-4 animate-spin" />
+              <Icons.Spinner className="me-2 size-4 animate-spin" />
             ) : (
-              <Icons.Sparkles className="mr-2 size-4" />
+              <Icons.Sparkles className="me-2 size-4" />
             )}
             Generate interest (all accounts)
           </Button>
           <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full sm:w-auto"
-                data-testid="button-remove-all-auto-interest"
-                disabled={busy}
-              >
-                <Icons.Trash className="mr-2 size-4" />
-                Remove auto interest (all accounts)
-              </Button>
+            <AlertDialogTrigger
+              render={
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  data-testid="button-remove-all-auto-interest"
+                  disabled={busy}
+                />
+              }
+            >
+              <Icons.Trash className="me-2 size-4" />
+              Remove auto interest (all accounts)
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
