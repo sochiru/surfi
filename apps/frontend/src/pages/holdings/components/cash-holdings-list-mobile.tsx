@@ -52,7 +52,7 @@ export function CashHoldingsListMobile({
                 </p>
               </div>
             </div>
-            <div className="ml-2 text-right">
+            <div className="ms-2 text-end">
               <AmountDisplay
                 value={holding.balance}
                 currency={holding.currency}

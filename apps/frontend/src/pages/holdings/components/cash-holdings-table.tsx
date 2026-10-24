@@ -84,7 +84,7 @@ export function CashHoldingsTable({ holdings, isLoading, onRowClick }: CashHoldi
         cell: ({ row }) => {
           const { rate, compounding } = row.original;
           if (rate == null) {
-            return <div className="text-muted-foreground text-right text-sm">—</div>;
+            return <div className="text-muted-foreground text-end text-sm">—</div>;
           }
           return (
             <div className="flex flex-col items-end">
@@ -108,7 +108,7 @@ export function CashHoldingsTable({ holdings, isLoading, onRowClick }: CashHoldi
         cell: ({ row }) => {
           const { maturityDate, daysToMaturity } = row.original;
           if (!maturityDate) {
-            return <div className="text-muted-foreground text-right text-sm">—</div>;
+            return <div className="text-muted-foreground text-end text-sm">—</div>;
           }
           return (
             <div className="flex flex-col items-end">
@@ -134,7 +134,7 @@ export function CashHoldingsTable({ holdings, isLoading, onRowClick }: CashHoldi
           />
         ),
         cell: ({ row }) => (
-          <div className="text-right">
+          <div className="text-end">
             <AmountDisplay
               value={row.original.balance}
               currency={row.original.currency}

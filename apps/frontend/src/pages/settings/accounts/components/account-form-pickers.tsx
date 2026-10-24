@@ -11,7 +11,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
 const TYPE_CARD_CLASS =
-  "hover:bg-accent/50 flex cursor-pointer flex-col items-start gap-2 rounded-xl border bg-card p-3 text-left transition-colors dark:bg-muted/20 dark:hover:bg-muted/30";
+  "hover:bg-accent/50 flex cursor-pointer flex-col items-start gap-2 rounded-xl border bg-card p-3 text-start transition-colors dark:bg-muted/20 dark:hover:bg-muted/30";
 
 interface AccountTypeCardsProps {
   value: AccountType;

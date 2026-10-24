@@ -40,9 +40,9 @@ export function CashInterestMaintenance() {
             onClick={() => syncMutation.mutate()}
           >
             {syncMutation.isPending ? (
-              <Icons.Spinner className="mr-2 size-4 animate-spin" />
+              <Icons.Spinner className="me-2 size-4 animate-spin" />
             ) : (
-              <Icons.Sparkles className="mr-2 size-4" />
+              <Icons.Sparkles className="me-2 size-4" />
             )}
             Generate interest (all accounts)
           </Button>

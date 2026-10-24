@@ -68,7 +68,7 @@ export function AccountItem({
             </Link>
             {isSynced && <Icons.CloudSync2 className="text-muted-foreground h-3.5 w-3.5" />}
             {productType && (
-              <span className="bg-muted rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide">
+              <span className="bg-muted text-2xs rounded px-1.5 py-0.5 font-semibold tracking-wide">
                 {productBadgeLabels[productType]}
               </span>
             )}

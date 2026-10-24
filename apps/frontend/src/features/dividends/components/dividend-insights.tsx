@@ -65,9 +65,9 @@ export function DividendInsightsActions() {
         aria-label="Sync dividends now"
       >
         {syncMutation.isPending ? (
-          <Icons.Spinner className="size-4 animate-spin sm:mr-2" />
+          <Icons.Spinner className="size-4 animate-spin sm:me-2" />
         ) : (
-          <Icons.Refresh className="size-4 sm:mr-2" />
+          <Icons.Refresh className="size-4 sm:me-2" />
         )}
         <span className="hidden sm:inline">Sync now</span>
       </Button>

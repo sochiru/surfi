@@ -150,7 +150,7 @@ function RatesEditor({ initial }: { initial: Mp2DividendRates }) {
             disabled={!hasUndeclaredYear(draft)}
             onClick={() => setDraft(setDeclaredRate(draft, nextUndeclaredYear(draft), 0))}
           >
-            <Plus className="mr-1 h-4 w-4" aria-hidden />
+            <Plus className="me-1 h-4 w-4" aria-hidden />
             Add year
           </Button>
           <Button

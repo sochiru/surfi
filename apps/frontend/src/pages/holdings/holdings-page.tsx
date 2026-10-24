@@ -734,7 +734,7 @@ export const HoldingsPage = () => {
             description="Track savings, Pag-IBIG MP2 and other fixed-income products alongside your investments."
           >
             <Button size="default" onClick={() => navigate("/settings/accounts")}>
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
               Add cash account
             </Button>
           </EmptyPlaceholder>
