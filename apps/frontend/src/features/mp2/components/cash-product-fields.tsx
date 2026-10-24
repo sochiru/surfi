@@ -1,12 +1,4 @@
-import type {
-  CashProductType,
-  CreditFrequency,
-  DayCount,
-  MonthlyCreditTiming,
-  ProductConfig,
-  RatePeriod,
-  RateTier,
-} from "@/lib/cash-product-meta";
+import type { CashProductType, ProductConfig, RatePeriod, RateTier } from "@/lib/cash-product-meta";
 import {
   computeMp2Maturity,
   defaultHysaGoalProduct,
@@ -386,7 +378,9 @@ export function CashProductFields({
             <Label>Credit frequency</Label>
             <Select
               value={product.yield.creditFrequency}
-              onValueChange={(value) => updateYield({ creditFrequency: value as CreditFrequency })}
+              onValueChange={(value) => {
+                if (value != null) updateYield({ creditFrequency: value });
+              }}
             >
               <SelectTrigger data-testid="select-credit-frequency">
                 <SelectValue />
@@ -404,9 +398,9 @@ export function CashProductFields({
             <Label>Monthly credit date</Label>
             <Select
               value={product.yield.monthlyCreditTiming ?? "next_month_start"}
-              onValueChange={(value) =>
-                updateYield({ monthlyCreditTiming: value as MonthlyCreditTiming })
-              }
+              onValueChange={(value) => {
+                if (value != null) updateYield({ monthlyCreditTiming: value });
+              }}
             >
               <SelectTrigger data-testid="select-monthly-credit-timing">
                 <SelectValue />
@@ -553,7 +547,9 @@ export function CashProductFields({
             <Label>Day-count basis</Label>
             <Select
               value={product.yield.dayCount ?? "actual_365"}
-              onValueChange={(value) => updateYield({ dayCount: value as DayCount })}
+              onValueChange={(value) => {
+                if (value != null) updateYield({ dayCount: value });
+              }}
             >
               <SelectTrigger data-testid="select-day-count">
                 <SelectValue />
