@@ -242,11 +242,11 @@ export function DividendAutomationSettings() {
               Sync missing dividends (all accounts)
             </Button>
             <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" className="w-full sm:w-auto" disabled={busy}>
-                  <Icons.Trash className="mr-2 size-4" />
-                  Remove auto-created (all accounts)
-                </Button>
+              <AlertDialogTrigger
+                render={<Button variant="outline" className="w-full sm:w-auto" disabled={busy} />}
+              >
+                <Icons.Trash className="me-2 size-4" />
+                Remove auto-created (all accounts)
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>

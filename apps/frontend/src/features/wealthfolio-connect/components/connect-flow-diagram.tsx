@@ -37,7 +37,7 @@ export function ConnectFlowDiagram() {
           >
             {t("connect:flow.yourDevice")}
           </text>
-          <text x="68" y="50" className="fill-[#9a9a9a] dark:fill-white/50" fontSize="12">
+          <text x="68" y="50" className="fill-[#9a9a9a] dark:fill-white/50" fontSize="0.75rem">
             {t("connect:flow.localDatabase")}
           </text>
 
@@ -48,7 +48,7 @@ export function ConnectFlowDiagram() {
             textAnchor="middle"
             className="fill-[#504f4f] dark:fill-white/50"
             fontFamily="Space Mono, ui-monospace, monospace"
-            fontSize="12"
+            fontSize="0.75rem"
           >
             SURfi
           </text>
@@ -57,7 +57,7 @@ export function ConnectFlowDiagram() {
             y="116"
             textAnchor="middle"
             className="fill-[#b5b0a6] dark:fill-white/30"
-            fontSize="10"
+            fontSize="0.6875rem"
           >
             {t("connect:flow.dataStaysHere")}
           </text>
@@ -161,7 +161,7 @@ export function ConnectFlowDiagram() {
             y="88"
             textAnchor="middle"
             className="fill-[#504f4f] dark:fill-white/50"
-            fontSize="12"
+            fontSize="0.75rem"
           >
             {t("connect:flow.aggregators")}
           </text>
@@ -170,7 +170,7 @@ export function ConnectFlowDiagram() {
             y="104"
             textAnchor="middle"
             className="fill-[#b5b0a6] dark:fill-white/30"
-            fontSize="10"
+            fontSize="0.6875rem"
           >
             {t("connect:flow.aggregatorExample")}
           </text>

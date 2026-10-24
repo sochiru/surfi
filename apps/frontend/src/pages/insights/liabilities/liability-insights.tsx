@@ -6,9 +6,8 @@ import { Link } from "react-router-dom";
 import { useAlternativeHoldings } from "@/hooks/use-alternative-assets";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import type { AlternativeAssetHolding } from "@/lib/types";
-import { AmountDisplay, EmptyPlaceholder, Icons } from "@wealthfolio/ui";
+import { AmountDisplay, EmptyPlaceholder, Icons, buttonVariants } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 
@@ -121,9 +120,9 @@ export function LiabilityInsights() {
         title={t("insights:liabilities.empty_title")}
         description={t("insights:liabilities.empty_description")}
       >
-        <Button asChild size="sm">
-          <Link to="/holdings?tab=liabilities">{t("insights:liabilities.add_liability")}</Link>
-        </Button>
+        <Link to="/holdings?tab=liabilities" className={buttonVariants({ size: "sm" })}>
+          {t("insights:liabilities.add_liability")}
+        </Link>
       </EmptyPlaceholder>
     );
   }

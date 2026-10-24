@@ -2,7 +2,8 @@ import { getIncomeSummary, searchActivities } from "@/adapters";
 import { DashboardCard } from "@/components/dashboard-card";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { AmountDisplay, Button, Skeleton } from "@wealthfolio/ui";
+import { AmountDisplay, Skeleton, buttonVariants } from "@wealthfolio/ui";
+import { cn } from "@wealthfolio/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
@@ -70,9 +71,12 @@ export function DividendsCard() {
             </p>
           )}
 
-          <Button asChild variant="outline" size="sm" className="w-full">
-            <Link to={DIVIDENDS_ROUTE}>Open dividends</Link>
-          </Button>
+          <Link
+            to={DIVIDENDS_ROUTE}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full")}
+          >
+            Open dividends
+          </Link>
         </div>
       )}
     </DashboardCard>

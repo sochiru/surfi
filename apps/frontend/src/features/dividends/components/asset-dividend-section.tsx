@@ -4,14 +4,15 @@ import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
 import {
   AmountDisplay,
-  Button,
   Card,
+  buttonVariants,
   CardContent,
   CardHeader,
   CardTitle,
   Skeleton,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { cn } from "@wealthfolio/ui/lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -95,18 +96,20 @@ function LabelWithInfo({ label, tip }: { label: string; tip: string }) {
   return (
     <div className="text-muted-foreground flex items-center gap-1 text-xs">
       <span>{label}</span>
-      <TooltipProvider delayDuration={200}>
+      <TooltipProvider>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground inline-flex"
-              aria-label={tip}
-            >
-              <Icons.Info className="size-3" />
-            </button>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground inline-flex"
+                aria-label={tip}
+              />
+            }
+          >
+            <Icons.Info className="size-3" />
           </TooltipTrigger>
-          <TooltipContent className="max-w-xs text-left">
+          <TooltipContent className="max-w-xs text-start">
             <p>{tip}</p>
           </TooltipContent>
         </Tooltip>
@@ -183,14 +186,15 @@ export function AssetDividendSection({ assetId, accountId = null }: Props) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="text-lg">Dividends</CardTitle>
-        <Button
-          asChild
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground h-8 px-2 text-xs"
+        <Link
+          to="/insights?tab=dividends"
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "sm" }),
+            "text-muted-foreground h-8 px-2 text-xs",
+          )}
         >
-          <Link to="/insights?tab=dividends">View all</Link>
-        </Button>
+          View all
+        </Link>
       </CardHeader>
       <CardContent className="space-y-4">
         {viewQuery.isLoading ? (

@@ -25,10 +25,8 @@ import ActivityImportPage from "@/pages/activity/import/activity-import-page";
 import AssetsPage from "@/pages/asset/assets-page";
 import PortfolioPage from "@/pages/dashboard/portfolio-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
-import IncomePage from "@/pages/income/income-page";
 import PortfolioInsightsPage from "@/pages/insights/portfolio-insights";
 import NotFoundPage from "@/pages/not-found";
-import PerformancePage from "@/pages/performance/performance-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
 import PortfoliosPage from "@/pages/settings/portfolios/portfolios-page";
@@ -109,11 +107,11 @@ export function AppRoutes() {
           <Route path="holdings/:assetId" element={<AssetProfilePage />} />
           <Route path="import" element={<ActivityImportPage />} />
           <Route path="accounts/:id" element={<AccountPage />} />
-          <Route path="income" element={<IncomePage />} />
+          <Route path="income" element={<Navigate to="/insights?tab=income" replace />} />
           <Route path="dividends" element={<Navigate to="/insights?tab=dividends" replace />} />
           <Route path="mp2" element={<Navigate to="/holdings?tab=cash" replace />} />
           <Route path="mp2/:accountId" element={<Mp2AccountRedirect />} />
-          <Route path="performance" element={<PerformancePage />} />
+          <Route path="performance" element={<Navigate to="/insights?tab=performance" replace />} />
           <Route path="insights" element={<PortfolioInsightsPage />} />
           <Route path="health" element={<HealthPage />} />
           <Route path="assistant" element={<AiAssistantPage />} />

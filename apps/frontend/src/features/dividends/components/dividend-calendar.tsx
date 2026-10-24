@@ -248,7 +248,7 @@ export function DividendCalendar({ events, isLoading }: Props) {
             <div className={cellClass}>{body}</div>
           ) : isMobile ? (
             <Sheet>
-              <SheetTrigger asChild>{trigger}</SheetTrigger>
+              <SheetTrigger render={trigger} />
               <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-3xl">
                 <SheetHeader className="text-left">
                   <SheetTitle>{format(day.date, "EEEE, PPP")}</SheetTitle>
@@ -263,7 +263,7 @@ export function DividendCalendar({ events, isLoading }: Props) {
             </Sheet>
           ) : (
             <Popover>
-              <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+              <PopoverTrigger render={trigger} />
               <PopoverContent align="start" className="max-h-[70vh] w-72 overflow-y-auto">
                 <div className="mb-2 text-sm font-semibold">{format(day.date, "EEEE, PPP")}</div>
                 <DayEvents events={dayEvents} />
