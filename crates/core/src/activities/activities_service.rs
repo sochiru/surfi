@@ -293,13 +293,19 @@ impl ActivityService {
         } else if matches!(activity_type, ACTIVITY_TYPE_FEE | ACTIVITY_TYPE_TAX) {
             ActivityEconomicsResolver::calculate_standalone_charge_amount(inputs)
         } else {
-            ActivityEconomicsResolver::calculate_composite_final_cash(
+            let gross = ActivityEconomicsResolver::calculate_composite_final_cash(
                 activity_type,
                 subtype,
                 quantity,
                 unit_price,
                 unit_multiplier,
-            )
+            )?;
+            let charges = fee
+                .unwrap_or(Decimal::ZERO)
+                .abs()
+                .checked_add(tax.unwrap_or(Decimal::ZERO).abs())?;
+            let net = gross.checked_sub(charges)?;
+            (!net.is_sign_negative()).then_some(net)
         }
     }
 
@@ -860,11 +866,13 @@ impl ActivityService {
 
     fn prepare_incomplete_sync_asset_income_for_review(activity: &mut NewActivity) {
         if activity.amount.is_none() {
-            activity.amount = ActivityEconomicsResolver::calculate_composite_final_cash(
+            activity.amount = Self::calculated_missing_final_amount(
                 &activity.activity_type,
                 activity.subtype.as_deref(),
                 activity.quantity,
                 activity.unit_price,
+                activity.fee,
+                activity.tax,
                 Decimal::ONE,
             );
         }

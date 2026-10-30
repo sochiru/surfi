@@ -1376,6 +1376,7 @@ describe("activity-utils", () => {
         quantity: "1",
         unitPrice: "0.2",
         amount: "0.2",
+        fee: "0",
       });
 
       const updated = applyTransactionUpdate({
@@ -1391,7 +1392,7 @@ describe("activity-utils", () => {
       expect(updated.amount).toBe("0.02");
     });
 
-    it("keeps asset-backed income charges separate from the final amount", () => {
+    it("reduces an auto-generated asset-backed income amount by its charges", () => {
       const accountLookup = new Map<string, { id: string; name: string; currency: string }>([
         ["account-1", { id: "account-1", name: "Test Account", currency: "USD" }],
       ]);
@@ -1401,6 +1402,7 @@ describe("activity-utils", () => {
         quantity: "2",
         unitPrice: "50",
         amount: "100",
+        fee: "0",
         tax: "15",
       });
 
@@ -1414,7 +1416,7 @@ describe("activity-utils", () => {
         resolveTransactionCurrency: () => "USD",
       });
 
-      expect(updated.amount).toBe("100");
+      expect(updated.amount).toBe("80");
       expect(updated.tax).toBe("20");
     });
 

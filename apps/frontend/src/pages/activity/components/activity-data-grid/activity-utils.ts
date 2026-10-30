@@ -323,6 +323,8 @@ function applyAutomaticFinalAmount(transaction: LocalTransaction): LocalTransact
       transaction.unitPrice,
       transaction.pendingInstrumentType ?? transaction.instrumentType,
       transaction.metadata?.contract_multiplier,
+      transaction.fee,
+      transaction.tax,
     );
   }
 
@@ -686,8 +688,9 @@ export function buildSavePayload(
     // trade totals from the resolved asset, and a client-computed preview
     // (possibly priced with an unresolved multiplier) must not be persisted.
     // Asset-backed income composites are the exception: their amount tracks
-    // quantity x price client-side (as in the dividend/interest forms)
-    // because the backend only derives composite amounts that are missing.
+    // quantity x price minus fee and tax client-side (as in the dividend
+    // and interest forms) because the backend only derives composite amounts
+    // that are missing.
     const sendsAmount =
       transaction._amountEdited ||
       isAssetBackedIncomeSubtype(transaction.activityType, transaction.subtype);

@@ -135,6 +135,8 @@ export function MobileDetailsStep({
   const toAccountId = watch("toAccountId" as any) as string | undefined;
   const currency = watch("currency");
   const quantity = watch("quantity");
+  const fee = watch("fee");
+  const tax = watch("tax");
   const unitPrice = watch("unitPrice");
   const sourceAmount = watch("sourceAmount" as any) as number | null | undefined;
   const transferRate = watch("transferRate" as any) as number | null | undefined;
@@ -468,7 +470,7 @@ export function MobileDetailsStep({
     if (isEditing && !shouldDirty) return;
     const computedAmount = isBuyOrSell
       ? calculatedTradeAmount
-      : calculateIncomeFinalAmount(quantity, unitPrice, symbolInstrumentType);
+      : calculateIncomeFinalAmount(quantity, unitPrice, symbolInstrumentType, undefined, fee, tax);
     if (computedAmount === undefined || Number(getValues("amount")) === computedAmount) return;
     setValue("amount" as any, computedAmount, {
       shouldDirty,
@@ -485,6 +487,8 @@ export function MobileDetailsStep({
     quantity,
     setValue,
     unitPrice,
+    fee,
+    tax,
   ]);
 
   // Quantity label adapts to asset type
