@@ -566,7 +566,7 @@ impl DividendSyncService {
                         currency: ccy.clone(),
                         fee: Some(Decimal::ZERO),
                         tax: Some(tax),
-                        amount: Some(gross),
+                        amount: Some(net),
                         status: Some(ActivityStatus::Posted),
                         notes: Some("Auto-created from market dividend history".into()),
                         fx_rate: None,
