@@ -135,7 +135,7 @@ fn compile_leg(leg: &Leg, account: &AccountFacts, facts: &CanonicalFacts) -> Eco
     let action = action_for(activity, &mut diagnostics);
     let contribution = contribution_for(activity, facts);
     let flow = flow_for(activity, facts, multiplier, cash.as_ref(), &mut diagnostics);
-    let attribution = attribution_for(activity, account, &action);
+    let attribution = attribution_for(activity, account, &action, multiplier);
 
     EconomicEvent {
         id: leg.event_id.clone(),
@@ -179,7 +179,10 @@ fn resolve_cash(
         });
     }
 
-    let Some(final_amount) = activity.amount else {
+    let Some(final_amount) = activity.amount.map(|amount| {
+        // A dividend saved as the generated share total is still gross.
+        settled_auto_gross_dividend(activity, multiplier, amount)
+    }) else {
         diagnostics.push(Diagnostic::warning(
             DiagnosticCode::MissingFinalCash,
             activity.id.as_str(),
@@ -395,7 +398,69 @@ fn action_for(activity: &Activity, diagnostics: &mut Vec<Diagnostic>) -> Action 
 /// on deposits, withdrawals and transfers are booked but knowingly not
 /// attributed. Credit-card interest is a charge on a liability (its cash is
 /// negative), so its amount is attributed as a fee, never as income.
-fn attribution_for(activity: &Activity, account: &AccountFacts, action: &Action) -> Attributed {
+/// A dividend whose amount is still quantity × price × multiplier. Charges
+/// have not been taken out of that generated total.
+fn auto_gross_dividend(activity: &Activity, multiplier: Decimal) -> bool {
+    if activity.kind != ActivityKind::Dividend
+        || matches!(activity.subtype, Some(Subtype::ReturnOfCapital))
+        || activity.quantity <= Decimal::ZERO
+        || activity.unit_price <= Decimal::ZERO
+        || multiplier <= Decimal::ZERO
+    {
+        return false;
+    }
+    let Some(amount) = activity.amount else {
+        return false;
+    };
+    let Some(gross) = arith::product(&[
+        activity.quantity.abs(),
+        activity.unit_price.abs(),
+        multiplier,
+    ]) else {
+        return false;
+    };
+    if gross <= Decimal::ZERO {
+        return false;
+    }
+    let Some(charges) = activity.fee.abs().checked_add(activity.tax.abs()) else {
+        return false;
+    };
+    if charges <= Decimal::ZERO {
+        return false;
+    }
+    let Some(net) = gross.checked_sub(charges) else {
+        return false;
+    };
+    if net.is_sign_negative() {
+        return false;
+    }
+    let tolerance = minor_unit(activity.currency.as_str()) / Decimal::TWO;
+    (amount.abs() - gross).abs() <= tolerance
+}
+
+fn settled_auto_gross_dividend(
+    activity: &Activity,
+    multiplier: Decimal,
+    amount: Decimal,
+) -> Decimal {
+    if !auto_gross_dividend(activity, multiplier) {
+        return amount;
+    }
+    activity
+        .fee
+        .abs()
+        .checked_add(activity.tax.abs())
+        .and_then(|charges| amount.abs().checked_sub(charges))
+        .filter(|net| !net.is_sign_negative())
+        .unwrap_or(amount)
+}
+
+fn attribution_for(
+    activity: &Activity,
+    account: &AccountFacts,
+    action: &Action,
+    multiplier: Decimal,
+) -> Attributed {
     use ActivityKind::*;
     let amount = activity.amount.unwrap_or(Decimal::ZERO);
     let (fee, tax) = (activity.fee, activity.tax);
@@ -411,10 +476,16 @@ fn attribution_for(activity: &Activity, account: &AccountFacts, action: &Action)
             ..Attributed::default()
         },
         Dividend | Interest => Attributed {
-            income: activity
-                .amount
-                .map(|amount| amount + fee + tax)
-                .unwrap_or(Decimal::ZERO),
+            // An auto-generated dividend amount is already the gross share
+            // total, so adding the charges again would count the tax twice.
+            income: if auto_gross_dividend(activity, multiplier) {
+                activity.amount.unwrap_or(Decimal::ZERO)
+            } else {
+                activity
+                    .amount
+                    .map(|amount| amount + fee + tax)
+                    .unwrap_or(Decimal::ZERO)
+            },
             fee,
             tax,
         },
@@ -613,6 +684,23 @@ mod tests {
             observed_snapshots: vec![],
         };
         compile(&normalize(facts).unwrap().facts)
+    }
+
+    #[test]
+    fn auto_gross_dividend_books_net_cash_and_gross_income() {
+        let mut dividend = raw("d", "a1", "DIVIDEND", "2025-01-02T10:00:00Z");
+        dividend.asset_id = Some("aapl".into());
+        dividend.quantity = Some(dec!(40));
+        dividend.unit_price = Some(dec!(5));
+        dividend.amount = Some(dec!(200));
+        dividend.tax = Some(dec!(20));
+        let ledger = ledger(vec![dividend], "SECURITIES");
+        let event = &ledger.events[0];
+        let cash = event.cash.as_ref().unwrap();
+        assert_eq!(cash.amount, dec!(180));
+        assert_eq!(cash.gross, Some(dec!(200)));
+        assert_eq!(event.attribution.income, dec!(200));
+        assert_eq!(event.attribution.tax, dec!(20));
     }
 
     #[test]

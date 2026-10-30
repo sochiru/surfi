@@ -179,10 +179,12 @@ impl ActivityEconomicsResolver {
         Ok(resolved)
     }
 
-    /// Runtime cash resolution is deliberately final-only. It never treats a
-    /// stored amount as legacy gross and never substitutes a derived amount for
-    /// a missing stored value. Derivation is restricted to proving direction
-    /// for exceptional charges-over-proceeds cases.
+    /// Runtime cash resolution is deliberately final-only. It never substitutes
+    /// a derived amount for a missing stored value. Derivation is restricted
+    /// to proving direction for exceptional charges-over-proceeds cases, and
+    /// to one dividend case: a saved amount that is still the generated share
+    /// total (quantity × price × multiplier) is gross, so fee and tax come
+    /// out of the cash. Any other dividend amount is already final.
     pub fn resolve_cash_inputs(inputs: ActivityCashInputs<'_>) -> ResolvedActivityCash {
         if inputs.activity_type == ACTIVITY_TYPE_SPLIT {
             return ResolvedActivityCash::default();
@@ -204,7 +206,10 @@ impl ActivityEconomicsResolver {
         let charges = fee.checked_add(tax);
         let expected_effect = Self::calculate_trade_cash_effect(inputs)
             .or_else(|| Self::calculate_standalone_charge_amount(inputs).map(|amount| -amount));
-        let final_amount = inputs.amount.map(|amount| amount.abs());
+        let final_amount = inputs
+            .amount
+            .map(|amount| amount.abs())
+            .map(|amount| Self::net_auto_gross_dividend(inputs, amount, charges));
         let signed_cash_effect = final_amount.map(|amount| {
             if amount.is_zero() {
                 return Decimal::ZERO;
@@ -311,6 +316,33 @@ impl ActivityEconomicsResolver {
             .checked_mul(unit_price?.abs())?
             .checked_mul(Self::valid_unit_multiplier(unit_multiplier))?;
         (!gross.is_zero()).then_some(gross)
+    }
+
+    /// A dividend amount equal to the share total has not had charges removed.
+    /// Returns that total minus the charges, or the stored amount when this
+    /// row is not that generated shape.
+    fn net_auto_gross_dividend(
+        inputs: ActivityCashInputs<'_>,
+        amount: Decimal,
+        charges: Option<Decimal>,
+    ) -> Decimal {
+        let Some(charges) = charges.filter(|charges| !charges.is_zero()) else {
+            return amount;
+        };
+        if inputs.activity_type != ACTIVITY_TYPE_DIVIDEND {
+            return amount;
+        }
+        let Some(gross) = Self::derived_positive_gross(inputs) else {
+            return amount;
+        };
+        let tolerance = currency_minor_unit(inputs.currency) / Decimal::TWO;
+        if (amount - gross).abs() > tolerance {
+            return amount;
+        }
+        match gross.checked_sub(charges) {
+            Some(net) if !net.is_sign_negative() => net,
+            _ => amount,
+        }
     }
 
     fn calculate_trade_cash_effect(inputs: ActivityCashInputs<'_>) -> Option<Decimal> {
@@ -466,6 +498,22 @@ mod cash_tests {
         assert_eq!(resolved.signed_cash_effect, Some(dec!(100)));
         assert_eq!(resolved.gross_amount, Some(dec!(115)));
         assert_eq!(resolved.signed_gross_effect, Some(dec!(115)));
+    }
+
+    #[test]
+    fn auto_gross_dividend_cash_is_net_of_charges() {
+        let mut dividend = inputs(ACTIVITY_TYPE_DIVIDEND);
+        dividend.quantity = Some(dec!(556));
+        dividend.unit_price = Some(dec!(1.5));
+        dividend.amount = Some(dec!(834));
+        dividend.fee = Some(Decimal::ZERO);
+        dividend.tax = Some(dec!(83.4));
+
+        let resolved = ActivityEconomicsResolver::resolve_cash_inputs(dividend);
+
+        assert_eq!(resolved.final_amount, Some(dec!(750.6)));
+        assert_eq!(resolved.signed_cash_effect, Some(dec!(750.6)));
+        assert_eq!(resolved.gross_amount, Some(dec!(834)));
     }
 
     #[test]

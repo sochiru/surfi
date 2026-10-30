@@ -233,6 +233,7 @@ export function DividendForm({
   const subtype = watch("subtype");
   const quantity = watch("quantity");
   const unitPrice = watch("unitPrice");
+  const tax = watch("tax");
   const amountWasEdited = useRef(false);
   const isAssetBacked =
     subtype === ACTIVITY_SUBTYPES.DRIP || subtype === ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND;
@@ -247,24 +248,29 @@ export function DividendForm({
       quantity,
       unitPrice,
       getValues("symbolInstrumentType"),
+      undefined,
+      undefined,
+      tax,
     );
     if (computedAmount === undefined) return;
     const currentAmount = Number(getValues("amount"));
     const quantityIsDirty = getFieldState("quantity").isDirty;
     const unitPriceIsDirty = getFieldState("unitPrice").isDirty;
+    const taxIsDirty = getFieldState("tax").isDirty;
     const shouldAutoSetAmount =
       quantityIsDirty ||
       unitPriceIsDirty ||
+      taxIsDirty ||
       !(Number.isFinite(currentAmount) && currentAmount >= 0);
     if (q > 0 && p > 0 && shouldAutoSetAmount) {
       if (currentAmount !== computedAmount) {
         setValue("amount", computedAmount, {
-          shouldDirty: quantityIsDirty || unitPriceIsDirty,
+          shouldDirty: quantityIsDirty || unitPriceIsDirty || taxIsDirty,
           shouldValidate: false,
         });
       }
     }
-  }, [getFieldState, getValues, isAssetBacked, quantity, setValue, unitPrice]);
+  }, [getFieldState, getValues, isAssetBacked, quantity, setValue, tax, unitPrice]);
 
   const handleDividendModeChange = (value: string) => {
     setValue("subtype", value === INCOME_MODE_CASH ? null : value, {

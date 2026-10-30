@@ -259,6 +259,20 @@ describe("Activity Utilities", () => {
       expect(calculateActivityCashImpact(activity)).toBe(100);
     });
 
+    it("nets a dividend whose amount is still the generated share total", () => {
+      const activity = createActivity({
+        activityType: ActivityType.DIVIDEND,
+        quantity: "556",
+        unitPrice: "1.5",
+        amount: "834",
+        fee: "0",
+        tax: "83.4",
+      });
+
+      expect(calculateActivityValue(activity)).toBe(750.6);
+      expect(calculateActivityCashImpact(activity)).toBe(750.6);
+    });
+
     it("does not replace a missing final amount", () => {
       const activity = createActivity({ amount: null });
 

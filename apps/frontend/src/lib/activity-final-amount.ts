@@ -96,14 +96,19 @@ export function calculateIncomeFinalAmount(
   unitPrice: unknown,
   instrumentType?: unknown,
   contractMultiplier?: unknown,
+  fee?: unknown,
+  tax?: unknown,
 ): number | undefined {
   const q = Number(quantity);
   const price = Number(unitPrice);
   if (!(q > 0) || !(price > 0)) return undefined;
   // Mirrors calculate_composite_final_cash (economic_events.rs) with the
   // multiplier defaults from Asset::contract_multiplier (assets_model.rs), which
-  // includes the asset's unit multiplier.
-  return roundDecimal(
-    q * price * resolveActivityCashMultiplier(instrumentType, contractMultiplier),
-  );
+  // includes the asset's unit multiplier. The product is the gross dividend;
+  // the saved amount is the cash that lands, after fee and withholding.
+  const gross = q * price * resolveActivityCashMultiplier(instrumentType, contractMultiplier);
+  const charges = Math.abs(Number(fee) || 0) + Math.abs(Number(tax) || 0);
+  const net = gross - charges;
+  if (!(net >= 0)) return undefined;
+  return roundDecimal(net);
 }

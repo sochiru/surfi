@@ -360,6 +360,8 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
     const derived = quantity * unitPrice * activityCashMultiplier(activity);
     if (Number.isFinite(derived) && derived > 0) return derived;
   }
+  const autoNet = netAutoGrossDividend(activity);
+  if (autoNet !== undefined) return autoNet;
   const value = Number(activity.amount ?? 0);
   return Number.isFinite(value) ? Math.abs(value) : 0;
 };
@@ -367,7 +369,8 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
 /**
  * Derives the signed ledger movement from the authoritative final amount.
  * This is presentation-only cash-audit logic; it never replaces a missing
- * amount or changes persisted economics.
+ * amount. A dividend whose saved amount is still the generated share total
+ * is the exception: its cash is that total minus fee and tax.
  */
 export const calculateActivityCashImpact = (
   activity: ActivityDetails,
@@ -383,7 +386,8 @@ export const calculateActivityCashImpact = (
 
   if (isAssetBackedIncomeSubtype(activity.activityType, activity.subtype)) return 0;
 
-  const amount = Math.abs(Number(activity.amount ?? 0));
+  const autoNet = netAutoGrossDividend(activity);
+  const amount = autoNet ?? Math.abs(Number(activity.amount ?? 0));
   if (!Number.isFinite(amount) || amount === 0) return 0;
 
   switch (activity.activityType) {
@@ -411,6 +415,35 @@ export const calculateActivityCashImpact = (
  * Keep in lockstep with the SELL reversal check in
  * crates/core/src/portfolio/economic_events.rs, including the epsilon.
  */
+/**
+ * A dividend whose saved amount is still the generated share total
+ * (quantity × price × multiplier) has not had its fee and tax taken out.
+ * The cash figure is that total minus the charges. An amount that differs
+ * from the share total is already the final cash and is left alone.
+ */
+function netAutoGrossDividend(activity: ActivityDetails): number | undefined {
+  if (activity.activityType !== ActivityType.DIVIDEND) return undefined;
+  if (activity.subtype === ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL) return undefined;
+
+  const quantity = Math.abs(Number(activity.quantity));
+  const unitPrice = Math.abs(Number(activity.unitPrice));
+  const multiplier = activityCashMultiplier(activity);
+  const amount = Math.abs(Number(activity.amount));
+  const fee = Math.abs(Number(activity.fee ?? 0));
+  const tax = Math.abs(Number(activity.tax ?? 0));
+  if (![quantity, unitPrice, multiplier, amount, fee, tax].every(Number.isFinite)) return undefined;
+  if (!(quantity > 0) || !(unitPrice > 0) || !(multiplier > 0)) return undefined;
+
+  const charges = fee + tax;
+  if (!(charges > 0)) return undefined;
+  const gross = quantity * unitPrice * multiplier;
+  const tolerance = Math.max(currencyMinorUnit(activity.currency) / 2, amount * 1e-8);
+  if (Math.abs(amount - gross) > tolerance) return undefined;
+
+  const net = gross - charges;
+  return net >= 0 ? net : undefined;
+}
+
 function isProvenNegativeSell(activity: ActivityDetails, finalAmount: number): boolean {
   const quantity = Math.abs(Number(activity.quantity));
   const unitPrice = Math.abs(Number(activity.unitPrice));
