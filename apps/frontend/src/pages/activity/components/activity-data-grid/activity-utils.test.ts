@@ -1376,6 +1376,7 @@ describe("activity-utils", () => {
         quantity: "1",
         unitPrice: "0.2",
         amount: "0.2",
+        fee: "0",
       });
 
       const updated = applyTransactionUpdate({
