@@ -49,9 +49,15 @@ impl CashLedgerEvent {
     }
 
     pub fn signed_cash_delta(&self) -> Decimal {
-        // Withholding reduces the settled cash exactly as the snapshot calculator
-        // books it, so the balance we compound on matches the portfolio engine.
-        signed_cash_delta(&self.activity_type, self.amount, self.fee + self.tax)
+        // A saved interest amount is already the cash that landed. Withholding
+        // stays in `tax` and must not be removed again. Other rows still treat
+        // a stored amount as gross of withholding.
+        let charges = if self.is_interest() {
+            self.fee
+        } else {
+            self.fee + self.tax
+        };
+        signed_cash_delta(&self.activity_type, self.amount, charges)
     }
 
     pub fn is_interest(&self) -> bool {

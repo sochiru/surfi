@@ -432,10 +432,11 @@ fn reconcile(
 ) {
     match ctx.existing_auto.get(&planned.idempotency_key) {
         Some((id, previous_amount, previous_tax)) => {
-            if *previous_amount == planned.amount && *previous_tax == planned.tax {
+            // A saved interest amount is the settled cash, so it matches `net()`.
+            if *previous_amount == planned.net() && *previous_tax == planned.tax {
                 return;
             }
-            acc.running += sign(planned.net() - (previous_amount - previous_tax));
+            acc.running += sign(planned.net() - previous_amount);
             acc.plan.amendments.push(PlannedAmendment {
                 activity_id: id.clone(),
                 previous_amount: *previous_amount,
@@ -1090,7 +1091,7 @@ mod tests {
             NaiveDate::from_ymd_opt(2024, 3, 1).unwrap(),
         );
         let jan = &planned.creates[0];
-        // Gross is booked on the activity; the tax field carries the deduction.
+        // The plan keeps the gross in `amount`. The saved activity stores `net()`.
         assert_eq!(jan.amount, dec!(424.66));
         assert_eq!(jan.tax, dec!(84.93));
         assert_eq!(jan.net(), dec!(339.73));

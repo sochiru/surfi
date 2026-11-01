@@ -145,7 +145,8 @@ impl InterestAccrualService {
             currency: currency.to_string(),
             fee: Some(Decimal::ZERO),
             tax: Some(planned.tax),
-            amount: Some(planned.amount),
+            // The saved amount is the cash that lands. Tax stays in its own column.
+            amount: Some(planned.net()),
             status: Some(ActivityStatus::Posted),
             notes: Some(notes),
             fx_rate: None,
@@ -182,7 +183,7 @@ impl InterestAccrualService {
             currency: currency.to_string(),
             fee: Some(Some(Decimal::ZERO)),
             tax: Some(Some(planned.tax)),
-            amount: Some(Some(planned.amount)),
+            amount: Some(Some(planned.net())),
             status: Some(ActivityStatus::Posted),
             needs_review: Some(false),
             notes: Some(Self::describe(planned)),
@@ -297,7 +298,7 @@ impl InterestAccrualService {
             }
             for item in &planned.amendments {
                 if item.planned.kind == PlannedKind::Interest {
-                    net_cash += item.planned.net() - (item.previous_amount - item.previous_tax);
+                    net_cash += item.planned.net() - item.previous_amount;
                 }
                 updates.push(Self::amend_activity(
                     &account.id,
