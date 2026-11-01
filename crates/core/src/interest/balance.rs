@@ -75,7 +75,13 @@ fn cash_delta(activity: &Activity) -> Decimal {
         return Decimal::ZERO;
     }
 
-    let net = activity.amt() - activity.fee_amt() - activity.tax_amt();
+    // Interest is stored as the cash that landed. Other rows still carry
+    // withholding beside a gross amount.
+    let net = if activity.effective_type() == ACTIVITY_TYPE_INTEREST {
+        activity.amt() - activity.fee_amt()
+    } else {
+        activity.amt() - activity.fee_amt() - activity.tax_amt()
+    };
     match activity.effective_type() {
         ACTIVITY_TYPE_DEPOSIT
         | ACTIVITY_TYPE_INTEREST
