@@ -27,6 +27,8 @@ import type { ExternalUpdateSource } from "@/lib/types";
 interface DismissedUpdate {
   version: string;
   dismissedAt: number;
+  /** Closed rather than snoozed: the version stays dismissed until a manual check. */
+  permanent?: boolean;
 }
 
 const SNOOZE_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
@@ -39,6 +41,7 @@ function formatBytes(bytes: number): string {
 
 function isDismissed(dismissed: DismissedUpdate | null, version: string): boolean {
   if (dismissed?.version !== version) return false;
+  if (dismissed.permanent) return true;
   return Date.now() - dismissed.dismissedAt < SNOOZE_DURATION_MS;
 }
 
@@ -93,13 +96,21 @@ export function UpdateDialog() {
     }
   }, [updateInfo, dismissedUpdate]);
 
-  // X button, Escape, backdrop — dismiss for current session only
+  // X button, Escape, backdrop — dismiss this version. Remembered so a refetch
+  // (any unscoped query invalidation) or a reload does not reopen it.
   const handleDismiss = useCallback(() => {
     if (isPending) return;
+    if (updateInfo?.latestVersion) {
+      setDismissedUpdate({
+        version: updateInfo.latestVersion,
+        dismissedAt: Date.now(),
+        permanent: true,
+      });
+    }
     setIsOpen(false);
     clearUpdate();
     reset();
-  }, [isPending, clearUpdate, reset]);
+  }, [isPending, updateInfo?.latestVersion, setDismissedUpdate, clearUpdate, reset]);
 
   // "Remind me later" — snooze for 3 days
   const handleSnooze = useCallback(() => {
