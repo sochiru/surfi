@@ -253,7 +253,7 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
           /* Main grid: Chart on left, Details on right */
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {/* Left: Value history chart with value/gain/equity in header */}
-            <Card className="col-span-1 md:col-span-2">
+            <Card className="col-span-1 overflow-hidden md:col-span-2">
               <CardHeader className="flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-md">
                   <div>
@@ -265,9 +265,7 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
                       />
                     </p>
                     {gainAmount !== null && gainPercent !== null && (
-                      <p
-                        className={`text-sm ${gainAmount >= 0 ? "text-success" : "text-destructive"}`}
-                      >
+                      <p className={`text-sm ${gainAmount >= 0 ? "text-gain" : "text-loss"}`}>
                         <AmountDisplay
                           value={gainAmount}
                           currency={holding.currency}
@@ -290,7 +288,7 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
                     />
                   </>
                 ) : (
-                  <div className="h-50 flex items-center justify-center">
+                  <div className="flex h-50 items-center justify-center">
                     <Empty>
                       <EmptyHeader>
                         <EmptyMedia variant="icon">
@@ -557,7 +555,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
             </div>
             <div>
               <div
-                className={`text-xl font-extrabold ${netEquity >= 0 ? "text-success" : "text-destructive"}`}
+                className={`text-xl font-extrabold ${netEquity >= 0 ? "text-gain" : "text-loss"}`}
               >
                 <AmountDisplay
                   value={netEquity}

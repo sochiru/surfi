@@ -270,7 +270,7 @@ export function DividendAutomationSettings() {
               </AlertDialogContent>
             </AlertDialog>
           </div>
-          {message ? <p className="text-muted-foreground break-words text-sm">{message}</p> : null}
+          {message ? <p className="text-muted-foreground text-sm break-words">{message}</p> : null}
         </CardContent>
       </Card>
     </div>

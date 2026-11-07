@@ -189,6 +189,8 @@ impl InterestAccrualService {
             notes: Some(Self::describe(planned)),
             fx_rate: None,
             metadata: Some(Self::metadata(planned, compounding)),
+            unlink_transfer_pair_id: None,
+            split_review: None,
         }
     }
 
