@@ -77,6 +77,36 @@ it("the actual update dialog reopens after snooze and a manual check", async () 
   client.clear();
 });
 
+it("a closed update stays closed through refetches and remounts until a manual check", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const tree = (
+    <QueryClientProvider client={client}>
+      <FormattingProvider locale="en-US">
+        <ManualCheck />
+        <UpdateDialog />
+      </FormattingProvider>
+    </QueryClientProvider>
+  );
+  const view = render(tree);
+  expect(await screen.findByText("New Update Available")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: common.component.close_dialog }));
+  await waitFor(() => expect(screen.queryByText("New Update Available")).not.toBeInTheDocument());
+
+  const checksBefore = vi.mocked(checkForUpdates).mock.calls.length;
+  await client.invalidateQueries();
+  await waitFor(() =>
+    expect(vi.mocked(checkForUpdates).mock.calls.length).toBeGreaterThan(checksBefore),
+  );
+  view.unmount();
+  render(tree);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.queryByText("New Update Available")).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Check now" }));
+  expect(await screen.findByText("New Update Available")).toBeVisible();
+  client.clear();
+});
+
 it.each([
   [
     { kind: "packager", explanation: "Update Wealthfolio with pacman." },

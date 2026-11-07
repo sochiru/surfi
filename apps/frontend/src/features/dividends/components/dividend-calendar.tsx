@@ -89,7 +89,7 @@ function DayEvents({ events }: { events: DividendCalendarEvent[] }) {
     <div className="space-y-3">
       {byAccount.map(([accountName, accountEvents]) => (
         <div key={accountName} className="space-y-1">
-          <div className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+          <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
             {accountName}
           </div>
           {accountEvents.map((event) => (

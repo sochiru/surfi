@@ -6,28 +6,12 @@
       "long_name": "New York Stock Exchange",
       "currency": "USD",
       "timezone": "America/New_York",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "bare": true,
-          "codes": [
-            "NYQ",
-            "NYS"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "bare": true,
-          "currency": "USD"
-        },
-        "FINNHUB": {
-          "bare": true
-        },
-        "MARKETDATA_APP": {
-          "bare": true
-        }
+        "YAHOO": { "bare": true, "codes": ["NYQ", "NYS"] },
+        "ALPHA_VANTAGE": { "bare": true, "currency": "USD" },
+        "FINNHUB": { "bare": true },
+        "MARKETDATA_APP": { "bare": true }
       }
     },
     {
@@ -36,30 +20,12 @@
       "long_name": "NASDAQ Stock Market",
       "currency": "USD",
       "timezone": "America/New_York",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "bare": true,
-          "codes": [
-            "NMS",
-            "NGM",
-            "NCM",
-            "NAS"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "bare": true,
-          "currency": "USD"
-        },
-        "FINNHUB": {
-          "bare": true
-        },
-        "MARKETDATA_APP": {
-          "bare": true
-        }
+        "YAHOO": { "bare": true, "codes": ["NMS", "NGM", "NCM", "NAS"] },
+        "ALPHA_VANTAGE": { "bare": true, "currency": "USD" },
+        "FINNHUB": { "bare": true },
+        "MARKETDATA_APP": { "bare": true }
       }
     },
     {
@@ -68,27 +34,12 @@
       "long_name": "NYSE American",
       "currency": "USD",
       "timezone": "America/New_York",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "bare": true,
-          "codes": [
-            "ASE"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "bare": true,
-          "currency": "USD"
-        },
-        "FINNHUB": {
-          "bare": true
-        },
-        "MARKETDATA_APP": {
-          "bare": true
-        }
+        "YAHOO": { "bare": true, "codes": ["ASE"] },
+        "ALPHA_VANTAGE": { "bare": true, "currency": "USD" },
+        "FINNHUB": { "bare": true },
+        "MARKETDATA_APP": { "bare": true }
       }
     },
     {
@@ -97,28 +48,12 @@
       "long_name": "NYSE Arca",
       "currency": "USD",
       "timezone": "America/New_York",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "bare": true,
-          "codes": [
-            "PCX",
-            "ARC"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "bare": true,
-          "currency": "USD"
-        },
-        "FINNHUB": {
-          "bare": true
-        },
-        "MARKETDATA_APP": {
-          "bare": true
-        }
+        "YAHOO": { "bare": true, "codes": ["PCX", "ARC"] },
+        "ALPHA_VANTAGE": { "bare": true, "currency": "USD" },
+        "FINNHUB": { "bare": true },
+        "MARKETDATA_APP": { "bare": true }
       }
     },
     {
@@ -127,27 +62,12 @@
       "long_name": "Cboe BZX Exchange",
       "currency": "USD",
       "timezone": "America/New_York",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "bare": true,
-          "codes": [
-            "BTS"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "bare": true,
-          "currency": "USD"
-        },
-        "FINNHUB": {
-          "bare": true
-        },
-        "MARKETDATA_APP": {
-          "bare": true
-        }
+        "YAHOO": { "bare": true, "codes": ["BTS"] },
+        "ALPHA_VANTAGE": { "bare": true, "currency": "USD" },
+        "FINNHUB": { "bare": true },
+        "MARKETDATA_APP": { "bare": true }
       }
     },
     {
@@ -156,19 +76,9 @@
       "long_name": "OTC Markets",
       "currency": "USD",
       "timezone": "America/New_York",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "bare": true,
-          "codes": [
-            "PNK",
-            "OQB",
-            "OQX"
-          ]
-        }
+        "YAHOO": { "bare": true, "codes": ["PNK", "OQB", "OQX"] }
       }
     },
     {
@@ -177,21 +87,10 @@
       "long_name": "Toronto Stock Exchange",
       "currency": "CAD",
       "timezone": "America/Toronto",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".TO",
-          "codes": [
-            "TOR"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".TRT",
-          "currency": "CAD"
-        }
+        "YAHOO": { "suffix": ".TO", "codes": ["TOR"] },
+        "ALPHA_VANTAGE": { "suffix": ".TRT", "currency": "CAD" }
       }
     },
     {
@@ -200,22 +99,10 @@
       "long_name": "TSX Venture Exchange",
       "currency": "CAD",
       "timezone": "America/Toronto",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".V",
-          "codes": [
-            "VAN",
-            "CVE"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".TRV",
-          "currency": "CAD"
-        }
+        "YAHOO": { "suffix": ".V", "codes": ["VAN", "CVE"] },
+        "ALPHA_VANTAGE": { "suffix": ".TRV", "currency": "CAD" }
       }
     },
     {
@@ -224,21 +111,10 @@
       "long_name": "Canadian Securities Exchange",
       "currency": "CAD",
       "timezone": "America/Toronto",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".CN",
-          "codes": [
-            "CNQ"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".CNQ",
-          "currency": "CAD"
-        }
+        "YAHOO": { "suffix": ".CN", "codes": ["CNQ"] },
+        "ALPHA_VANTAGE": { "suffix": ".CNQ", "currency": "CAD" }
       }
     },
     {
@@ -247,17 +123,9 @@
       "long_name": "Cboe Canada",
       "currency": "CAD",
       "timezone": "America/Toronto",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".NE",
-          "codes": [
-            "NEO"
-          ]
-        }
+        "YAHOO": { "suffix": ".NE", "codes": ["NEO"] }
       }
     },
     {
@@ -266,21 +134,10 @@
       "long_name": "Bolsa Mexicana de Valores",
       "currency": "MXN",
       "timezone": "America/Mexico_City",
-      "close": [
-        15,
-        0
-      ],
+      "close": [15, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".MX",
-          "codes": [
-            "MEX"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".MEX",
-          "currency": "MXN"
-        }
+        "YAHOO": { "suffix": ".MX", "codes": ["MEX"] },
+        "ALPHA_VANTAGE": { "suffix": ".MEX", "currency": "MXN" }
       }
     },
     {
@@ -289,22 +146,10 @@
       "long_name": "London Stock Exchange",
       "currency": "GBp",
       "timezone": "Europe/London",
-      "close": [
-        16,
-        30
-      ],
+      "close": [16, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".L",
-          "codes": [
-            "LSE",
-            "IOB"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".LON",
-          "currency": "GBP"
-        }
+        "YAHOO": { "suffix": ".L", "codes": ["LSE", "IOB"] },
+        "ALPHA_VANTAGE": { "suffix": ".LON", "currency": "GBP" }
       }
     },
     {
@@ -313,17 +158,9 @@
       "long_name": "Aquis Stock Exchange",
       "currency": "GBP",
       "timezone": "Europe/London",
-      "close": [
-        16,
-        30
-      ],
+      "close": [16, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".AQ",
-          "codes": [
-            "AQS"
-          ]
-        }
+        "YAHOO": { "suffix": ".AQ", "codes": ["AQS"] }
       }
     },
     {
@@ -332,17 +169,9 @@
       "long_name": "Cboe Europe Equities UK",
       "currency": "GBP",
       "timezone": "Europe/London",
-      "close": [
-        16,
-        30
-      ],
+      "close": [16, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".XC",
-          "codes": [
-            "CXE"
-          ]
-        }
+        "YAHOO": { "suffix": ".XC", "codes": ["CXE"] }
       }
     },
     {
@@ -351,17 +180,9 @@
       "long_name": "Cboe Europe Equities (EUR)",
       "currency": "EUR",
       "timezone": "Europe/London",
-      "close": [
-        16,
-        30
-      ],
+      "close": [16, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".XD",
-          "codes": [
-            "DXE"
-          ]
-        }
+        "YAHOO": { "suffix": ".XD", "codes": ["DXE"] }
       }
     },
     {
@@ -370,21 +191,10 @@
       "long_name": "Euronext Dublin",
       "currency": "EUR",
       "timezone": "Europe/Dublin",
-      "close": [
-        16,
-        30
-      ],
+      "close": [16, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".IR",
-          "codes": [
-            "ISE"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".DUB",
-          "currency": "EUR"
-        }
+        "YAHOO": { "suffix": ".IR", "codes": ["ISE"] },
+        "ALPHA_VANTAGE": { "suffix": ".DUB", "currency": "EUR" }
       }
     },
     {
@@ -393,22 +203,10 @@
       "long_name": "XETRA (Deutsche Börse)",
       "currency": "EUR",
       "timezone": "Europe/Berlin",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".DE",
-          "codes": [
-            "GER",
-            "XETRA"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".DEX",
-          "currency": "EUR"
-        }
+        "YAHOO": { "suffix": ".DE", "codes": ["GER", "XETRA"] },
+        "ALPHA_VANTAGE": { "suffix": ".DEX", "currency": "EUR" }
       }
     },
     {
@@ -417,21 +215,10 @@
       "long_name": "Frankfurt Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Berlin",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".F",
-          "codes": [
-            "FRA"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".FRK",
-          "currency": "EUR"
-        }
+        "YAHOO": { "suffix": ".F", "codes": ["FRA"] },
+        "ALPHA_VANTAGE": { "suffix": ".FRK", "currency": "EUR" }
       }
     },
     {
@@ -440,21 +227,10 @@
       "long_name": "Stuttgart Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Berlin",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".SG",
-          "codes": [
-            "STU"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".STU",
-          "currency": "EUR"
-        }
+        "YAHOO": { "suffix": ".SG", "codes": ["STU"] },
+        "ALPHA_VANTAGE": { "suffix": ".STU", "currency": "EUR" }
       }
     },
     {
@@ -463,17 +239,9 @@
       "long_name": "Hamburg Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Berlin",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".HM",
-          "codes": [
-            "HAM"
-          ]
-        }
+        "YAHOO": { "suffix": ".HM", "codes": ["HAM"] }
       }
     },
     {
@@ -482,17 +250,9 @@
       "long_name": "Düsseldorf Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Berlin",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".DU",
-          "codes": [
-            "DUS"
-          ]
-        }
+        "YAHOO": { "suffix": ".DU", "codes": ["DUS"] }
       }
     },
     {
@@ -501,17 +261,9 @@
       "long_name": "Munich Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Berlin",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".MU",
-          "codes": [
-            "MUN"
-          ]
-        }
+        "YAHOO": { "suffix": ".MU", "codes": ["MUN"] }
       }
     },
     {
@@ -520,17 +272,9 @@
       "long_name": "Berlin Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Berlin",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".BE",
-          "codes": [
-            "BER"
-          ]
-        }
+        "YAHOO": { "suffix": ".BE", "codes": ["BER"] }
       }
     },
     {
@@ -539,14 +283,9 @@
       "long_name": "Hanover Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Berlin",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".HA"
-        }
+        "YAHOO": { "suffix": ".HA" }
       }
     },
     {
@@ -555,22 +294,10 @@
       "long_name": "Euronext Paris",
       "currency": "EUR",
       "timezone": "Europe/Paris",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".PA",
-          "codes": [
-            "PAR",
-            "ENX"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".PAR",
-          "currency": "EUR"
-        }
+        "YAHOO": { "suffix": ".PA", "codes": ["PAR", "ENX"] },
+        "ALPHA_VANTAGE": { "suffix": ".PAR", "currency": "EUR" }
       }
     },
     {
@@ -579,17 +306,9 @@
       "long_name": "Euronext Amsterdam",
       "currency": "EUR",
       "timezone": "Europe/Amsterdam",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".AS",
-          "codes": [
-            "AMS"
-          ]
-        }
+        "YAHOO": { "suffix": ".AS", "codes": ["AMS"] }
       }
     },
     {
@@ -598,21 +317,10 @@
       "long_name": "Euronext Brussels",
       "currency": "EUR",
       "timezone": "Europe/Brussels",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".BR",
-          "codes": [
-            "BRU"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".BRU",
-          "currency": "EUR"
-        }
+        "YAHOO": { "suffix": ".BR", "codes": ["BRU"] },
+        "ALPHA_VANTAGE": { "suffix": ".BRU", "currency": "EUR" }
       }
     },
     {
@@ -621,21 +329,10 @@
       "long_name": "Euronext Lisbon",
       "currency": "EUR",
       "timezone": "Europe/Lisbon",
-      "close": [
-        16,
-        30
-      ],
+      "close": [16, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".LS",
-          "codes": [
-            "LIS"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".LIS",
-          "currency": "EUR"
-        }
+        "YAHOO": { "suffix": ".LS", "codes": ["LIS"] },
+        "ALPHA_VANTAGE": { "suffix": ".LIS", "currency": "EUR" }
       }
     },
     {
@@ -644,21 +341,10 @@
       "long_name": "Borsa Italiana (Milan)",
       "currency": "EUR",
       "timezone": "Europe/Rome",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".MI",
-          "codes": [
-            "MIL"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".MIL",
-          "currency": "EUR"
-        }
+        "YAHOO": { "suffix": ".MI", "codes": ["MIL"] },
+        "ALPHA_VANTAGE": { "suffix": ".MIL", "currency": "EUR" }
       }
     },
     {
@@ -667,21 +353,10 @@
       "long_name": "Bolsa de Madrid",
       "currency": "EUR",
       "timezone": "Europe/Madrid",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".MC",
-          "codes": [
-            "MCE"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".MCE",
-          "currency": "EUR"
-        }
+        "YAHOO": { "suffix": ".MC", "codes": ["MCE"] },
+        "ALPHA_VANTAGE": { "suffix": ".MCE", "currency": "EUR" }
       }
     },
     {
@@ -690,17 +365,9 @@
       "long_name": "Athens Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Athens",
-      "close": [
-        17,
-        20
-      ],
+      "close": [17, 20],
       "providers": {
-        "YAHOO": {
-          "suffix": ".AT",
-          "codes": [
-            "ATH"
-          ]
-        }
+        "YAHOO": { "suffix": ".AT", "codes": ["ATH"] }
       }
     },
     {
@@ -709,21 +376,10 @@
       "long_name": "Nasdaq Stockholm",
       "currency": "SEK",
       "timezone": "Europe/Stockholm",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".ST",
-          "codes": [
-            "STO"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".STO",
-          "currency": "SEK"
-        }
+        "YAHOO": { "suffix": ".ST", "codes": ["STO"] },
+        "ALPHA_VANTAGE": { "suffix": ".STO", "currency": "SEK" }
       }
     },
     {
@@ -732,21 +388,10 @@
       "long_name": "Nasdaq Helsinki",
       "currency": "EUR",
       "timezone": "Europe/Helsinki",
-      "close": [
-        18,
-        30
-      ],
+      "close": [18, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".HE",
-          "codes": [
-            "HEL"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".HEL",
-          "currency": "EUR"
-        }
+        "YAHOO": { "suffix": ".HE", "codes": ["HEL"] },
+        "ALPHA_VANTAGE": { "suffix": ".HEL", "currency": "EUR" }
       }
     },
     {
@@ -755,21 +400,10 @@
       "long_name": "Nasdaq Copenhagen",
       "currency": "DKK",
       "timezone": "Europe/Copenhagen",
-      "close": [
-        17,
-        0
-      ],
+      "close": [17, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".CO",
-          "codes": [
-            "CPH"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".CPH",
-          "currency": "DKK"
-        }
+        "YAHOO": { "suffix": ".CO", "codes": ["CPH"] },
+        "ALPHA_VANTAGE": { "suffix": ".CPH", "currency": "DKK" }
       }
     },
     {
@@ -778,21 +412,10 @@
       "long_name": "Oslo Stock Exchange",
       "currency": "NOK",
       "timezone": "Europe/Oslo",
-      "close": [
-        16,
-        20
-      ],
+      "close": [16, 20],
       "providers": {
-        "YAHOO": {
-          "suffix": ".OL",
-          "codes": [
-            "OSL"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".OSL",
-          "currency": "NOK"
-        }
+        "YAHOO": { "suffix": ".OL", "codes": ["OSL"] },
+        "ALPHA_VANTAGE": { "suffix": ".OSL", "currency": "NOK" }
       }
     },
     {
@@ -801,14 +424,9 @@
       "long_name": "Nasdaq Iceland",
       "currency": "ISK",
       "timezone": "Atlantic/Reykjavik",
-      "close": [
-        15,
-        30
-      ],
+      "close": [15, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".IC"
-        }
+        "YAHOO": { "suffix": ".IC" }
       }
     },
     {
@@ -817,22 +435,10 @@
       "long_name": "SIX Swiss Exchange",
       "currency": "CHF",
       "timezone": "Europe/Zurich",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".SW",
-          "codes": [
-            "EBS",
-            "SWX"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".SWX",
-          "currency": "CHF"
-        }
+        "YAHOO": { "suffix": ".SW", "codes": ["EBS", "SWX"] },
+        "ALPHA_VANTAGE": { "suffix": ".SWX", "currency": "CHF" }
       }
     },
     {
@@ -841,21 +447,10 @@
       "long_name": "Vienna Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Vienna",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".VI",
-          "codes": [
-            "VIE"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".VIE",
-          "currency": "EUR"
-        }
+        "YAHOO": { "suffix": ".VI", "codes": ["VIE"] },
+        "ALPHA_VANTAGE": { "suffix": ".VIE", "currency": "EUR" }
       }
     },
     {
@@ -864,18 +459,18 @@
       "long_name": "Warsaw Stock Exchange",
       "currency": "PLN",
       "timezone": "Europe/Warsaw",
-      "close": [
-        17,
-        0
-      ],
+      "close": [17, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".WA",
-          "codes": [
-            "WSE"
-          ]
-        }
+        "YAHOO": { "suffix": ".WA", "codes": ["WSE"] }
       }
+    },
+    {
+      "mic": "MISX",
+      "name": "MOEX",
+      "long_name": "Moscow Exchange",
+      "currency": "RUB",
+      "timezone": "Europe/Moscow",
+      "close": [18, 50]
     },
     {
       "mic": "XPRA",
@@ -883,17 +478,9 @@
       "long_name": "Prague Stock Exchange",
       "currency": "CZK",
       "timezone": "Europe/Prague",
-      "close": [
-        16,
-        25
-      ],
+      "close": [16, 25],
       "providers": {
-        "YAHOO": {
-          "suffix": ".PR",
-          "codes": [
-            "PRA"
-          ]
-        }
+        "YAHOO": { "suffix": ".PR", "codes": ["PRA"] }
       }
     },
     {
@@ -902,17 +489,9 @@
       "long_name": "Budapest Stock Exchange",
       "currency": "HUF",
       "timezone": "Europe/Budapest",
-      "close": [
-        17,
-        0
-      ],
+      "close": [17, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".BD",
-          "codes": [
-            "BUD"
-          ]
-        }
+        "YAHOO": { "suffix": ".BD", "codes": ["BUD"] }
       }
     },
     {
@@ -921,17 +500,9 @@
       "long_name": "Borsa Istanbul",
       "currency": "TRY",
       "timezone": "Europe/Istanbul",
-      "close": [
-        18,
-        0
-      ],
+      "close": [18, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".IS",
-          "codes": [
-            "IST"
-          ]
-        }
+        "YAHOO": { "suffix": ".IS", "codes": ["IST"] }
       }
     },
     {
@@ -940,17 +511,9 @@
       "long_name": "Bucharest Stock Exchange",
       "currency": "RON",
       "timezone": "Europe/Bucharest",
-      "close": [
-        17,
-        30
-      ],
+      "close": [17, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".RO",
-          "codes": [
-            "BVB"
-          ]
-        }
+        "YAHOO": { "suffix": ".RO", "codes": ["BVB"] }
       }
     },
     {
@@ -959,17 +522,9 @@
       "long_name": "Nasdaq Tallinn Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Tallinn",
-      "close": [
-        16,
-        30
-      ],
+      "close": [16, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".TL",
-          "codes": [
-            "TLX"
-          ]
-        }
+        "YAHOO": { "suffix": ".TL", "codes": ["TLX"] }
       }
     },
     {
@@ -978,17 +533,9 @@
       "long_name": "Nasdaq Riga Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Riga",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".RG",
-          "codes": [
-            "RIS"
-          ]
-        }
+        "YAHOO": { "suffix": ".RG", "codes": ["RIS"] }
       }
     },
     {
@@ -997,17 +544,9 @@
       "long_name": "Nasdaq Vilnius Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Vilnius",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".VS",
-          "codes": [
-            "VSE"
-          ]
-        }
+        "YAHOO": { "suffix": ".VS", "codes": ["VSE"] }
       }
     },
     {
@@ -1016,17 +555,9 @@
       "long_name": "Zagreb Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Zagreb",
-      "close": [
-        16,
-        30
-      ],
+      "close": [16, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".ZA",
-          "codes": [
-            "ZSE"
-          ]
-        }
+        "YAHOO": { "suffix": ".ZA", "codes": ["ZSE"] }
       }
     },
     {
@@ -1035,17 +566,9 @@
       "long_name": "Ljubljana Stock Exchange",
       "currency": "EUR",
       "timezone": "Europe/Ljubljana",
-      "close": [
-        16,
-        30
-      ],
+      "close": [16, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".LJ",
-          "codes": [
-            "LJU"
-          ]
-        }
+        "YAHOO": { "suffix": ".LJ", "codes": ["LJU"] }
       }
     },
     {
@@ -1054,21 +577,10 @@
       "long_name": "Shanghai Stock Exchange",
       "currency": "CNY",
       "timezone": "Asia/Shanghai",
-      "close": [
-        15,
-        0
-      ],
+      "close": [15, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".SS",
-          "codes": [
-            "SHH"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".SHH",
-          "currency": "CNY"
-        }
+        "YAHOO": { "suffix": ".SS", "codes": ["SHH"] },
+        "ALPHA_VANTAGE": { "suffix": ".SHH", "currency": "CNY" }
       }
     },
     {
@@ -1077,21 +589,10 @@
       "long_name": "Shenzhen Stock Exchange",
       "currency": "CNY",
       "timezone": "Asia/Shanghai",
-      "close": [
-        15,
-        0
-      ],
+      "close": [15, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".SZ",
-          "codes": [
-            "SHZ"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".SHZ",
-          "currency": "CNY"
-        }
+        "YAHOO": { "suffix": ".SZ", "codes": ["SHZ"] },
+        "ALPHA_VANTAGE": { "suffix": ".SHZ", "currency": "CNY" }
       }
     },
     {
@@ -1100,21 +601,10 @@
       "long_name": "Hong Kong Stock Exchange",
       "currency": "HKD",
       "timezone": "Asia/Hong_Kong",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".HK",
-          "codes": [
-            "HKG"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".HKG",
-          "currency": "HKD"
-        }
+        "YAHOO": { "suffix": ".HK", "codes": ["HKG"] },
+        "ALPHA_VANTAGE": { "suffix": ".HKG", "currency": "HKD" }
       }
     },
     {
@@ -1123,22 +613,10 @@
       "long_name": "Tokyo Stock Exchange",
       "currency": "JPY",
       "timezone": "Asia/Tokyo",
-      "close": [
-        15,
-        0
-      ],
+      "close": [15, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".T",
-          "codes": [
-            "TYO",
-            "JPX"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".TYO",
-          "currency": "JPY"
-        }
+        "YAHOO": { "suffix": ".T", "codes": ["TYO", "JPX"] },
+        "ALPHA_VANTAGE": { "suffix": ".TYO", "currency": "JPY" }
       }
     },
     {
@@ -1147,18 +625,9 @@
       "long_name": "Korea Exchange",
       "currency": "KRW",
       "timezone": "Asia/Seoul",
-      "close": [
-        15,
-        30
-      ],
+      "close": [15, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".KS",
-          "codes": [
-            "KSC",
-            "KRX"
-          ]
-        }
+        "YAHOO": { "suffix": ".KS", "codes": ["KSC", "KRX"] }
       }
     },
     {
@@ -1167,18 +636,9 @@
       "long_name": "KOSDAQ",
       "currency": "KRW",
       "timezone": "Asia/Seoul",
-      "close": [
-        15,
-        30
-      ],
+      "close": [15, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".KQ",
-          "codes": [
-            "KOE",
-            "KOSDAQ"
-          ]
-        }
+        "YAHOO": { "suffix": ".KQ", "codes": ["KOE", "KOSDAQ"] }
       }
     },
     {
@@ -1187,18 +647,9 @@
       "long_name": "Singapore Exchange",
       "currency": "SGD",
       "timezone": "Asia/Singapore",
-      "close": [
-        17,
-        0
-      ],
+      "close": [17, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".SI",
-          "codes": [
-            "SES",
-            "SGX"
-          ]
-        }
+        "YAHOO": { "suffix": ".SI", "codes": ["SES", "SGX"] }
       }
     },
     {
@@ -1207,18 +658,9 @@
       "long_name": "Stock Exchange of Thailand",
       "currency": "THB",
       "timezone": "Asia/Bangkok",
-      "close": [
-        16,
-        30
-      ],
+      "close": [16, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".BK",
-          "codes": [
-            "BKK",
-            "SET"
-          ]
-        }
+        "YAHOO": { "suffix": ".BK", "codes": ["BKK", "SET"] }
       }
     },
     {
@@ -1227,18 +669,9 @@
       "long_name": "Indonesia Stock Exchange",
       "currency": "IDR",
       "timezone": "Asia/Jakarta",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".JK",
-          "codes": [
-            "JKT",
-            "IDX"
-          ]
-        }
+        "YAHOO": { "suffix": ".JK", "codes": ["JKT", "IDX"] }
       }
     },
     {
@@ -1247,18 +680,9 @@
       "long_name": "Bursa Malaysia",
       "currency": "MYR",
       "timezone": "Asia/Kuala_Lumpur",
-      "close": [
-        17,
-        0
-      ],
+      "close": [17, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".KL",
-          "codes": [
-            "KLS",
-            "KLSE"
-          ]
-        }
+        "YAHOO": { "suffix": ".KL", "codes": ["KLS", "KLSE"] }
       }
     },
     {
@@ -1267,22 +691,10 @@
       "long_name": "Bombay Stock Exchange",
       "currency": "INR",
       "timezone": "Asia/Kolkata",
-      "close": [
-        15,
-        30
-      ],
+      "close": [15, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".BO",
-          "codes": [
-            "BSE",
-            "BOM"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".BSE",
-          "currency": "INR"
-        }
+        "YAHOO": { "suffix": ".BO", "codes": ["BSE", "BOM"] },
+        "ALPHA_VANTAGE": { "suffix": ".BSE", "currency": "INR" }
       }
     },
     {
@@ -1291,22 +703,10 @@
       "long_name": "National Stock Exchange of India",
       "currency": "INR",
       "timezone": "Asia/Kolkata",
-      "close": [
-        15,
-        30
-      ],
+      "close": [15, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".NS",
-          "codes": [
-            "NSI",
-            "NSE"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".NSE",
-          "currency": "INR"
-        }
+        "YAHOO": { "suffix": ".NS", "codes": ["NSI", "NSE"] },
+        "ALPHA_VANTAGE": { "suffix": ".NSE", "currency": "INR" }
       }
     },
     {
@@ -1315,18 +715,9 @@
       "long_name": "Taiwan Stock Exchange",
       "currency": "TWD",
       "timezone": "Asia/Taipei",
-      "close": [
-        13,
-        30
-      ],
+      "close": [13, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".TW",
-          "codes": [
-            "TAI",
-            "TPE"
-          ]
-        }
+        "YAHOO": { "suffix": ".TW", "codes": ["TAI", "TPE"] }
       }
     },
     {
@@ -1335,17 +726,9 @@
       "long_name": "Taipei Exchange",
       "currency": "TWD",
       "timezone": "Asia/Taipei",
-      "close": [
-        13,
-        30
-      ],
+      "close": [13, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".TWO",
-          "codes": [
-            "TWO"
-          ]
-        }
+        "YAHOO": { "suffix": ".TWO", "codes": ["TWO"] }
       }
     },
     {
@@ -1354,22 +737,10 @@
       "long_name": "Australian Securities Exchange",
       "currency": "AUD",
       "timezone": "Australia/Sydney",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".AX",
-          "codes": [
-            "ASX",
-            "AX"
-          ]
-        },
-        "ALPHA_VANTAGE": {
-          "suffix": ".AX",
-          "currency": "AUD"
-        }
+        "YAHOO": { "suffix": ".AX", "codes": ["ASX", "AX"] },
+        "ALPHA_VANTAGE": { "suffix": ".AX", "currency": "AUD" }
       }
     },
     {
@@ -1378,17 +749,9 @@
       "long_name": "New Zealand Exchange",
       "currency": "NZD",
       "timezone": "Pacific/Auckland",
-      "close": [
-        16,
-        45
-      ],
+      "close": [16, 45],
       "providers": {
-        "YAHOO": {
-          "suffix": ".NZ",
-          "codes": [
-            "NZE"
-          ]
-        }
+        "YAHOO": { "suffix": ".NZ", "codes": ["NZE"] }
       }
     },
     {
@@ -1397,18 +760,9 @@
       "long_name": "B3 (Brasil Bolsa Balcão)",
       "currency": "BRL",
       "timezone": "America/Sao_Paulo",
-      "close": [
-        17,
-        0
-      ],
+      "close": [17, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".SA",
-          "codes": [
-            "SAO",
-            "BVMF"
-          ]
-        }
+        "YAHOO": { "suffix": ".SA", "codes": ["SAO", "BVMF"] }
       }
     },
     {
@@ -1417,17 +771,9 @@
       "long_name": "Buenos Aires Stock Exchange",
       "currency": "ARS",
       "timezone": "America/Argentina/Buenos_Aires",
-      "close": [
-        17,
-        0
-      ],
+      "close": [17, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".BA",
-          "codes": [
-            "BUE"
-          ]
-        }
+        "YAHOO": { "suffix": ".BA", "codes": ["BUE"] }
       }
     },
     {
@@ -1436,17 +782,9 @@
       "long_name": "Santiago Stock Exchange",
       "currency": "CLP",
       "timezone": "America/Santiago",
-      "close": [
-        16,
-        0
-      ],
+      "close": [16, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".SN",
-          "codes": [
-            "SGO"
-          ]
-        }
+        "YAHOO": { "suffix": ".SN", "codes": ["SGO"] }
       }
     },
     {
@@ -1455,17 +793,9 @@
       "long_name": "Tel Aviv Stock Exchange",
       "currency": "ILA",
       "timezone": "Asia/Jerusalem",
-      "close": [
-        17,
-        25
-      ],
+      "close": [17, 25],
       "providers": {
-        "YAHOO": {
-          "suffix": ".TA",
-          "codes": [
-            "TLV"
-          ]
-        }
+        "YAHOO": { "suffix": ".TA", "codes": ["TLV"] }
       }
     },
     {
@@ -1474,17 +804,9 @@
       "long_name": "Saudi Stock Exchange (Tadawul)",
       "currency": "SAR",
       "timezone": "Asia/Riyadh",
-      "close": [
-        15,
-        0
-      ],
+      "close": [15, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".SAU",
-          "codes": [
-            "SAU"
-          ]
-        }
+        "YAHOO": { "suffix": ".SAU", "codes": ["SAU"] }
       }
     },
     {
@@ -1493,17 +815,9 @@
       "long_name": "Dubai Financial Market",
       "currency": "AED",
       "timezone": "Asia/Dubai",
-      "close": [
-        14,
-        0
-      ],
+      "close": [14, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".AE",
-          "codes": [
-            "DFM"
-          ]
-        }
+        "YAHOO": { "suffix": ".AE", "codes": ["DFM"] }
       }
     },
     {
@@ -1512,17 +826,9 @@
       "long_name": "Abu Dhabi Securities Exchange",
       "currency": "AED",
       "timezone": "Asia/Dubai",
-      "close": [
-        14,
-        0
-      ],
+      "close": [14, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".AE",
-          "codes": [
-            "ADX"
-          ]
-        }
+        "YAHOO": { "suffix": ".AE", "codes": ["ADX"] }
       }
     },
     {
@@ -1531,17 +837,9 @@
       "long_name": "Qatar Stock Exchange",
       "currency": "QAR",
       "timezone": "Asia/Qatar",
-      "close": [
-        13,
-        0
-      ],
+      "close": [13, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".QA",
-          "codes": [
-            "DOH"
-          ]
-        }
+        "YAHOO": { "suffix": ".QA", "codes": ["DOH"] }
       }
     },
     {
@@ -1550,18 +848,9 @@
       "long_name": "Johannesburg Stock Exchange",
       "currency": "ZAR",
       "timezone": "Africa/Johannesburg",
-      "close": [
-        17,
-        0
-      ],
+      "close": [17, 0],
       "providers": {
-        "YAHOO": {
-          "suffix": ".JO",
-          "codes": [
-            "JNB",
-            "JSE"
-          ]
-        }
+        "YAHOO": { "suffix": ".JO", "codes": ["JNB", "JSE"] }
       }
     },
     {
@@ -1570,17 +859,9 @@
       "long_name": "Egyptian Exchange",
       "currency": "EGP",
       "timezone": "Africa/Cairo",
-      "close": [
-        14,
-        30
-      ],
+      "close": [14, 30],
       "providers": {
-        "YAHOO": {
-          "suffix": ".CA",
-          "codes": [
-            "CAI"
-          ]
-        }
+        "YAHOO": { "suffix": ".CA", "codes": ["CAI"] }
       }
     },
     {
@@ -1589,14 +870,9 @@
       "long_name": "Philippine Stock Exchange",
       "currency": "PHP",
       "timezone": "Asia/Manila",
-      "close": [
-        14,
-        45
-      ],
+      "close": [14, 45],
       "providers": {
-        "EODHD": {
-          "suffix": ".PSE"
-        }
+        "EODHD": { "suffix": ".PSE" }
       }
     }
   ],
@@ -1606,103 +882,36 @@
       "name": "London Stock Exchange IOB",
       "currency": "GBp",
       "providers": {
-        "YAHOO": {
-          "suffix": ".IL"
-        }
+        "YAHOO": { "suffix": ".IL" }
       }
     }
   ],
   "currency_priority": {
-    "USD": [
-      "XNYS",
-      "XNAS",
-      "ARCX",
-      "BATS",
-      "XASE",
-      "OTCM"
-    ],
-    "CAD": [
-      "XTSE",
-      "XTSX",
-      "XCNQ",
-      "NEOE"
-    ],
-    "GBP": [
-      "XLON"
-    ],
-    "GBX": [
-      "XLON"
-    ],
-    "GBp": [
-      "XLON"
-    ],
-    "EUR": [
-      "XETR",
-      "XPAR",
-      "XAMS",
-      "XMIL",
-      "XMAD"
-    ],
-    "CHF": [
-      "XSWX"
-    ],
-    "HKD": [
-      "XHKG"
-    ],
-    "JPY": [
-      "XTKS"
-    ],
-    "AUD": [
-      "XASX"
-    ],
-    "NZD": [
-      "XNZE"
-    ],
-    "SGD": [
-      "XSES"
-    ],
-    "CNY": [
-      "XSHG",
-      "XSHE"
-    ],
-    "KRW": [
-      "XKRX",
-      "XKOS"
-    ],
-    "INR": [
-      "XNSE",
-      "XBOM"
-    ],
-    "BRL": [
-      "BVMF"
-    ],
-    "MXN": [
-      "XMEX"
-    ],
-    "SEK": [
-      "XSTO"
-    ],
-    "DKK": [
-      "XCSE"
-    ],
-    "NOK": [
-      "XOSL"
-    ],
-    "PLN": [
-      "XWAR"
-    ],
-    "ILS": [
-      "XTAE"
-    ],
-    "ILA": [
-      "XTAE"
-    ],
-    "ZAR": [
-      "XJSE"
-    ],
-    "TWD": [
-      "XTAI",
-      "ROCO"
-    ]
+    "USD": ["XNYS", "XNAS", "ARCX", "BATS", "XASE", "OTCM"],
+    "CAD": ["XTSE", "XTSX", "XCNQ", "NEOE"],
+    "GBP": ["XLON"],
+    "GBX": ["XLON"],
+    "GBp": ["XLON"],
+    "EUR": ["XETR", "XPAR", "XAMS", "XMIL", "XMAD"],
+    "CHF": ["XSWX"],
+    "HKD": ["XHKG"],
+    "JPY": ["XTKS"],
+    "AUD": ["XASX"],
+    "NZD": ["XNZE"],
+    "SGD": ["XSES"],
+    "CNY": ["XSHG", "XSHE"],
+    "KRW": ["XKRX", "XKOS"],
+    "INR": ["XNSE", "XBOM"],
+    "BRL": ["BVMF"],
+    "MXN": ["XMEX"],
+    "SEK": ["XSTO"],
+    "DKK": ["XCSE"],
+    "NOK": ["XOSL"],
+    "PLN": ["XWAR"],
+    "RUB": ["MISX"],
+    "ILS": ["XTAE"],
+    "ILA": ["XTAE"],
+    "ZAR": ["XJSE"],
+    "TWD": ["XTAI", "ROCO"]
   }
 }

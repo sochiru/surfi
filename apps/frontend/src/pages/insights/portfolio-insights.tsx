@@ -4,6 +4,8 @@ import {
   DividendInsights,
   DividendInsightsActions,
 } from "@/features/dividends/components/dividend-insights";
+import { useSpendingSettings } from "@/features/spending/hooks/use-spending-settings";
+import SpendingInsightsPage from "@/features/spending/pages/spending-insights-page";
 
 import { useAccountScopeStore } from "@/lib/account-scope-store";
 import IncomePage from "@/pages/income/income-page";
@@ -49,8 +51,10 @@ export default function PortfolioInsightsPage() {
   const accountFilter = useAccountScopeStore((state) => state.scope);
   const setAccountScope = useAccountScopeStore((state) => state.setScope);
   const [overviewToolbarActions, setOverviewToolbarActions] = useState<ReactNode | null>(null);
+  const [spendingToolbarActions, setSpendingToolbarActions] = useState<ReactNode | null>(null);
 
   const [customizeAction, setCustomizeAction] = useState<ReactNode | null>(null);
+  const { isEnabled: spendingEnabled } = useSpendingSettings();
 
   const holdingsActions = useMemo(
     () =>
@@ -74,8 +78,8 @@ export default function PortfolioInsightsPage() {
   );
 
   // Define the views with icons
-  const views: SwipablePageView[] = useMemo(
-    () => [
+  const views: SwipablePageView[] = useMemo(() => {
+    const items: SwipablePageView[] = [
       {
         value: "overview",
         label: t("insights:insights.tab_overview"),
@@ -133,9 +137,30 @@ export default function PortfolioInsightsPage() {
           </Suspense>
         ),
       },
-    ],
-    [accountFilter, dividendActions, holdingsActions, setAccountScope, t],
-  );
+    ];
+    if (spendingEnabled) {
+      items.push({
+        value: "spending",
+        label: t("dashboard:tabs.spending"),
+        icon: Icons.Wallet,
+        content: (
+          <Suspense fallback={<DashboardLoader />}>
+            <SpendingInsightsPage onToolbarActionsChange={setSpendingToolbarActions} />
+          </Suspense>
+        ),
+        actions: spendingToolbarActions,
+      });
+    }
+    return items;
+  }, [
+    accountFilter,
+    dividendActions,
+    holdingsActions,
+    setAccountScope,
+    spendingEnabled,
+    spendingToolbarActions,
+    t,
+  ]);
 
   return <SwipablePage views={views} defaultView="overview" withPadding={true} />;
 }
