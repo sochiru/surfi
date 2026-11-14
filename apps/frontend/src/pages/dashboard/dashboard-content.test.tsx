@@ -21,6 +21,9 @@ vi.mock("@/adapters", () => ({
   calculatePerformanceSummary: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-health", () => ({
+  useHealthStatus: () => ({ data: undefined, isLoading: false }),
+}));
 vi.mock("@/components/privacy-toggle", () => ({
   PrivacyToggle: () => <button onClick={uiMocks.togglePrivacy}>Hide Balance</button>,
 }));
@@ -185,6 +188,7 @@ describe("DashboardContent", () => {
     mockUseHoldings.mockReturnValue({
       holdings: [],
       isLoading: false,
+      isComplete: true,
       error: null,
     } as unknown as ReturnType<typeof useHoldings>);
     mockUseValuationHistory.mockReturnValue({
@@ -260,6 +264,7 @@ describe("DashboardContent", () => {
         },
       ],
       isLoading: false,
+      isComplete: true,
       error: null,
     } as unknown as ReturnType<typeof useHoldings>);
     mockUseValuationHistory.mockReturnValue({
@@ -289,6 +294,7 @@ describe("DashboardContent", () => {
     mockUseHoldings.mockReturnValue({
       holdings: [],
       isLoading: false,
+      isComplete: true,
       error: null,
     } as unknown as ReturnType<typeof useHoldings>);
     mockUseValuationHistory.mockReturnValue({
@@ -314,6 +320,7 @@ describe("DashboardContent", () => {
     mockUseHoldings.mockReturnValue({
       holdings: [],
       isLoading: false,
+      isComplete: true,
       error: null,
     } as unknown as ReturnType<typeof useHoldings>);
     mockUseValuationHistory.mockReturnValue({
@@ -356,6 +363,7 @@ describe("DashboardContent", () => {
     mockUseHoldings.mockReturnValue({
       holdings: [],
       isLoading: false,
+      isComplete: true,
       error: null,
     } as unknown as ReturnType<typeof useHoldings>);
     mockUseValuationHistory.mockReturnValue({
@@ -394,7 +402,7 @@ describe("DashboardContent", () => {
       mockUseSettingsContext.mockReturnValue({
         settings: { baseCurrency: "USD", timezone: "Asia/Shanghai" },
       } as ReturnType<typeof useSettingsContext>);
-      mockUseHoldings.mockReturnValue({ holdings: [], isLoading: false } as unknown as ReturnType<
+      mockUseHoldings.mockReturnValue({ holdings: [], isLoading: false, isComplete: true } as unknown as ReturnType<
         typeof useHoldings
       >);
       mockUseValuationHistory.mockReturnValue({ valuationHistory: [], isLoading: false });
@@ -418,7 +426,7 @@ describe("DashboardContent", () => {
     mockUseSettingsContext.mockReturnValue({ settings: { baseCurrency: "USD" } } as ReturnType<
       typeof useSettingsContext
     >);
-    mockUseHoldings.mockReturnValue({ holdings: [], isLoading: false } as unknown as ReturnType<
+    mockUseHoldings.mockReturnValue({ holdings: [], isLoading: false, isComplete: true } as unknown as ReturnType<
       typeof useHoldings
     >);
     mockUseValuationHistory.mockReturnValue({ valuationHistory: [], isLoading: false });
@@ -445,7 +453,7 @@ describe("DashboardContent", () => {
     mockUseSettingsContext.mockReturnValue({ settings: { baseCurrency: "USD" } } as ReturnType<
       typeof useSettingsContext
     >);
-    mockUseHoldings.mockReturnValue({ holdings: [], isLoading: false } as unknown as ReturnType<
+    mockUseHoldings.mockReturnValue({ holdings: [], isLoading: false, isComplete: true } as unknown as ReturnType<
       typeof useHoldings
     >);
     mockUseValuationHistory.mockReturnValue({ valuationHistory: [], isLoading: false });
@@ -455,7 +463,10 @@ describe("DashboardContent", () => {
 
     const privacy = screen.getByRole("button", { name: "Hide Balance" });
     expect(privacy.closest("a")).toBeNull();
-    await userEvent.tab();
+    // Header navigation comes before the balance controls in keyboard order.
+    for (let tabs = 0; tabs < 3 && document.activeElement !== privacy; tabs++) {
+      await userEvent.tab();
+    }
     expect(privacy).toHaveFocus();
     await new Promise((resolve) => setTimeout(resolve, 800));
     expect(screen.queryByRole("button", { name: "Update prices" })).not.toBeInTheDocument();

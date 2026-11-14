@@ -1,3 +1,5 @@
+import { SPENDING_ENTRY_PATH } from "./features/spending/lib/activity-entry";
+import SpendingActivityPage from "./features/spending/pages/spending-activity-page";
 import { memo, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useParams, type Location } from "react-router-dom";
 
@@ -11,6 +13,7 @@ import ConnectPage from "@/features/wealthfolio-connect/pages/connect-page";
 import ActivityManagerPage from "@/pages/activity/activity-manager-page";
 import ActivityPage from "@/pages/activity/activity-page";
 import ActivityImportPage from "@/pages/activity/import/activity-import-page";
+import { TransferReviewPage } from "@/pages/activity/transfer-review/transfer-review-page";
 import AssetsPage from "@/pages/asset/assets-page";
 import PortfolioPage from "@/pages/dashboard/portfolio-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
@@ -29,6 +32,7 @@ import AddonSettingsPage from "./pages/settings/addons/addon-settings";
 import AgentAccessPage from "./pages/settings/agent-access/agent-access-page";
 import AiProvidersPage from "./pages/settings/ai-providers/ai-providers-page";
 import ContributionLimitPage from "./pages/settings/contribution-limits/contribution-limits-page";
+import { ContributionLimitDetailPage } from "./pages/settings/contribution-limits/contribution-limit-detail-page";
 import DividendsSettingsPage from "./pages/settings/dividends/dividends-settings-page";
 import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
@@ -97,7 +101,12 @@ export const AppScreenRoutes = memo(function AppScreenRoutes({ location }: AppSc
       <Route index element={<PortfolioPage />} />
       <Route path="dashboard" element={<PortfolioPage />} />
       <Route path="activities" element={<ActivityPage />} />
+      <Route
+        path="activities/add"
+        element={<ActivityPage key="transfer-holdings" initialAction="transfer-holdings" />}
+      />
       <Route path="activities/manage" element={<ActivityManagerPage />} />
+      <Route path="activities/transfers" element={<TransferReviewPage />} />
       <Route path="holdings" element={<HoldingsPage />} />
       <Route path="holdings/:assetId" element={<AssetProfilePage />} />
       <Route path="import" element={<ActivityImportPage />} />
@@ -117,6 +126,7 @@ export const AppScreenRoutes = memo(function AppScreenRoutes({ location }: AppSc
       <Route path="goals/:goalId/guide" element={<GoalRetirementGuidePage />} />
       <Route path="goals/:goalId" element={<GoalDetailPage />} />
       <Route path="spending/insights" element={<SpendingInsightsRedirect />} />
+      <Route path={SPENDING_ENTRY_PATH} element={<SpendingActivityPage />} />
       <Route path="spending/budget" element={<SpendingBudgetPage />} />
       {/* Dynamic addon routes */}
       {dynamicRoutes.map(({ path, addonId, routeId }) => (
@@ -135,6 +145,7 @@ export const AppScreenRoutes = memo(function AppScreenRoutes({ location }: AppSc
         <Route path="about" element={<AboutSettingsPage />} />
         <Route path="exports" element={<ExportSettingsPage />} />
         <Route path="contribution-limits" element={<ContributionLimitPage />} />
+        <Route path="contribution-limits/:limitId" element={<ContributionLimitDetailPage />} />
         <Route path="dividends" element={<DividendsSettingsPage />} />
         <Route path="mp2" element={<Mp2SettingsPage />} />
         <Route path="spending" element={<SpendingSettingsPage />} />

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getDividendCalendarEvents, getHoldingsList, type DividendCalendarEvent } from "@/adapters";
-import type { AccountScope, Holding, PortfolioWithAccounts } from "@/lib/types";
+import type { AccountScope, HoldingsListResponse, PortfolioWithAccounts } from "@/lib/types";
 import { QueryKeys } from "@/lib/query-keys";
 import {
   AmountDisplay,
@@ -92,7 +92,7 @@ export function DividendInsights({ accountFilter }: DividendInsightsProps) {
     queryFn: getDividendCalendarEvents,
   });
 
-  const holdingsQuery = useQuery<Holding[], Error>({
+  const holdingsQuery = useQuery<HoldingsListResponse, Error>({
     queryKey: [QueryKeys.HOLDINGS, accountFilter],
     queryFn: () => getHoldingsList(accountFilter),
   });
@@ -137,7 +137,7 @@ export function DividendInsights({ accountFilter }: DividendInsightsProps) {
 
       <DividendIncomeChart
         events={filteredEvents}
-        holdings={holdingsQuery.data ?? []}
+        holdings={holdingsQuery.data?.holdings ?? []}
         isLoading={calendarQuery.isLoading || calendarQuery.isFetching || holdingsQuery.isLoading}
         fallbackCurrency={appSettings?.baseCurrency}
       />

@@ -127,6 +127,7 @@ describe("HoldingsPage account scope", () => {
     mocks.useHoldingsWithClosedProbe.mockReturnValue({
       holdings: [],
       isLoading: false,
+      isComplete: true,
       hasHiddenClosedPositions: false,
     });
   });
