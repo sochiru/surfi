@@ -1,13 +1,17 @@
 import { useMemo, type ReactNode } from "react";
 import { format, parseISO } from "date-fns";
+import { useTranslation } from "react-i18next";
 import {
   AmountDisplay,
+  AnimatedToggleGroup,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@wealthfolio/ui";
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   ChartContainer,
   ChartLegend,
@@ -20,7 +24,37 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import type { DividendCalendarEvent } from "@/adapters";
 import { useIsMobileViewport } from "@/hooks";
 import type { Holding } from "@/lib/types";
+import type { DividendGroupBy, DividendPeriodBounds } from "../lib/dividend-filters";
 import { buildDividendIncomeSummary, formatYieldPct } from "../lib/dividend-income-summary";
+
+export function UnconvertedDividendNotice({
+  currencies,
+  baseCurrency,
+}: {
+  currencies: string[];
+  baseCurrency: string;
+}) {
+  const { t, i18n } = useTranslation();
+  if (currencies.length === 0 || !baseCurrency) return null;
+  return (
+    <Alert variant="warning">
+      <Icons.AlertTriangle />
+      <AlertDescription>
+        {t("income:unconverted_currencies", {
+          count: currencies.length,
+          currencies: new Intl.ListFormat(i18n.language).format(currencies),
+          baseCurrency,
+        })}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+const GROUP_BY_ITEMS: { value: DividendGroupBy; label: string }[] = [
+  { value: "ticker", label: "Ticker" },
+  { value: "account", label: "Account" },
+  { value: "total", label: "Total" },
+];
 
 interface Props {
   events: DividendCalendarEvent[];
@@ -32,6 +66,10 @@ interface Props {
   compact?: boolean;
   /** Optional header action (e.g. link to dividend insights). */
   headerAction?: ReactNode;
+  /** Selected period; the full layout shows totals for it. Defaults to the last 12 months. */
+  bounds?: DividendPeriodBounds;
+  groupBy?: DividendGroupBy;
+  onGroupByChange?: (groupBy: DividendGroupBy) => void;
 }
 
 export function DividendIncomeChart({
@@ -41,16 +79,23 @@ export function DividendIncomeChart({
   fallbackCurrency = "",
   compact = false,
   headerAction,
+  bounds,
+  groupBy = "ticker",
+  onGroupByChange,
 }: Props) {
   const isMobile = useIsMobileViewport();
   const summary = useMemo(
-    () => buildDividendIncomeSummary(events, holdings, fallbackCurrency),
-    [events, holdings, fallbackCurrency],
+    () => buildDividendIncomeSummary(events, holdings, fallbackCurrency, { bounds, groupBy }),
+    [events, holdings, fallbackCurrency, bounds, groupBy],
   );
 
   const {
     ytd,
     week52,
+    received,
+    monthlyAverage,
+    payoutCount,
+    payerCount,
     ytdYield,
     week52Yield,
     marketValue,
@@ -59,7 +104,9 @@ export function DividendIncomeChart({
     chartConfig,
     currency,
     mixedCurrencies,
+    unconvertedCurrencies,
   } = summary;
+  const groupLabel = groupBy === "account" ? "account" : groupBy === "total" ? null : "ticker";
 
   if (isLoading) {
     return (
@@ -81,7 +128,7 @@ export function DividendIncomeChart({
         className={
           compact
             ? "flex flex-row items-start justify-between space-y-0 px-4 pb-2 sm:px-6"
-            : "px-4 sm:px-6"
+            : "flex flex-col gap-3 space-y-0 px-4 sm:flex-row sm:items-start sm:justify-between sm:px-6"
         }
       >
         <div className="min-w-0 space-y-1">
@@ -92,7 +139,7 @@ export function DividendIncomeChart({
               : "Recorded cash dividends and yield from your current holdings."}
             {!compact ? (
               <span className="hidden sm:inline">
-                {` Monthly totals are grouped by ticker. Yield is 52-week/YTD cash ÷ current investment market value${
+                {`${groupLabel ? ` Monthly totals are grouped by ${groupLabel}.` : ""} Yield is 52-week cash ÷ current investment market value${
                   fallbackCurrency ? ` (${fallbackCurrency})` : ""
                 }.${
                   mixedCurrencies
@@ -104,37 +151,75 @@ export function DividendIncomeChart({
           </CardDescription>
         </div>
         {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
+        {!compact && onGroupByChange ? (
+          <div className="shrink-0" data-no-swipe-drag>
+            <AnimatedToggleGroup
+              variant="secondary"
+              size={isMobile ? "xs" : "sm"}
+              items={GROUP_BY_ITEMS}
+              value={groupBy}
+              onValueChange={onGroupByChange}
+            />
+          </div>
+        ) : null}
       </CardHeader>
       <CardContent
         className={compact ? "space-y-4 px-4 sm:px-6" : "space-y-5 px-4 sm:space-y-6 sm:px-6"}
       >
-        <div
-          className={
-            compact
-              ? "grid grid-cols-2 gap-3 sm:grid-cols-4"
-              : "grid grid-cols-2 gap-x-3 gap-y-4 lg:grid-cols-4"
-          }
-        >
-          <div>
-            <div className="text-muted-foreground text-xs">YTD · year to date</div>
-            <div className={`font-semibold tabular-nums ${compact ? "text-lg" : "text-2xl"}`}>
-              <AmountDisplay value={ytd} currency={currency} />
+        <UnconvertedDividendNotice currencies={unconvertedCurrencies} baseCurrency={currency} />
+        {compact ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div>
+              <div className="text-muted-foreground text-xs">YTD · year to date</div>
+              <div className="text-lg font-semibold tabular-nums">
+                <AmountDisplay value={ytd} currency={currency} />
+              </div>
             </div>
-            {!compact ? <p className="text-muted-foreground text-xs">Jan 1 → today</p> : null}
+            <div>
+              <div className="text-muted-foreground text-xs">52-week</div>
+              <div className="text-lg font-semibold tabular-nums">
+                <AmountDisplay value={week52} currency={currency} />
+              </div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">52-week yield</div>
+              <div className="text-lg font-semibold tabular-nums">
+                {formatYieldPct(week52Yield)}
+              </div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">YTD yield</div>
+              <div className="text-lg font-semibold tabular-nums">{formatYieldPct(ytdYield)}</div>
+            </div>
           </div>
-          <div>
-            <div className="text-muted-foreground text-xs">52-week</div>
-            <div className={`font-semibold tabular-nums ${compact ? "text-lg" : "text-2xl"}`}>
-              <AmountDisplay value={week52} currency={currency} />
+        ) : (
+          <div className="grid grid-cols-2 gap-x-3 gap-y-4 lg:grid-cols-4">
+            <div>
+              <div className="text-muted-foreground text-xs">Received</div>
+              <div className="text-2xl font-semibold tabular-nums">
+                <AmountDisplay value={received} currency={currency} />
+              </div>
+              <p className="text-muted-foreground text-xs">In selected period</p>
             </div>
-            {!compact ? <p className="text-muted-foreground text-xs">Last 52 weeks</p> : null}
-          </div>
-          <div>
-            <div className="text-muted-foreground text-xs">52-week yield</div>
-            <div className={`font-semibold tabular-nums ${compact ? "text-lg" : "text-2xl"}`}>
-              {formatYieldPct(week52Yield)}
+            <div>
+              <div className="text-muted-foreground text-xs">Monthly average</div>
+              <div className="text-2xl font-semibold tabular-nums">
+                <AmountDisplay value={monthlyAverage} currency={currency} />
+              </div>
+              <p className="text-muted-foreground text-xs">Received ÷ months in period</p>
             </div>
-            {!compact ? (
+            <div>
+              <div className="text-muted-foreground text-xs">Payouts</div>
+              <div className="text-2xl font-semibold tabular-nums">{payoutCount}</div>
+              <p className="text-muted-foreground text-xs">
+                From {payerCount} holding{payerCount === 1 ? "" : "s"}
+              </p>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">52-week yield</div>
+              <div className="text-2xl font-semibold tabular-nums">
+                {formatYieldPct(week52Yield)}
+              </div>
               <p className="text-muted-foreground text-xs">
                 vs{" "}
                 {marketValue > 0 ? (
@@ -144,21 +229,18 @@ export function DividendIncomeChart({
                 )}{" "}
                 invested
               </p>
-            ) : null}
-          </div>
-          <div>
-            <div className="text-muted-foreground text-xs">YTD yield</div>
-            <div className={`font-semibold tabular-nums ${compact ? "text-lg" : "text-2xl"}`}>
-              {formatYieldPct(ytdYield)}
             </div>
-            {!compact ? <p className="text-muted-foreground text-xs">Not annualized</p> : null}
           </div>
-        </div>
+        )}
 
         {chartData.length === 0 || symbols.length === 0 ? (
           <EmptyPlaceholder
-            title="No recorded dividends yet"
-            description="Sync missing dividends or record DIVIDEND activities to populate this chart."
+            title={bounds ? "No dividends in this period" : "No recorded dividends yet"}
+            description={
+              bounds
+                ? "Choose a longer period, or sync missing dividends."
+                : "Sync missing dividends or record DIVIDEND activities to populate this chart."
+            }
           />
         ) : (
           <ChartContainer

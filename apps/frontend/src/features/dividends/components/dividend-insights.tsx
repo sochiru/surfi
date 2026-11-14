@@ -4,24 +4,30 @@ import { Link } from "react-router-dom";
 import { getDividendCalendarEvents, getHoldingsList, type DividendCalendarEvent } from "@/adapters";
 import type { AccountScope, HoldingsListResponse, PortfolioWithAccounts } from "@/lib/types";
 import { QueryKeys } from "@/lib/query-keys";
-import {
-  AmountDisplay,
-  Button,
-  Card,
-  buttonVariants,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wealthfolio/ui";
+import { Button, buttonVariants, DateRangeSelector } from "@wealthfolio/ui";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { cn } from "@wealthfolio/ui/lib/utils";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { usePortfolios } from "@/hooks/use-portfolios";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { DividendCalendar } from "./dividend-calendar";
 import { DividendIncomeChart } from "./dividend-income-chart";
+import { buildDividendFxTable } from "../lib/dividend-income-summary";
+import {
+  buildAnnualDividendIncome,
+  buildDividendPayers,
+  buildDividendRhythm,
+  buildDividendYearOutlook,
+  countMissingDividendPayouts,
+} from "../lib/dividend-outlook";
+import { DividendAnnualChart } from "./dividend-annual-chart";
+import { DividendCalendar } from "./dividend-calendar";
+import { DividendPayersTable } from "./dividend-payers-table";
+import { DividendRhythmCard } from "./dividend-rhythm";
+import { DividendYearOutlookCard } from "./dividend-year-outlook";
+import { useDividendFilters } from "../hooks/use-dividend-filters";
 import { useDividendSyncSettings, useSyncDividends } from "../hooks/use-dividend-sync";
+
+const DIVIDEND_HIDDEN_DATE_RANGES = ["1D", "1W"] as const;
 
 interface DividendInsightsProps {
   accountFilter: AccountScope;
@@ -44,6 +50,18 @@ function filterEventsByAccounts(
   if (!accountIds) return events;
   const allowed = new Set(accountIds);
   return events.filter((event) => allowed.has(event.accountId));
+}
+
+export function DividendPeriodSelector() {
+  const { today, range, setRange } = useDividendFilters();
+  return (
+    <DateRangeSelector
+      asOf={today}
+      value={range}
+      onChange={setRange}
+      hiddenRanges={DIVIDEND_HIDDEN_DATE_RANGES}
+    />
+  );
 }
 
 export function DividendInsightsActions() {
@@ -86,6 +104,8 @@ export function DividendInsights({ accountFilter }: DividendInsightsProps) {
   const { settings: appSettings } = useSettingsContext();
   const { data: portfolios = [] } = usePortfolios();
   const syncSettingsQuery = useDividendSyncSettings();
+  const syncMutation = useSyncDividends();
+  const { bounds, groupBy, setGroupBy } = useDividendFilters();
 
   const calendarQuery = useQuery({
     queryKey: [QueryKeys.DIVIDEND_CALENDAR],
@@ -102,15 +122,35 @@ export function DividendInsights({ accountFilter }: DividendInsightsProps) {
     return filterEventsByAccounts(calendarQuery.data ?? [], ids);
   }, [accountFilter, portfolios, calendarQuery.data]);
 
-  const upcoming = useMemo(() => {
-    const events = filteredEvents.filter((event) => event.kind === "upcoming_estimated");
-    const total = events.reduce((sum, event) => sum + Number(event.displayAmount), 0);
-    const nextDate = events
-      .map((event) => event.date)
-      .sort()
-      .at(0);
-    return { total, count: events.length, nextDate };
-  }, [filteredEvents]);
+  const dividendFx = useMemo(
+    () => buildDividendFxTable(holdingsQuery.data?.holdings ?? [], appSettings?.baseCurrency ?? ""),
+    [holdingsQuery.data?.holdings, appSettings?.baseCurrency],
+  );
+  const outlook = useMemo(
+    () => buildDividendYearOutlook(filteredEvents, dividendFx),
+    [filteredEvents, dividendFx],
+  );
+  const annual = useMemo(
+    () => buildAnnualDividendIncome(filteredEvents, dividendFx),
+    [filteredEvents, dividendFx],
+  );
+  const holdings = holdingsQuery.data?.holdings;
+  const payers = useMemo(
+    () => buildDividendPayers(filteredEvents, dividendFx, bounds, new Date(), holdings ?? []),
+    [filteredEvents, dividendFx, bounds, holdings],
+  );
+  const rhythm = useMemo(
+    () => buildDividendRhythm(filteredEvents, dividendFx),
+    [filteredEvents, dividendFx],
+  );
+  const missingPayouts = useMemo(
+    () => countMissingDividendPayouts(filteredEvents),
+    [filteredEvents],
+  );
+  const baseCurrency = appSettings?.baseCurrency ?? "";
+  // Totals wait for holdings, whose rates convert foreign payouts.
+  const totalsLoading =
+    calendarQuery.isLoading || calendarQuery.isFetching || holdingsQuery.isLoading;
 
   const syncSettings = syncSettingsQuery.data;
   const syncEnabled =
@@ -135,35 +175,50 @@ export function DividendInsights({ accountFilter }: DividendInsightsProps) {
         </Alert>
       ) : null}
 
+      {missingPayouts > 0 ? (
+        <Alert>
+          <AlertDescription className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              {missingPayouts} past payout{missingPayouts === 1 ? "" : "s"} not recorded.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto"
+              onClick={() => syncMutation.mutate()}
+              disabled={!syncEnabled || syncMutation.isPending}
+            >
+              {syncMutation.isPending ? (
+                <Icons.Spinner className="size-4 animate-spin" />
+              ) : (
+                "Sync now"
+              )}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <DividendIncomeChart
         events={filteredEvents}
-        holdings={holdingsQuery.data?.holdings ?? []}
-        isLoading={calendarQuery.isLoading || calendarQuery.isFetching || holdingsQuery.isLoading}
+        holdings={holdings ?? []}
+        isLoading={totalsLoading}
         fallbackCurrency={appSettings?.baseCurrency}
+        bounds={bounds}
+        groupBy={groupBy}
+        onGroupByChange={setGroupBy}
       />
 
-      <Card>
-        <CardHeader className="px-4 pb-2 sm:px-6">
-          <CardTitle className="text-lg">Upcoming</CardTitle>
-          <CardDescription>
-            {upcoming.count === 0
-              ? "No announced dividends ahead for the selected accounts."
-              : `${upcoming.count} announced payout${upcoming.count === 1 ? "" : "s"} × your current shares — an estimate only.`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-4 pb-4 sm:px-6">
-          <div className="text-2xl font-semibold tabular-nums">
-            <AmountDisplay
-              value={upcoming.total}
-              currency={appSettings?.baseCurrency ?? ""}
-              displayCurrency={false}
-            />
-          </div>
-          {upcoming.nextDate ? (
-            <p className="text-muted-foreground text-xs">Next payout {upcoming.nextDate}</p>
-          ) : null}
-        </CardContent>
-      </Card>
+      <DividendYearOutlookCard
+        outlook={outlook}
+        currency={baseCurrency}
+        isLoading={totalsLoading}
+      />
+
+      <DividendAnnualChart rows={annual} currency={baseCurrency} isLoading={totalsLoading} />
+
+      <DividendRhythmCard rhythm={rhythm} isLoading={totalsLoading} />
+
+      <DividendPayersTable summary={payers} currency={baseCurrency} isLoading={totalsLoading} />
 
       <DividendCalendar
         events={filteredEvents}

@@ -3,6 +3,7 @@ import { SwipablePage, SwipablePageView } from "@/components/page";
 import {
   DividendInsights,
   DividendInsightsActions,
+  DividendPeriodSelector,
 } from "@/features/dividends/components/dividend-insights";
 import { useSpendingSettings } from "@/features/spending/hooks/use-spending-settings";
 import SpendingInsightsPage from "@/features/spending/pages/spending-insights-page";
@@ -71,6 +72,7 @@ export default function PortfolioInsightsPage() {
     () => (
       <div className="flex items-center gap-1 sm:gap-2">
         <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
+        <DividendPeriodSelector />
         <DividendInsightsActions />
       </div>
     ),
