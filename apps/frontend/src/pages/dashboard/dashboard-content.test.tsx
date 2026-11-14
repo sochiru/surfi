@@ -402,9 +402,11 @@ describe("DashboardContent", () => {
       mockUseSettingsContext.mockReturnValue({
         settings: { baseCurrency: "USD", timezone: "Asia/Shanghai" },
       } as ReturnType<typeof useSettingsContext>);
-      mockUseHoldings.mockReturnValue({ holdings: [], isLoading: false, isComplete: true } as unknown as ReturnType<
-        typeof useHoldings
-      >);
+      mockUseHoldings.mockReturnValue({
+        holdings: [],
+        isLoading: false,
+        isComplete: true,
+      } as unknown as ReturnType<typeof useHoldings>);
       mockUseValuationHistory.mockReturnValue({ valuationHistory: [], isLoading: false });
       mockUseQuery.mockReturnValue({ data: undefined, isLoading: false } as ReturnType<
         typeof useQuery
@@ -426,9 +428,11 @@ describe("DashboardContent", () => {
     mockUseSettingsContext.mockReturnValue({ settings: { baseCurrency: "USD" } } as ReturnType<
       typeof useSettingsContext
     >);
-    mockUseHoldings.mockReturnValue({ holdings: [], isLoading: false, isComplete: true } as unknown as ReturnType<
-      typeof useHoldings
-    >);
+    mockUseHoldings.mockReturnValue({
+      holdings: [],
+      isLoading: false,
+      isComplete: true,
+    } as unknown as ReturnType<typeof useHoldings>);
     mockUseValuationHistory.mockReturnValue({ valuationHistory: [], isLoading: false });
     mockUseQuery.mockReturnValue({ data: null, isLoading: false } as ReturnType<typeof useQuery>);
     const scope = { type: "portfolio", portfolioId: "retirement" } as const;
@@ -453,9 +457,11 @@ describe("DashboardContent", () => {
     mockUseSettingsContext.mockReturnValue({ settings: { baseCurrency: "USD" } } as ReturnType<
       typeof useSettingsContext
     >);
-    mockUseHoldings.mockReturnValue({ holdings: [], isLoading: false, isComplete: true } as unknown as ReturnType<
-      typeof useHoldings
-    >);
+    mockUseHoldings.mockReturnValue({
+      holdings: [],
+      isLoading: false,
+      isComplete: true,
+    } as unknown as ReturnType<typeof useHoldings>);
     mockUseValuationHistory.mockReturnValue({ valuationHistory: [], isLoading: false });
     mockUseQuery.mockReturnValue({ data: null, isLoading: false } as ReturnType<typeof useQuery>);
     render(<DashboardContent scopeLabel="All Accounts" />);

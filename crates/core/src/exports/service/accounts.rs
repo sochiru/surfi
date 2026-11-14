@@ -135,7 +135,7 @@ impl DataExportService {
                     record.set("cashBalanceCurrency", row.cash_balance_currency.clone());
                     record.set(
                         "cashBalanceScope",
-                        serde_json::to_value(&row.cash_balance_scope).unwrap_or(Value::Null),
+                        serde_json::to_value(row.cash_balance_scope).unwrap_or(Value::Null),
                     );
                     record
                 } else {
