@@ -359,7 +359,7 @@ describe("AccountPage", () => {
       const queryKey = (options as { queryKey?: unknown[] })?.queryKey;
       if (Array.isArray(queryKey) && queryKey[0] === "holdings") {
         return {
-          data: [createCashHolding()],
+          data: { holdings: [createCashHolding()], incompleteAccounts: [] },
           isLoading: false,
           error: null,
         } as ReturnType<typeof useQuery>;
@@ -372,7 +372,10 @@ describe("AccountPage", () => {
       } as ReturnType<typeof useQuery>;
     });
 
-    vi.mocked(getHoldingsList).mockResolvedValue([createCashHolding()]);
+    vi.mocked(getHoldingsList).mockResolvedValue({
+      holdings: [createCashHolding()],
+      incompleteAccounts: [],
+    });
   });
 
   it("displays live current account valuation instead of stale historical valuation", () => {
@@ -680,7 +683,6 @@ function createAccount(): Account {
     name: "Brokerage",
     accountType: AccountType.SECURITIES,
     group: "Investments",
-    balance: 0,
     currency: "USD",
     isDefault: false,
     isActive: true,
