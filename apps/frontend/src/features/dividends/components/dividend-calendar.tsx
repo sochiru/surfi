@@ -170,7 +170,7 @@ function SeasonalityStrip({
             {entry.quiet ? (
               <Badge
                 variant="warning-subtle"
-                className="h-auto w-full max-w-full shrink px-1 py-0 text-center text-[10px] leading-tight font-normal whitespace-normal"
+                className="text-2xs h-auto w-full max-w-full shrink px-1 py-0 text-center leading-tight font-normal whitespace-normal"
               >
                 <span className="lg:hidden">
                   {entry.yearsWithIncome}/{entry.years}
