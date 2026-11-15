@@ -3,6 +3,7 @@ import { addMonths, format, isSameMonth, parseISO, startOfMonth, subMonths } fro
 import type { DayProps } from "react-day-picker";
 import {
   AmountDisplay,
+  Badge,
   Button,
   Calendar,
   Card,
@@ -10,6 +11,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  PrivacyAmount,
   Skeleton,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -24,13 +26,22 @@ import {
 } from "@wealthfolio/ui/components/ui/sheet";
 import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
 import type { DividendCalendarEvent } from "@/adapters";
+import { TickerAvatar } from "@/components/ticker-avatar";
 import { useIsMobileViewport } from "@/hooks";
 import { cn } from "@/lib/utils";
+import { nextMonthOccurrence } from "../lib/dividend-calendar";
+import type { DividendRhythm, UpcomingDividendRow } from "../lib/dividend-outlook";
+import { DividendSourceBadge } from "./dividend-year-outlook";
 
 interface Props {
   events: DividendCalendarEvent[];
+  upcoming: UpcomingDividendRow[];
+  rhythm: DividendRhythm | null;
+  currency: string;
   isLoading?: boolean;
 }
+
+const AGENDA_ROWS_SHOWN = 6;
 
 const KIND_STYLES: Record<DividendCalendarEvent["kind"], string> = {
   posted: "bg-success-subtle text-success-subtle-foreground",
@@ -118,7 +129,111 @@ function DayEvents({ events }: { events: DividendCalendarEvent[] }) {
   );
 }
 
-export function DividendCalendar({ events, isLoading }: Props) {
+function SeasonalityStrip({
+  rhythm,
+  selectedMonth,
+  onSelect,
+}: {
+  rhythm: DividendRhythm;
+  selectedMonth: number;
+  onSelect: (monthIndex: number) => void;
+}) {
+  return (
+    <div className="grid grid-cols-6 gap-1.5 lg:grid-cols-12">
+      {rhythm.months.map((entry, index) => {
+        const selected = index === selectedMonth;
+        return (
+          <button
+            key={entry.month}
+            type="button"
+            aria-pressed={selected}
+            aria-label={`${entry.label}, paid in ${entry.yearsWithIncome} of ${entry.years} years`}
+            onClick={() => onSelect(index)}
+            className={cn(
+              "flex min-w-0 flex-col items-center gap-1 rounded-md px-0.5 py-1.5 text-xs transition-colors",
+              selected ? "ring-ring ring-2 ring-inset" : "hover:bg-accent/40",
+              entry.quiet ? "bg-muted/50" : "bg-chart-1/10",
+            )}
+          >
+            <span className="font-medium">{entry.label}</span>
+            <span aria-hidden className="flex flex-wrap justify-center gap-0.5">
+              {Array.from({ length: entry.years }, (_, dot) => (
+                <span
+                  key={dot}
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    dot < entry.yearsWithIncome ? "bg-chart-1" : "bg-muted",
+                  )}
+                />
+              ))}
+            </span>
+            {entry.quiet ? (
+              <Badge
+                variant="warning-subtle"
+                className="text-2xs h-auto w-full max-w-full shrink px-1 py-0 text-center leading-tight font-normal whitespace-normal"
+              >
+                <span className="lg:hidden">
+                  {entry.yearsWithIncome}/{entry.years}
+                </span>
+                <span className="hidden lg:inline">
+                  Quiet · {entry.yearsWithIncome}/{entry.years} yrs
+                </span>
+              </Badge>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function UpcomingAgenda({
+  rows,
+  title,
+  currency,
+  moreLabel,
+}: {
+  rows: UpcomingDividendRow[];
+  title: string;
+  currency: string;
+  moreLabel: string | null;
+}) {
+  return (
+    <div className="mt-4 min-w-0 border-t pt-4 lg:mt-0 lg:border-0 lg:pt-0">
+      <div className="mb-2 text-sm font-medium">{title}</div>
+      {rows.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No payouts expected in the next 90 days.</p>
+      ) : (
+        <ul className="divide-border divide-y">
+          {rows.map((row) => (
+            <li key={row.id} className="flex items-center justify-between gap-3 py-2">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <TickerAvatar symbol={row.symbol} className="size-7 shrink-0" />
+                <div className="min-w-0 leading-tight">
+                  <p className="truncate text-sm font-semibold">
+                    <bdi>{row.symbol}</bdi>
+                  </p>
+                  <p className="text-muted-foreground truncate text-xs">
+                    {format(parseISO(row.date), "EEE, MMM d")} · <bdi>{row.accountName}</bdi>
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <span className="text-sm font-medium tabular-nums">
+                  <PrivacyAmount value={row.amount} currency={currency} />
+                </span>
+                <DividendSourceBadge source={row.source} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {moreLabel ? <p className="text-muted-foreground pt-2 text-xs">{moreLabel}</p> : null}
+    </div>
+  );
+}
+
+export function DividendCalendar({ events, upcoming, rhythm, currency, isLoading }: Props) {
   const isMobile = useIsMobileViewport();
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [didAutoJump, setDidAutoJump] = useState(false);
@@ -169,6 +284,13 @@ export function DividendCalendar({ events, isLoading }: Props) {
 
   const hasEarlier = monthsWithEvents.some((m) => m < format(month, "yyyy-MM"));
   const hasLater = monthsWithEvents.some((m) => m > format(month, "yyyy-MM"));
+  const visibleQuiet = rhythm?.months[month.getMonth()]?.quiet === true && monthEventCount === 0;
+  const monthKey = format(month, "yyyy-MM");
+  const monthUpcoming = upcoming.filter((row) => row.date.startsWith(monthKey));
+  const agendaShowsMonth = monthUpcoming.length > 0;
+  const agendaSource = agendaShowsMonth ? monthUpcoming : upcoming;
+  const agendaRows = agendaSource.slice(0, AGENDA_ROWS_SHOWN);
+  const agendaMore = agendaSource.length - agendaRows.length;
 
   const DayCell = useMemo(() => {
     return function DayCell({ day, modifiers, className, ...tdProps }: DayProps) {
@@ -286,11 +408,17 @@ export function DividendCalendar({ events, isLoading }: Props) {
                 ? `${monthEventCount} dividend event${monthEventCount === 1 ? "" : "s"} in ${format(month, "MMMM yyyy")}`
                 : `No dividend events in ${format(month, "MMMM yyyy")}`}
             </CardDescription>
+            {visibleQuiet ? (
+              <p className="text-muted-foreground text-xs">
+                Usually quiet. A monthly or quarterly payer would fill this gap.
+              </p>
+            ) : null}
           </div>
-          <div className="grid w-full grid-cols-5 gap-1 sm:flex sm:w-auto sm:items-center">
+          <div className="grid w-full min-w-0 grid-cols-5 gap-1 sm:flex sm:w-auto sm:items-center">
             <Button
               variant="ghost"
               size="icon"
+              className="w-full sm:w-9"
               disabled={!hasEarlier}
               onClick={() => goToAdjacentEventMonth(-1)}
               aria-label="Jump to previous month with dividends"
@@ -300,17 +428,24 @@ export function DividendCalendar({ events, isLoading }: Props) {
             <Button
               variant="outline"
               size="icon"
+              className="w-full sm:w-9"
               onClick={() => setMonth((m) => subMonths(m, 1))}
               aria-label="Previous month"
             >
               <Icons.ChevronLeft className="size-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setMonth(startOfMonth(new Date()))}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full min-w-0 px-1 sm:w-auto sm:px-3"
+              onClick={() => setMonth(startOfMonth(new Date()))}
+            >
               Today
             </Button>
             <Button
               variant="outline"
               size="icon"
+              className="w-full sm:w-9"
               onClick={() => setMonth((m) => addMonths(m, 1))}
               aria-label="Next month"
             >
@@ -319,6 +454,7 @@ export function DividendCalendar({ events, isLoading }: Props) {
             <Button
               variant="ghost"
               size="icon"
+              className="w-full sm:w-9"
               disabled={!hasLater}
               onClick={() => goToAdjacentEventMonth(1)}
               aria-label="Jump to next month with dividends"
@@ -335,6 +471,13 @@ export function DividendCalendar({ events, isLoading }: Props) {
             </span>
           ))}
         </div>
+        {rhythm ? (
+          <SeasonalityStrip
+            rhythm={rhythm}
+            selectedMonth={month.getMonth()}
+            onSelect={(monthIndex) => setMonth(nextMonthOccurrence(monthIndex, new Date()))}
+          />
+        ) : null}
       </CardHeader>
       <CardContent className="px-2 sm:px-6">
         {isLoading ? (
@@ -345,28 +488,40 @@ export function DividendCalendar({ events, isLoading }: Props) {
             description="Enable dividend sync in Settings and make sure your market data providers return dividend events for your holdings."
           />
         ) : (
-          <Calendar
-            month={month}
-            onMonthChange={setMonth}
-            hideNavigation
-            showOutsideDays
-            className="w-full p-0"
-            classNames={{
-              root: "w-full",
-              months: "w-full min-w-0",
-              month: "flex w-full flex-col gap-2",
-              month_caption: "hidden",
-              month_grid: "w-full border-collapse",
-              weekdays: "flex w-full gap-0.5 sm:gap-1",
-              weekday:
-                "text-muted-foreground text-2xs min-w-0 flex-1 select-none py-1 text-center font-medium uppercase sm:text-xs sm:tracking-wide",
-              week: "flex w-full gap-0.5 sm:gap-1 [&:not(:first-child)]:mt-0.5 sm:[&:not(:first-child)]:mt-1",
-              day: "",
-              today: "",
-              outside: "",
-            }}
-            components={{ Day: DayCell }}
-          />
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-6">
+            <Calendar
+              month={month}
+              onMonthChange={setMonth}
+              hideNavigation
+              showOutsideDays
+              className="w-full min-w-0 p-0"
+              classNames={{
+                root: "w-full",
+                months: "w-full min-w-0",
+                month: "flex w-full flex-col gap-2",
+                month_caption: "hidden",
+                month_grid: "w-full border-collapse",
+                weekdays: "flex w-full gap-0.5 sm:gap-1",
+                weekday:
+                  "text-muted-foreground text-2xs min-w-0 flex-1 select-none py-1 text-center font-medium uppercase sm:text-xs sm:tracking-wide",
+                week: "flex w-full gap-0.5 sm:gap-1 [&:not(:first-child)]:mt-0.5 sm:[&:not(:first-child)]:mt-1",
+                day: "",
+                today: "",
+                outside: "",
+              }}
+              components={{ Day: DayCell }}
+            />
+            <UpcomingAgenda
+              rows={agendaRows}
+              title={agendaShowsMonth ? format(month, "MMMM yyyy") : "Next 90 days"}
+              currency={currency}
+              moreLabel={
+                agendaMore > 0
+                  ? `+${agendaMore} more${agendaShowsMonth ? "" : " in the next 90 days"}`
+                  : null
+              }
+            />
+          </div>
         )}
       </CardContent>
     </Card>

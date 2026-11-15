@@ -36,7 +36,7 @@ export function DividendAnnualChart({ rows, currency, isLoading }: Props) {
   }));
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader className="px-4 sm:px-6">
         <CardTitle className="text-lg">Income by year</CardTitle>
         <CardDescription>
@@ -55,6 +55,18 @@ export function DividendAnnualChart({ rows, currency, isLoading }: Props) {
         ) : (
           <ChartContainer config={chartConfig} className="aspect-auto h-60 w-full sm:h-64">
             <BarChart data={data} margin={{ top: 24, left: isMobile ? 0 : 8, right: 8, bottom: 0 }}>
+              <defs>
+                <pattern
+                  id="dividend-expected-hatch"
+                  patternUnits="userSpaceOnUse"
+                  width={6}
+                  height={6}
+                  patternTransform="rotate(45)"
+                >
+                  <rect width={6} height={6} fill="var(--chart-1)" fillOpacity={0.18} />
+                  <line x1={0} y1={0} x2={0} y2={6} stroke="var(--chart-1)" strokeWidth={2} />
+                </pattern>
+              </defs>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis
@@ -90,8 +102,7 @@ export function DividendAnnualChart({ rows, currency, isLoading }: Props) {
               <Bar
                 dataKey="expected"
                 stackId="year"
-                fill="var(--color-expected)"
-                fillOpacity={0.4}
+                fill="url(#dividend-expected-hatch)"
                 radius={[3, 3, 0, 0]}
               >
                 <LabelList
@@ -104,6 +115,25 @@ export function DividendAnnualChart({ rows, currency, isLoading }: Props) {
             </BarChart>
           </ChartContainer>
         )}
+        {rows.length > 0 && !isLoading ? (
+          <div className="text-muted-foreground mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden className="bg-chart-1 size-2 rounded-full" />
+              Received
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className="size-2 rounded-[2px]"
+                style={{
+                  backgroundImage:
+                    "repeating-linear-gradient(45deg, var(--chart-1) 0 1px, color-mix(in srgb, var(--chart-1) 25%, transparent) 1px 3px)",
+                }}
+              />
+              Expected
+            </span>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

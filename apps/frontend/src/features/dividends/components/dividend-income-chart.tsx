@@ -128,7 +128,7 @@ export function DividendIncomeChart({
         className={
           compact
             ? "flex flex-row items-start justify-between space-y-0 px-4 pb-2 sm:px-6"
-            : "flex flex-col gap-3 space-y-0 px-4 sm:flex-row sm:items-start sm:justify-between sm:px-6"
+            : "flex min-w-0 flex-col gap-3 space-y-0 px-4 sm:flex-row sm:items-start sm:justify-between sm:px-6"
         }
       >
         <div className="min-w-0 space-y-1">
@@ -152,7 +152,7 @@ export function DividendIncomeChart({
         </div>
         {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
         {!compact && onGroupByChange ? (
-          <div className="shrink-0" data-no-swipe-drag>
+          <div className="max-w-full shrink-0" data-no-swipe-drag>
             <AnimatedToggleGroup
               variant="secondary"
               size={isMobile ? "xs" : "sm"}

@@ -406,6 +406,113 @@ export function buildDividendPayers(
   return { rows, total, previous, topThreeShare };
 }
 
+export interface DividendSectorSlice {
+  id: string;
+  name: string;
+  amount: number;
+  /** Share of received income, from 0 to 1. */
+  share: number;
+  /** Taxonomy color, when the sector itself has one. */
+  color: string | null;
+}
+
+const UNCLASSIFIED_SECTOR_ID = "unclassified";
+
+/**
+ * Splits received dividend income across top-level sectors.
+ * A holding assigned to several sectors contributes to each by its weight.
+ * Income with no sector, or only a partial assignment, is Unclassified.
+ */
+export function buildDividendSectorIncome(
+  rows: Pick<DividendPayerRow, "symbol" | "received">[],
+  holdings: Holding[],
+): DividendSectorSlice[] {
+  const sectorsBySymbol = sectorWeightsBySymbol(holdings);
+  const totals = new Map<string, { name: string; amount: number; color: string | null }>();
+  let income = 0;
+
+  for (const row of rows) {
+    if (row.received <= 0) continue;
+    income += row.received;
+    const sectors = sectorsBySymbol.get(row.symbol.trim().toUpperCase()) ?? [];
+    const weightSum = sectors.reduce((sum, sector) => sum + sector.weight, 0);
+    const scale = weightSum > 100 ? 100 / weightSum : 1;
+    let assigned = 0;
+    for (const sector of sectors) {
+      const portion = row.received * ((sector.weight * scale) / 100);
+      if (portion <= 0) continue;
+      assigned += portion;
+      const current = totals.get(sector.id) ?? {
+        name: sector.name,
+        amount: 0,
+        color: sector.color,
+      };
+      current.amount += portion;
+      if (!current.color && sector.color) current.color = sector.color;
+      totals.set(sector.id, current);
+    }
+    const leftover = row.received - assigned;
+    if (leftover > 0.005) {
+      const current = totals.get(UNCLASSIFIED_SECTOR_ID) ?? {
+        name: "Unclassified",
+        amount: 0,
+        color: null,
+      };
+      current.amount += leftover;
+      totals.set(UNCLASSIFIED_SECTOR_ID, current);
+    }
+  }
+
+  if (income <= 0) return [];
+
+  return [...totals.entries()]
+    .map(([id, value]) => ({
+      id,
+      name: value.name,
+      amount: value.amount,
+      share: value.amount / income,
+      color: value.color,
+    }))
+    .filter((slice) => slice.amount > 0)
+    .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+}
+
+function sectorWeightsBySymbol(
+  holdings: Holding[],
+): Map<string, { id: string; name: string; weight: number; color: string | null }[]> {
+  const map = new Map<
+    string,
+    { id: string; name: string; weight: number; color: string | null }[]
+  >();
+  for (const holding of holdings) {
+    const symbol = holding.instrument?.symbol?.trim().toUpperCase();
+    if (!symbol) continue;
+    const sectors = holding.instrument?.classifications?.sectors ?? [];
+    const existing = map.get(symbol);
+    if (existing && existing.length > 0) continue;
+    if (sectors.length === 0) {
+      if (!existing) map.set(symbol, []);
+      continue;
+    }
+    const rolled = new Map<
+      string,
+      { id: string; name: string; weight: number; color: string | null }
+    >();
+    for (const entry of sectors) {
+      const id = entry.topLevelCategory?.id || entry.category.id;
+      const name = entry.topLevelCategory?.name || entry.category.name;
+      const isTopLevel = entry.category.id === id;
+      const color = isTopLevel && entry.category.color ? entry.category.color : null;
+      const current = rolled.get(id) ?? { id, name, weight: 0, color };
+      current.weight += entry.weight;
+      if (color) current.color = color;
+      rolled.set(id, current);
+    }
+    map.set(symbol, [...rolled.values()]);
+  }
+  return map;
+}
+
 export interface DividendMonthRhythm {
   month: number;
   label: string;
