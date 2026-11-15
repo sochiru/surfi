@@ -6,6 +6,7 @@ import {
   buildAnnualDividendIncome,
   buildDividendPayers,
   buildDividendRhythm,
+  buildDividendSectorIncome,
   buildDividendYearOutlook,
   countMissingDividendPayouts,
   previousDividendPeriod,
@@ -233,6 +234,97 @@ describe("buildDividendRhythm", () => {
 
   it("waits for two completed years", () => {
     expect(buildDividendRhythm([posted("a", "2025-01-15", 10)], fx, NOW)).toBeNull();
+  });
+});
+
+function classifiedHolding(
+  symbol: string,
+  sectors: { id: string; name: string; weight: number; topId?: string; topName?: string }[],
+): Holding {
+  return {
+    id: symbol,
+    holdingType: "security",
+    accountId: "acct",
+    quantity: 1,
+    localCurrency: "PHP",
+    baseCurrency: "PHP",
+    marketValue: { local: 0, base: 0 },
+    weight: null,
+    asOfDate: "2026-11-14",
+    instrument: {
+      id: symbol,
+      symbol,
+      currency: "PHP",
+      quoteMode: "MARKET",
+      classifications: {
+        assetClasses: [],
+        regions: [],
+        customGroups: [],
+        sectors: sectors.map((sector) => ({
+          weight: sector.weight,
+          topLevelCategory: { id: sector.topId ?? sector.id, name: sector.topName ?? sector.name },
+          category: {
+            id: sector.id,
+            taxonomyId: "industries_gics",
+            name: sector.name,
+            key: sector.id,
+            color: "#336699",
+            sortOrder: 0,
+            createdAt: "",
+            updatedAt: "",
+          },
+        })),
+      },
+    },
+  };
+}
+
+describe("buildDividendSectorIncome", () => {
+  it("rolls industry assignments up to the sector and weights the income", () => {
+    const slices = buildDividendSectorIncome(
+      [
+        { symbol: "CREIT", received: 70 },
+        { symbol: "AC", received: 30 },
+      ],
+      [
+        classifiedHolding("CREIT", [
+          { id: "reit", name: "REITs", weight: 100, topId: "real-estate", topName: "Real Estate" },
+        ]),
+        classifiedHolding("AC", [{ id: "financials", name: "Financials", weight: 100 }]),
+      ],
+    );
+
+    expect(slices.map((slice) => [slice.name, slice.share])).toEqual([
+      ["Real Estate", 0.7],
+      ["Financials", 0.3],
+    ]);
+    expect(slices[0]?.color).toBeNull();
+    expect(slices[1]?.color).toBe("#336699");
+  });
+
+  it("splits one holding across its sectors and leaves the rest unclassified", () => {
+    const slices = buildDividendSectorIncome(
+      [{ symbol: "ETF", received: 100 }],
+      [
+        classifiedHolding("ETF", [
+          { id: "real-estate", name: "Real Estate", weight: 60 },
+          { id: "financials", name: "Financials", weight: 25 },
+        ]),
+      ],
+    );
+
+    expect(slices.map((slice) => [slice.id, slice.amount])).toEqual([
+      ["real-estate", 60],
+      ["financials", 25],
+      ["unclassified", 15],
+    ]);
+  });
+
+  it("puts income with no sector classification in Unclassified", () => {
+    const slices = buildDividendSectorIncome([{ symbol: "AC", received: 40 }], []);
+    expect(slices).toEqual([
+      { id: "unclassified", name: "Unclassified", amount: 40, share: 1, color: null },
+    ]);
   });
 });
 

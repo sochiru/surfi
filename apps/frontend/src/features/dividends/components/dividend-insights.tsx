@@ -16,13 +16,13 @@ import {
   buildAnnualDividendIncome,
   buildDividendPayers,
   buildDividendRhythm,
+  buildDividendSectorIncome,
   buildDividendYearOutlook,
   countMissingDividendPayouts,
 } from "../lib/dividend-outlook";
 import { DividendAnnualChart } from "./dividend-annual-chart";
 import { DividendCalendar } from "./dividend-calendar";
 import { DividendPayersTable } from "./dividend-payers-table";
-import { DividendRhythmCard } from "./dividend-rhythm";
 import { DividendYearOutlookCard } from "./dividend-year-outlook";
 import { useDividendFilters } from "../hooks/use-dividend-filters";
 import { useDividendSyncSettings, useSyncDividends } from "../hooks/use-dividend-sync";
@@ -139,6 +139,10 @@ export function DividendInsights({ accountFilter }: DividendInsightsProps) {
     () => buildDividendPayers(filteredEvents, dividendFx, bounds, new Date(), holdings ?? []),
     [filteredEvents, dividendFx, bounds, holdings],
   );
+  const sectors = useMemo(
+    () => buildDividendSectorIncome(payers.rows, holdings ?? []),
+    [payers.rows, holdings],
+  );
   const rhythm = useMemo(
     () => buildDividendRhythm(filteredEvents, dividendFx),
     [filteredEvents, dividendFx],
@@ -208,21 +212,28 @@ export function DividendInsights({ accountFilter }: DividendInsightsProps) {
         onGroupByChange={setGroupBy}
       />
 
-      <DividendYearOutlookCard
-        outlook={outlook}
-        currency={baseCurrency}
-        isLoading={totalsLoading}
-      />
-
-      <DividendAnnualChart rows={annual} currency={baseCurrency} isLoading={totalsLoading} />
-
-      <DividendRhythmCard rhythm={rhythm} isLoading={totalsLoading} />
-
-      <DividendPayersTable summary={payers} currency={baseCurrency} isLoading={totalsLoading} />
+      <div className="grid gap-3 sm:gap-6 lg:grid-cols-2">
+        <DividendYearOutlookCard
+          outlook={outlook}
+          currency={baseCurrency}
+          isLoading={totalsLoading}
+        />
+        <DividendAnnualChart rows={annual} currency={baseCurrency} isLoading={totalsLoading} />
+      </div>
 
       <DividendCalendar
         events={filteredEvents}
+        upcoming={outlook.next90Days}
+        rhythm={totalsLoading ? null : rhythm}
+        currency={baseCurrency}
         isLoading={calendarQuery.isLoading || calendarQuery.isFetching}
+      />
+
+      <DividendPayersTable
+        summary={payers}
+        sectors={sectors}
+        currency={baseCurrency}
+        isLoading={totalsLoading}
       />
     </div>
   );
